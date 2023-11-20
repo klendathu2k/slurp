@@ -137,6 +137,10 @@ def submit( rule, **kwargs ):
 
     # Build list of LFNs which match the input
     matching = matches( rule, kwargs )
+    if len(matching)==0:
+        print("Warning: no input files match the specifed rule.  Done.")
+        return result
+    
 
     job = rule.job.dict()
 
