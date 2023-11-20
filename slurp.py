@@ -49,7 +49,6 @@ class SPhnxCondorJob:
     accounting_group:      str = None
     accounting_group_user: str = None
 
-
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v }
 
@@ -123,18 +122,6 @@ class SPhnxMatch:
 
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v }
-
-def hasBeenProduced( name, lfn, build, tag, dst ):
-    """
-    This is a placeholder to examine the submissions DB to verify that
-    the job will not overwrite an existing job.
-    
-    name  = name of the DST production rule
-    lfn   = logical filename
-    build = software build
-    tag   = database tag    
-    """    
-    return False
 
 
 def submit( rule, **kwargs ):
@@ -221,6 +208,13 @@ def matches( rule, kwargs={} ):
         fc_cache[ rule.files ] = fc_result
         outputs = [ "%s_%s_%s-%08i-%04i.root"%(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
 
+    # Build dictionary of existing dsts
+    dsttype="%s_%s_%s"%(name,build,tag)
+    fc_check = list( fcc.execute("select filename,runnumber,segment from datasets where dsttype like '"+dsttype+"';").fetchall() )
+    exists = {}
+    for check in fc_check:
+        exists[ check[0] ] = ( check[1], check[2] )  # key=filename, value=(run,seg)
+    
 
     # Query the sched for all running jobs.  
     schedd = htcondor.Schedd()
@@ -230,18 +224,22 @@ def matches( rule, kwargs={} ):
         x = os.path.basename( q['Out'] )
         stdout[x]=( q['ClusterId'], q['ProcId'] )
 
-    #$$$ pprint.pprint(stdout)
-
     
     for ((lfn,run,seg),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
 
         x = dst.replace(".root",".stdout").rstrip()
         test=stdout.get( dst.replace(".root",".stdout"), None )
         if test:
-            print("Warning: %s is already being produced by %s.%s, skipping\n"%( dst, str(test[0]), (test[1]) ))
+            print("Warning: %s is already being produced by %s.%s, skipping."%( dst, str(test[0]), (test[1]) ))
             continue
 
-        if rule.resubmit or not hasBeenProduced( name, lfn, build, tag, dst ):
+        test=exists.get( dst, None )
+        if test and not rule.resubmit:
+            print("Warning: %s has already been produced, skipping."%dst)
+            continue
+            
+
+        if True:
             if verbose>10:
                 print (lfn, run, seg, dst, "\n");
 
