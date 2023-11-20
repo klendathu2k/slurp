@@ -140,7 +140,14 @@ def submit( rule, **kwargs ):
     if len(matching)==0:
         print("Warning: no input files match the specifed rule.  Done.")
         return result
-    
+
+    if kwargs.get('resubmit',False):
+        reply = "N"
+        while reply not in ['y','yes','Y','YES','Yes','n','N','no','No','NO']:
+            reply = "N"
+            reply = input("Warning: resubmit option may overwrite previous production.  Continue (y/N)?")
+        if reply in ['n','N','No','no','NO']:
+            return result
 
     job = rule.job.dict()
 
@@ -202,6 +209,7 @@ def matches( rule, kwargs={} ):
     buildarg  = kwargs.get('buildarg',  rule.buildarg)
     tag       = kwargs.get('tag',       rule.tag)
     script    = kwargs.get('script',    rule.script)
+    resubmit  = kwargs.get('resubmit',  rule.resubmit)
 
     outputs = []
 
@@ -238,10 +246,12 @@ def matches( rule, kwargs={} ):
             continue
 
         test=exists.get( dst, None )
-        if test and not rule.resubmit:
+        if test and not resubmit:
             print("Warning: %s has already been produced, skipping."%dst)
             continue
-            
+
+        if test and resubmit:
+            print("Warning: %s exists and will be overwritten"%dst)
 
         if True:
             if verbose>10:
