@@ -142,7 +142,7 @@ def submit( rule, **kwargs ):
         return result
 
     if kwargs.get('resubmit',False):
-        reply = "N"
+        reply = None
         while reply not in ['y','yes','Y','YES','Yes','n','N','no','No','NO']:
             reply = "N"
             reply = input("Warning: resubmit option may overwrite previous production.  Continue (y/N)?")
