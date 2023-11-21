@@ -147,6 +147,19 @@ def submit( rule, **kwargs ):
         print("Warning: no input files match the specifed rule.  Done.")
         return result
 
+    pprint.pprint(matching)
+
+    # Build "list" of paths which need to be created before submitting
+    mkpaths = {}
+    for m in matching:        
+        mkpaths[ m["condor"] ] = 1;
+        mkpaths[ m["stdout"] ] = 2;
+        mkpaths[ m["stderr"] ] = 3;
+
+    for (p,v) in mkpaths.items():
+        if not os.path.exists(p): os.mkdir( p )
+
+
     if kwargs.get('resubmit',False):
         reply = None
         while reply not in ['y','yes','Y','YES','Yes','n','N','no','No','NO']:
