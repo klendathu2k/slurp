@@ -274,10 +274,7 @@ def matches( rule, kwargs={} ):
                 build,
                 tag,
                 "4096MB",
-                "10GB",
-                stdout=".",
-                stderr=".",
-                condor="/tmp/slurp/rn%i"%(math.trunc(int(run)/100)*100)
+                "10GB"
                 ).dict()
 
             # Add / override with kwargs
