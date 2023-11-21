@@ -147,7 +147,6 @@ def submit( rule, **kwargs ):
         print("Warning: no input files match the specifed rule.  Done.")
         return result
 
-    pprint.pprint(matching)
 
     # Build "list" of paths which need to be created before submitting
     mkpaths = {}
