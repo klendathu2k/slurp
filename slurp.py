@@ -114,6 +114,12 @@ class SPhnxMatch:
         b = b.replace(".","")
         object.__setattr__(self, 'build', b)        
         
+        run = int(self.run)
+        sldir = "/tmp/slurp/%i"%( math.trunc(run/100)*100 )
+        if self.condor == None: object.__setattr__(self, 'condor', sldir )
+        sldir = "/sphenix/data/data02/sphnxpro/condorlogs/%i"%( math.trunc(run/100)*100 )            
+        if self.stdout == None: object.__setattr__(self, 'stdout', sldir )
+        if self.stderr == None: object.__setattr__(self, 'stderr', sldir )
 
 #    def __post_init__(self):
 #        if self.condor == None:
