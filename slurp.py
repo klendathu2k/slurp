@@ -156,7 +156,7 @@ def submit( rule, **kwargs ):
         mkpaths[ m["stderr"] ] = 3;
 
     for (p,v) in mkpaths.items():
-        if not os.path.exists(p): os.mkdirs( p )
+        if not os.path.exists(p): os.makedirs( p )
 
 
     if kwargs.get('resubmit',False):
