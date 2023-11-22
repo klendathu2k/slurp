@@ -45,7 +45,8 @@ class SPhnxCondorJob:
     request_cpus:          str = "1"
     request_memory:        str = "$(mem)"
     should_transfer_files: str = "YES"
-    output_destination:    str = "file:///sphenix/u/jwebb2/work/2023/slurp/output/"
+    output_destination:    str = "file://./output/"
+    #output_destination:    str = "file:////sphenix/data/data02/sphnxpro/condorlog/$$($(run)/100)00"
     when_to_transfer_output: str = "ON_EXIT_OR_EVICT"
     request_disk:          str = None    
     initialdir:            str = None
@@ -56,6 +57,9 @@ class SPhnxCondorJob:
 
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v }
+
+    def __post_init__(self):
+        pass
 
 @dataclass( frozen= __frozen__ )
 class SPhnxRule:
