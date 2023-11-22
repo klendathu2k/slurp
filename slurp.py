@@ -33,24 +33,26 @@ class SPhnxCondorJob:
     """
     universe:              str = "vanilla"
     executable:            str = "$(script)"    
-    arguments:             str = "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag)"
+    arguments:             str = "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
     batch_name:            str = "$(name)_$(build)_$(tag)"
-    output:                str = "$(stdout)/$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).stdout_$(ClusterId).$(ProcId)"
-    error:                 str = "$(stderr)/$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).stderr_$(ClusterId).$(ProcId)"
-    log:                   str = "$(condor)/$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).condor_$(ClusterId).$(ProcId)"
+    output:                str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).stdout_$(ClusterId).$(ProcId)"
+    error:                 str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).stderr_$(ClusterId).$(ProcId)"
+    log:                   str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).condor_$(ClusterId).$(ProcId)"
     periodichold: 	       str = "(NumJobStarts>=1 && JobStatus == 1)"
     priority:              str = "53"
     job_lease_duration:    str = "3600"
     requirements:          str = '(CPU_Type == "mdc2")\n';    
     request_cpus:          str = "1"
     request_memory:        str = "$(mem)"
+    should_transfer_files: str = "YES"
+    output_destination:    str = "file:///sphenix/u/jwebb2/work/2023/slurp/output/"
+    when_to_transfer_output: str = "ON_EXIT_OR_EVICT"
     request_disk:          str = None    
     initialdir:            str = None
     accounting_group:      str = None
     accounting_group_user: str = None
     transfer_output_files: str = None
     transfer_input_files:  str = None
-    should_transfer_files: str = None
 
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v }
