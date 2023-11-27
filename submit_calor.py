@@ -16,17 +16,19 @@ DST_CALOR_query = """
 select filename,runnumber,segment from datasets
    where dsttype = 'beam'
    and filename like 'beam-%'
-   and runnumber = 23053
+   and runnumber > 22000
    order by runnumber,segment
    limit 5
 """
 
 
 job=Job(
-    executable="/sphenix/u/jwebb2/work/2023/slurp/MDC2/submit/rawdata/caloreco/rundir/run_caloreco.sh",
-    initialdir="/sphenix/u/jwebb2/work/2023/slurp/MDC2/submit/rawdata/caloreco/rundir/"
-    output_destination="file:///sphenix/u/jwebb2/work/2023/slurp/output/",
-    transfer_output_files="$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).log,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).errlog"
+    executable            = "/sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/run_caloreco.sh",
+    initialdir            = "/sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/",
+    #output_destination:    str = "file:////sphenix/data/data02/sphnxpro/condorlog/$$($(run)/100)00"         
+    output_destination    = "file:///sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00",
+    transfer_output_files = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).log,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).errlog",
+    transfer_input_files  = "/sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/",
     )
 
 
