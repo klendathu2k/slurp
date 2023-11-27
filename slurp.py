@@ -37,7 +37,7 @@ class SPhnxCondorJob:
     batch_name:            str = "$(name)_$(build)_$(tag)"
     output:                str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).stdout_$(ClusterId).$(ProcId)"
     error:                 str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).stderr_$(ClusterId).$(ProcId)"
-    log:                   str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).condor_$(ClusterId).$(ProcId)"
+    log:                   str = "output/$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).condor_$(ClusterId).$(ProcId)"
     periodichold: 	       str = "(NumJobStarts>=1 && JobStatus == 1)"
     priority:              str = "53"
     job_lease_duration:    str = "3600"
@@ -82,7 +82,7 @@ class SPhnxRule:
         path_ = ""
         if self.job.initialdir:
             path_ = self.job.initialdir + "/"
-        assert( pathlib.Path( path_ + self.script ).exists() )
+        #assert( pathlib.Path( path_ + self.script ).exists() )
 
         object.__setattr__(self, 'buildarg', self.build)
         b = self.build
