@@ -284,6 +284,7 @@ def matches( rule, kwargs={} ):
             if verbose>10:
                 print (lfn, run, seg, dst, "\n");
 
+            
                 
             match = SPhnxMatch(
                 name,
@@ -292,11 +293,15 @@ def matches( rule, kwargs={} ):
                 dst,
                 str(run),
                 str(seg),
-                build,
+                buildarg,   # preserve the "." when building the match
                 tag,
                 "4096MB",
                 "10GB"
-                ).dict()
+                )
+
+            match = match.dict()
+
+            #pprint.pprint(match)
 
             # Add / override with kwargs
             for k,v in kwargs.items():
