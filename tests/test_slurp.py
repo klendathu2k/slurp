@@ -32,8 +32,6 @@ def test_define_condor_job():
                 request_memory="1024MB",
                 request_disk="1024MB" )
 
-                
-
     
 def test_simple_job_no_macros():
     job2 = Job( executable="tests/hello_world.sh",
