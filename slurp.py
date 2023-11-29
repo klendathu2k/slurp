@@ -10,8 +10,8 @@ import pathlib
 import pprint
 import math
 
-from dataclasses import dataclass, asdict
-from typing import Callable
+from dataclasses import dataclass, asdict, field
+
 
 verbose = 0
 
@@ -71,6 +71,8 @@ class SPhnxRule:
     job:               SPhnxCondorJob = SPhnxCondorJob()
     resubmit:          bool = False # Set true if job should overwrite existing job
     buildarg:          str  = ""    # The build tag passed as an argument (leaves the "." in place).
+    payload:  str = "";      # Payload directory (condor transfers inputs from)
+    #manifest: list[str] = None;      # List of files in the payload directory
 
     def __eq__(self, that ):
         return self.name == that.name
@@ -93,25 +95,29 @@ class SPhnxRule:
         __rules__.append(self)
 
     def dict(self):
-        return { k: str(v) for k, v in asdict(self).items() if v }        
+        return { k: str(v) for k, v in asdict(self).items() if v is not None }        
         
 
 @dataclass( frozen = __frozen__ )
 class SPhnxMatch:
-    name:   str = None;      # Name of the matching rule
-    script: str = None;      # The run script
-    lfn:    str = None;      # Logical filename that matches
-    dst:    str = None;      # Transformed output
-    run:    str = None;      # Run #
-    seg:    str = None;      # Seg #
-    build:  str = None;      # Build
-    tag:    str = None;      # DB tag
-    mem:    str = None;      # Required memory
-    disk:   str = None;      # Required disk space
-    stdout: str = None; 
-    stderr: str = None; 
-    condor: str = None;
+    name:     str = None;        # Name of the matching rule
+    script:   str = None;        # The run script
+    lfn:      str = None;        # Logical filename that matches
+    dst:      str = None;        # Transformed output
+    run:      str = None;        # Run #
+    seg:      str = None;        # Seg #
+    build:    str = None;        # Build
+    tag:      str = None;        # DB tag
+    mem:      str = None;        # Required memory
+    disk:     str = None;        # Required disk space
+    payload:  str = None;        # Payload directory (condor transfers inputs from)
+    #manifest: list[str] = field( default_factory=list );  # List of files in the payload directory
+    stdout:   str = None; 
+    stderr:   str = None; 
+    condor:   str = None;
     buildarg: str = None;
+
+    
 
     def __eq__( self, that ):
         return self.run==that.run and self.seg==that.seg
@@ -136,7 +142,7 @@ class SPhnxMatch:
 #            self.condor = "/tmp/slurp/%i"%( math.trunc(a/100)*100 )
 
     def dict(self):
-        return { k: str(v) for k, v in asdict(self).items() if v }
+        return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
 
 def submit( rule, **kwargs ):
@@ -176,9 +182,9 @@ def submit( rule, **kwargs ):
         if reply in ['n','N','No','no','NO']:
             return result
 
-    job = rule.job.dict()
+    jobd = rule.job.dict()
 
-    submit_job = htcondor.Submit( rule.job.dict() )
+    submit_job = htcondor.Submit( jobd )
     if verbose>0:
         print(submit_job)
         for m in matching:
@@ -189,7 +195,8 @@ def submit( rule, **kwargs ):
         if verbose==-10:
             print(submit_job)
         
-        schedd = htcondor.Schedd()        
+        schedd = htcondor.Schedd()    
+
         submit_result = schedd.submit(submit_job, itemdata=iter(matching))  # submit one job for each item in the itemdata
 
 
@@ -237,6 +244,8 @@ def matches( rule, kwargs={} ):
     tag       = kwargs.get('tag',       rule.tag)
     script    = kwargs.get('script',    rule.script)
     resubmit  = kwargs.get('resubmit',  rule.resubmit)
+    payload   = kwargs.get('payload',   rule.payload)
+    #manifest  = kwargs.get('manifest',  rule.manifest)
 
     outputs = []
 
@@ -296,7 +305,8 @@ def matches( rule, kwargs={} ):
                 buildarg,   # preserve the "." when building the match
                 tag,
                 "4096MB",
-                "10GB"
+                "10GB",
+                payload
                 )
 
             match = match.dict()
