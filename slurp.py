@@ -201,11 +201,16 @@ def submit( rule, **kwargs ):
 
     jobd = rule.job.dict()
 
+
+
+
     submit_job = htcondor.Submit( jobd )
     if verbose>0:
         print(submit_job)
         for m in matching:
             pprint.pprint(m)
+
+
 
     if dump==False:
 
@@ -214,6 +219,10 @@ def submit( rule, **kwargs ):
         
         schedd = htcondor.Schedd()    
 
+        # NEW: Iterate over all matches and insert a new row into the production table.  STATE="submitting"
+        #
+        # insert_production_status( matching, state="submitting" )
+        #
         submit_result = schedd.submit(submit_job, itemdata=iter(matching))  # submit one job for each item in the itemdata
 
         schedd.query(
@@ -222,7 +231,11 @@ def submit( rule, **kwargs ):
             )
 
         result = submit_result.cluster()
-        
+
+        # NEW: Iterate over all matches and update the row in the production table.  STATE="submitted"
+        #
+        # update_production_status( matching, state="submitting" )
+        #        
 
     else:
         order=["script","name","nevents","run","seg","lfn","indir","dst","outdir","buildarg","tag","stdout","stderr","condor","mem"]           
@@ -356,21 +369,52 @@ def matches( rule, kwargs={} ):
 
     setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
 
+
+    # Replace the condor query with a query to the production table.  Production table has the name PROD_name_build_dbtag
+    # ... proddb_name = "%s_%s_%s"%(name,build,dbtag)
+
+    # Lookup the named table.  If it doesn't exist, create it.  
+
+    # prod_status = fetch_production_status ( setup, runmn, runmx )  # between run min and run max inclusive
+    # prod_status_map = {}
+    # for status in prod_status:
+    #     dstname = setup.name + _ + setup.build + _ + setup.dbtag + _ + status.run + _ + status.segment
+    #     prod_status_map[ dstname ] = status.state
+    
+
+    ##################################################################################################################################
+    #
     # Query the sched for all running jobs.  
+    #
     schedd = htcondor.Schedd()
     query  = schedd.query( projection=["Out","ClusterId","ProcId"] )
     stdout = {}
     for q in query:
         x = os.path.basename( q['Out'] )
         stdout[x]=( q['ClusterId'], q['ProcId'] )
+    #
+    ##################################################################################################################################
     
     for ((lfn,run,seg),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
 
+        #
+        # x = dst.replace(".root","")
+        # stat = prod_status_map.get( x, None )
+        # blocking = ["submitted","submitting","running","failed","evicted"]    # set of states which will block submission of a DS.
+        # if stat in blocking:
+        #    print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat )
+        #    continue
+        #
+
+        ##############################################################################################################################
+        #
         x = dst.replace(".root",".stdout").rstrip()
         test=stdout.get( dst.replace(".root",".stdout"), None )
         if test:
             print("Warning: %s is already being produced by %s.%s, skipping."%( dst, str(test[0]), (test[1]) ))
             continue
+        #
+        ##############################################################################################################################
 
         test=exists.get( dst, None )
         if test and not resubmit:
