@@ -162,11 +162,11 @@ def submit( rule, **kwargs ):
         del kwargs["dump"];
 
     # Build list of LFNs which match the input
-    matching = matches( rule, kwargs )
+    matching, setup = matches( rule, kwargs )
+
     if len(matching)==0:
         print("Warning: no input files match the specifed rule.  Done.")
         return result
-
 
     # Build "list" of paths which need to be created before submitting
     mkpaths = {}
@@ -187,6 +187,18 @@ def submit( rule, **kwargs ):
         if reply in ['n','N','No','no','NO']:
             return result
 
+
+    if not ( setup.is_clean and setup.is_current ):
+        print("Warning: the macros/scripts directory is not at the same commit as its github repo and/or")
+        print("         there are uncommitted local changes.")
+        
+        reply=None
+        while reply not in ['y','yes','Y','YES','Yes','n','N','no','No','NO']:
+            reply = "N"
+            reply = input("Continue (y/N)?")
+        if reply in ['n','N','No','no','NO']:
+            return result        
+
     jobd = rule.job.dict()
 
     submit_job = htcondor.Submit( jobd )
@@ -203,7 +215,6 @@ def submit( rule, **kwargs ):
         schedd = htcondor.Schedd()    
 
         submit_result = schedd.submit(submit_job, itemdata=iter(matching))  # submit one job for each item in the itemdata
-
 
         schedd.query(
             constraint=f"ClusterId == {submit_result.cluster()}",
@@ -230,6 +241,8 @@ def submit( rule, **kwargs ):
                     line.append( str(m[k]) )
                 line = ','.join(line)                
                 f.write(line+"\n")
+
+    print("result="+str(result))
 
 
     return result                
@@ -261,11 +274,11 @@ def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
         insert into production_setup(name,build,dbtag,repo,dir,hash)
                values('%s','%s','%s','%s','%s','%s');
         """%(name,build,dbtag,repo,dir_,hash_)
-        print ("Will perform the following insert...")
-        print( insert )
-        # TODO: 
-        #   fcc.execute( insert )
-        #   result = fetch_production_setup(name, build, dbtag, repo, dir_, hash_)
+        #print ("Will perform the following insert...")
+        #print( insert )
+        fcc.execute( insert )
+        fcc.commit()
+        result = fetch_production_setup(name, build, dbtag, repo, dir_, hash_)
 
     elif len(array)==1:
 
@@ -304,7 +317,8 @@ def matches( rule, kwargs={} ):
     """
     
     Apply rule... extract files from DB according to the specified query
-    and build the matches.
+    and build the matches.  Return list of matches.  Return the production
+    setup from the DB.
     
     """
     result = []
@@ -335,6 +349,13 @@ def matches( rule, kwargs={} ):
         exists[ check[0] ] = ( check[1], check[2] )  # key=filename, value=(run,seg)
     
 
+    # Get the production setup for this submission
+    repo_dir  = payload #'/'.join(payload.split('/')[1:]) 
+    repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
+    repo_url  = sh.git('config','--get','remote.origin.url',_cwd="MDC2/submit/rawdata/caloreco/rundir/").rstrip()
+
+    setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
+
     # Query the sched for all running jobs.  
     schedd = htcondor.Schedd()
     query  = schedd.query( projection=["Out","ClusterId","ProcId"] )
@@ -342,14 +363,6 @@ def matches( rule, kwargs={} ):
     for q in query:
         x = os.path.basename( q['Out'] )
         stdout[x]=( q['ClusterId'], q['ProcId'] )
-
-    # Get the production setup for this submission
-    repo_dir  = payload #'/'.join(payload.split('/')[1:]) 
-    repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
-    repo_url  = sh.git('config','--get','remote.origin.url',_cwd="MDC2/submit/rawdata/caloreco/rundir/").rstrip()
-    #                                    y     y         y    y     y         y
-    setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
-    pprint.pprint(setup)
     
     for ((lfn,run,seg),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
 
@@ -370,8 +383,6 @@ def matches( rule, kwargs={} ):
         if True:
             if verbose>10:
                 print (lfn, run, seg, dst, "\n");
-
-            
                 
             match = SPhnxMatch(
                 name,
@@ -389,15 +400,13 @@ def matches( rule, kwargs={} ):
 
             match = match.dict()
 
-            #pprint.pprint(match)
-
             # Add / override with kwargs
             for k,v in kwargs.items():
                 match[k]=str(v)              # coerce any ints to string
             
             result.append(match)
 
-    return result
+    return result, setup
 
 
 
