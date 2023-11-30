@@ -9,6 +9,9 @@ import os
 import pathlib
 import pprint
 import math
+import sh
+
+from slurptables import SPhnxProductionSetup
 
 from dataclasses import dataclass, asdict, field
 
@@ -19,6 +22,8 @@ __frozen__ = True
 __rules__  = []
 
 # File Catalog (and file catalog cursor)
+# TODO: exception handling... if we can't connect, retry at some randomized point in the future.
+# ... and set a limit on the number of retries before we bomb out ...
 fc = pyodbc.connect("DSN=FileCatalog")
 fcc = fc.cursor()
 
@@ -229,6 +234,72 @@ def submit( rule, **kwargs ):
 
     return result                
 
+def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
+    """
+    Fetches the production setup from the database for the given (name,build,dbtag,hash).
+    If it doesn't exist in the DB it is created.  Queries the git repository to verify 
+    that the local repo is clean and up to date with the remote.  Returns production setup
+    object.
+    """
+
+    result = None # SPhnxProductionSetup
+
+    query="""
+    select id,hash from production_setup 
+           where name='%s'  and 
+                 build='%s' and 
+                 dbtag='%s' and 
+                 hash='%s'
+                 limit 1;
+    """%( name, build, dbtag, hash_ )
+    
+    array = list( fcc.execute( query ).fetchall() )
+    assert( len(array)<2 )
+
+    if   len(array)==0:
+        insert="""
+        insert into production_setup(name,build,dbtag,repo,dir,hash)
+               values('%s','%s','%s','%s','%s','%s');
+        """%(name,build,dbtag,repo,dir_,hash_)
+        print ("Will perform the following insert...")
+        print( insert )
+        # TODO: 
+        #   fcc.execute( insert )
+        #   result = fetch_production_setup(name, build, dbtag, repo, dir_, hash_)
+
+    elif len(array)==1:
+
+
+        # Check to see if the payload has any local modifications
+        #print("Checking is directory is clean: ", dir_)
+        is_clean = len( sh.git("-c","color.status=no","status","-uno","--short",_cwd=dir_).strip().split('\n') ) == 0;
+
+        # git show origin/main --format=%h -s
+        remote_hash = sh.git("show","origin/main","--format=%h","-s").strip()
+        is_current = (hash_ == remote_hash)
+
+        id_ = int( array[0][0] )
+        old_hash = str( array[0][1] )
+        is_current = ( hash_ == old_hash and remote_hash == old_hash )
+
+        # We reach this point in the code under two conditions... 1) the production_setup
+        # was found in the DB, or 2) this is a recursive call after we just created
+        # the setup.  So...
+        #
+        # We can return the setup based on the ID provided in the DB.
+        # We can return a setup based on the arguments passed to the function b/c
+        # 1) If it did not exist in the DB already, it was just created
+        # 2) OR it exists... the repo and local directories do not matter... but if the hash
+        #    has changed it is a problem...  
+        # Should issue a warning before submitting in case clean or current is violated...
+        result=SPhnxProductionSetup( id_, name, build, dbtag, repo, dir_, hash_, is_clean, is_current )
+
+    return result
+
+        
+
+    
+
 def matches( rule, kwargs={} ):
     """
     
@@ -272,6 +343,13 @@ def matches( rule, kwargs={} ):
         x = os.path.basename( q['Out'] )
         stdout[x]=( q['ClusterId'], q['ProcId'] )
 
+    # Get the production setup for this submission
+    repo_dir  = payload #'/'.join(payload.split('/')[1:]) 
+    repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
+    repo_url  = sh.git('config','--get','remote.origin.url',_cwd="MDC2/submit/rawdata/caloreco/rundir/").rstrip()
+    #                                    y     y         y    y     y         y
+    setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
+    pprint.pprint(setup)
     
     for ((lfn,run,seg),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
 
