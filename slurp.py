@@ -170,11 +170,9 @@ def Xtable_exists( tablename ):
 def table_exists( tablename ):
     """
     """ 
-    print("table exists for tablename=%s"%tablename)
     result = False
     if fcc.tables( table=tablename.lower(), tableType='TABLE' ).fetchone():
         result = True
-    print(result)
     return result
 
 
@@ -196,9 +194,6 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
         else              : query = query + " where run>=%i and run<=%i;"%(runmn,runmx)
 
         dbresult = fcc.execute( query ).fetchall();
-
-        print("dbresult = ")
-        pprint.pprint( dbresult )
 
         # Transform the list of tuples from the db query to a list of prouction status dataclass objects
         result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
