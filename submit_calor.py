@@ -10,6 +10,9 @@ from slurp import submit
 
 import pprint
 
+# parse command line options
+slurp.parse_command_line()
+
 indir  = "/sphenix/lustre01/sphnxpro/commissioning/aligned_2Gprdf/"
 #outdir = "/sphenix/lustre01/sphnxpro/slurp/"
 outdir = "/sphenix/lustre01/sphnxpro/slurp/$$([$(run)/100])00"
@@ -42,7 +45,7 @@ DST_CALOR_rule = Rule( name              = "DST_CALOR_auau23",
                        payload           = "/sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/",
                        job               = job)
 
-submit(DST_CALOR_rule, nevents=100, indir=indir, outdir=outdir, dump=True, resubmit=True, condor=condor ) 
+submit(DST_CALOR_rule, nevents=100, indir=indir, outdir=outdir, dump=False, resubmit=True, condor=condor ) 
 
 
 #kw={ 'nevents':10, 'indir':indir, 'outdir':outdir, 'condor':condor, 'resubmit':True }
