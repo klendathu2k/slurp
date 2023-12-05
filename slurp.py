@@ -152,7 +152,7 @@ class SPhnxMatch:
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
 
-def table_exists( tablename ):
+def Xtable_exists( tablename ):
     """
     Returns true if the named table exists
     """    
@@ -166,6 +166,15 @@ def table_exists( tablename ):
     fcc.execute( "select exists ( select 1 from information_schema.tables where table_name='production_setup' )" ).fetchone()
 
     return result
+
+def table_exists( tablename ):
+    """
+    """ 
+    result = False
+    if fcc.tables( table=tablename, tableType='TABLE' ).fetchone():
+        result = True
+    return result
+
 
 
 def fetch_production_status( setup, runmn=0, runmx=-1 ):
