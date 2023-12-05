@@ -10,6 +10,7 @@ import pathlib
 import pprint
 import math
 import sh
+import argparse
 
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
@@ -17,6 +18,9 @@ from slurptables import sphnx_production_status_table_def
 
 from dataclasses import dataclass, asdict, field
 
+# List of states which block the job
+#blocking = ["submitted","started","running","evicted","failed","finished"]
+blocking = ["submitted","started","running","evicted","failed","finished"]
 
 verbose = 0
 
@@ -487,7 +491,6 @@ def matches( rule, kwargs={} ):
         x = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
 
-        blocking = ["submitted","started","running","evicted","failed","finished"]  # set of states which will block submission of a DS.
         if stat in blocking:
            print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat ))
            continue
@@ -541,6 +544,21 @@ def matches( rule, kwargs={} ):
 
 
 
+#__________________________________________________________________________________________________
+#
+def parse_command_line():
+    global blocking
+
+    parser = argparse.ArgumentParser()    
+    parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=blocking )
+
+    args = parser.parse_args()
+
+    if len(args.unblock):
+        print(args.unblock)
+        blocking = [ b for b in blocking if b not in args.unblock ]
+        print(blocking)
+        
 
         
         
