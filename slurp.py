@@ -189,11 +189,7 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
     # replace with "status_%s" % sphenix_dstname( setup.name, setup.build, setup.dbtag
     name = "STATUS_%s"% sphenix_dstname( setup.name, setup.build, setup.dbtag )
     
-    print("Looking for table with name "+name+"...")
-
-
     if table_exists( name ):
-        print("exists")
 
         query = "select * from %s"%name
         if ( runmn>runmx ): query = query + " where run>=%i;"            %(runmn)
@@ -209,7 +205,6 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
 
     else:
 
-        print("nada")
         create = sphnx_production_status_table_def( setup.name, setup.build, setup.dbtag )
         # replace with ???... down one level... sphenix_dstname( setup.name, setup.build, setup.dbtag )
 
@@ -470,15 +465,13 @@ def matches( rule, kwargs={} ):
     setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
     
     prod_status = fetch_production_status ( setup, 0, -1 )  # between run min and run max inclusive
-    print(prod_status)
 
-    print("prod status map")
     prod_status_map = {}
     for stat in prod_status:
         #name = "_".join( [setup.name,setup.build,setup.dbtag,str(stat.run),str(stat.segment) ] )
         # replace with sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
-        name = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
-        prod_status_map = { name : stat.status }
+        name = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        
+        prod_status_map[name] = stat.status
 
     pprint.pprint(prod_status_map)
 
