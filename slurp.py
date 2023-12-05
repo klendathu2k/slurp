@@ -170,9 +170,11 @@ def Xtable_exists( tablename ):
 def table_exists( tablename ):
     """
     """ 
+    print("table exists for tablename=%s"%tablename)
     result = False
-    if fcc.tables( table=tablename, tableType='TABLE' ).fetchone():
+    if fcc.tables( table=tablename.lower(), tableType='TABLE' ).fetchone():
         result = True
+    print(result)
     return result
 
 
@@ -185,10 +187,12 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
 
     #name = ("_".join( ["status", setup.name, setup.build, setup.dbtag ] )).replace(".","")   # eg DST_CALO_auau1_ana387_2023p003
     # replace with "status_%s" % sphenix_dstname( setup.name, setup.build, setup.dbtag
-    name = "status_%s"% sphenix_dstname( setup.name, setup.build, setup.dbtag )
+    name = "STATUS_%s"% sphenix_dstname( setup.name, setup.build, setup.dbtag )
+    
+    print("Looking for table with name "+name+"...")
+
 
     if table_exists( name ):
-
         print("exists")
 
         query = "select * from %s"%name
@@ -216,7 +220,7 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
 
     return result
 
-def insert_production_status( matching, setup, state ):
+def insert_production_status( matching, setup, condor, state ):
 
 # select * from status_dst_calor_auau23_ana387_2023p003;
 # id | run | segment | nsegments | inputs | prod_id | cluster | process | status | flags | exit_code 
@@ -311,23 +315,21 @@ def submit( rule, **kwargs ):
         if verbose==-10:
             print(submit_job)
         
-#$$$        schedd = htcondor.Schedd()    
+        schedd = htcondor.Schedd()    
 
-
-#$$$        submit_result = schedd.submit(submit_job, itemdata=iter(matching))  # submit one job for each item in the itemdata
-
-#$$$        schedd.query(
-#$$$            constraint=f"ClusterId == {submit_result.cluster()}",
-#$$$            projection=["ClusterId", "ProcId", "Out", "Args" ]
-#$$$            )
-
-#$$$        result = submit_result.cluster()
+#       submit_result = schedd.submit(submit_job, itemdata=iter(matching))  # submit one job for each item in the itemdata
+#
+#       schedd.query(
+#           constraint=f"ClusterId == {submit_result.cluster()}",
+#           projection=["ClusterId", "ProcId", "Out", "Args" ]
+#       )
+#
+#       result = submit_result.cluster()
+        result = None
 
         # NEW: Iterate over all matches and insert the row in the production table.  STATE="submitted"
         #
-        insert_production_status( matching, setup, state="submitted" )
-        #        
-
+        insert_production_status( matching, setup, result, state="submitted" )
 
     else:
         order=["script","name","nevents","run","seg","lfn","indir","dst","outdir","buildarg","tag","stdout","stderr","condor","mem"]           
@@ -466,9 +468,11 @@ def matches( rule, kwargs={} ):
     repo_url  = sh.git('config','--get','remote.origin.url',_cwd="MDC2/submit/rawdata/caloreco/rundir/").rstrip()
 
     setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
-
+    
     prod_status = fetch_production_status ( setup, 0, -1 )  # between run min and run max inclusive
+    print(prod_status)
 
+    print("prod status map")
     prod_status_map = {}
     for stat in prod_status:
         #name = "_".join( [setup.name,setup.build,setup.dbtag,str(stat.run),str(stat.segment) ] )
