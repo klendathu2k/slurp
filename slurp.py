@@ -473,8 +473,6 @@ def matches( rule, kwargs={} ):
         name = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        
         prod_status_map[name] = stat.status
 
-    pprint.pprint(prod_status_map)
-
     ##################################################################################################################################
     #
     # Query the sched for all running jobs.  
@@ -493,13 +491,12 @@ def matches( rule, kwargs={} ):
         
         x = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
-        print( x + "-->" + str(stat) )
 
-        # blocking = ["submitted","running","failed","evicted"]    # set of states which will block submission of a DS.
-        # if stat in blocking:
-        #    print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat )
-        #    continue
-        #
+        blocking = ["submitted","started","running","evicted","failed","finished"]  # set of states which will block submission of a DS.
+        if stat in blocking:
+           print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat ))
+           continue
+        
 
         ##############################################################################################################################
         #
