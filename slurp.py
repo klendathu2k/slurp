@@ -492,12 +492,12 @@ def matches( rule, kwargs={} ):
     #
     # Query the sched for all running jobs.  
     #
-    schedd = htcondor.Schedd()
-    query  = schedd.query( projection=["Out","ClusterId","ProcId"] )
-    stdout = {}
-    for q in query:
-        x = os.path.basename( q['Out'] )
-        stdout[x]=( q['ClusterId'], q['ProcId'] )
+    #schedd = htcondor.Schedd()
+    #query  = schedd.query( projection=["Out","ClusterId","ProcId"] )
+    #stdout = {}
+    #for q in query:
+    #    x = os.path.basename( q['Out'] )
+    #    stdout[x]=( q['ClusterId'], q['ProcId'] )
     #
     ##################################################################################################################################
     
@@ -514,11 +514,11 @@ def matches( rule, kwargs={} ):
 
         ##############################################################################################################################
         #
-        x = dst.replace(".root",".stdout").rstrip()
-        test=stdout.get( dst.replace(".root",".stdout"), None )
-        if test:
-            print("Warning: %s is already being produced by %s.%s, skipping."%( dst, str(test[0]), (test[1]) ))
-            continue
+        #x = dst.replace(".root",".stdout").rstrip()
+        #test=stdout.get( dst.replace(".root",".stdout"), None )
+        #if test:
+        #    print("Warning: %s is already being produced by %s.%s, skipping."%( dst, str(test[0]), (test[1]) ))
+        #    continue
         #
         ##############################################################################################################################
 
