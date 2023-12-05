@@ -572,10 +572,8 @@ def parse_command_line():
     parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=blocking )
     parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, action='store_true', 
                          help='Existing filecatalog entry does not block a job')
-
     args = parser.parse_args()
 
-    #if hasattr( args, 'unblock' ):
     if args.unblock:
         blocking = [ b for b in blocking if b not in args.unblock ]
 
