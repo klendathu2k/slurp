@@ -19,8 +19,8 @@ from slurptables import sphnx_production_status_table_def
 from dataclasses import dataclass, asdict, field
 
 # List of states which block the job
-#blocking = ["submitted","started","running","evicted","failed","finished"]
 blocking = ["submitted","started","running","evicted","failed","finished"]
+args = None
 
 verbose = 0
 
@@ -216,6 +216,17 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
 
 def insert_production_status( matching, setup, condor, state ):
 
+    condor_map = {}
+    for ad in condor:
+        clusterId = ad['ClusterId']
+        procId = ad['ProcId']
+        out    = ad['Out']
+        args   = ad['Args']
+        key    = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
+        condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'Args':args }
+
+    pprint.pprint(condor_map)
+
 # select * from status_dst_calor_auau23_ana387_2023p003;
 # id | run | segment | nsegments | inputs | prod_id | cluster | process | status | flags | exit_code 
 #----+-----+---------+-----------+--------+---------+---------+---------+--------+-------+-----------
@@ -228,9 +239,12 @@ def insert_production_status( matching, setup, condor, state ):
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
+
+        key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
+        
         prod_id = setup.id
-        cluster = 0
-        process = 0
+        cluster = condor_map[ key.lower() ][ 'ClusterId' ]
+        process = condor_map[ key.lower() ][ 'ProcId'    ]
         status  = state        
         insert="""
         insert into status_%s (run,segment,prod_id,cluster,process,status) values(%i,%i,%i,%i,%i,'%s');
@@ -252,6 +266,9 @@ def submit( rule, **kwargs ):
     dump = kwargs.get( "dump", False )
     if dump:
         del kwargs["dump"];
+
+    if args:
+        kwargs['resubmit'] = args.resubmit
 
     # Build list of LFNs which match the input
     matching, setup = matches( rule, kwargs )
@@ -293,7 +310,8 @@ def submit( rule, **kwargs ):
 
     jobd = rule.job.dict()
 
-
+    print("Job dict:")
+    pprint.pprint(jobd)
 
 
     submit_job = htcondor.Submit( jobd )
@@ -311,19 +329,18 @@ def submit( rule, **kwargs ):
         
         schedd = htcondor.Schedd()    
 
-#       submit_result = schedd.submit(submit_job, itemdata=iter(matching))  # submit one job for each item in the itemdata
-#
-#       schedd.query(
-#           constraint=f"ClusterId == {submit_result.cluster()}",
-#           projection=["ClusterId", "ProcId", "Out", "Args" ]
-#       )
-#
-#       result = submit_result.cluster()
-        result = None
+        submit_result = schedd.submit(submit_job, itemdata=iter(matching))  # submit one job for each item in the itemdata
+ 
+        schedd_query = schedd.query(
+            constraint=f"ClusterId == {submit_result.cluster()}",
+            projection=["ClusterId", "ProcId", "Out", "Args" ]
+        )
+ 
+        result = submit_result.cluster()
 
         # NEW: Iterate over all matches and insert the row in the production table.  STATE="submitted"
         #
-        insert_production_status( matching, setup, result, state="submitted" )
+        insert_production_status( matching, setup, schedd_query, state="submitted" )
 
     else:
         order=["script","name","nevents","run","seg","lfn","indir","dst","outdir","buildarg","tag","stdout","stderr","condor","mem"]           
@@ -449,7 +466,7 @@ def matches( rule, kwargs={} ):
         outputs = [ "%s_%s_%s-%08i-%04i.root"%(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
 
     # Build dictionary of existing dsts
-    dsttype="%s_%s_%s"%(name,build,tag)
+    dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
     fc_check = list( fcc.execute("select filename,runnumber,segment from datasets where dsttype like '"+dsttype+"';").fetchall() )
     exists = {}
     for check in fc_check:
@@ -467,10 +484,9 @@ def matches( rule, kwargs={} ):
 
     prod_status_map = {}
     for stat in prod_status:
-        #name = "_".join( [setup.name,setup.build,setup.dbtag,str(stat.run),str(stat.segment) ] )
         # replace with sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
-        name = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        
-        prod_status_map[name] = stat.status
+        file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        
+        prod_status_map[file_basename] = stat.status
 
     ##################################################################################################################################
     #
@@ -517,6 +533,8 @@ def matches( rule, kwargs={} ):
         if True:
             if verbose>10:
                 print (lfn, run, seg, dst, "\n");
+
+            print ("match name=" + name)
                 
             match = SPhnxMatch(
                 name,
@@ -548,16 +566,19 @@ def matches( rule, kwargs={} ):
 #
 def parse_command_line():
     global blocking
+    global args
 
     parser = argparse.ArgumentParser()    
     parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=blocking )
+    parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, action='store_true', 
+                         help='Existing filecatalog entry does not block a job')
 
     args = parser.parse_args()
 
-    if len(args.unblock):
-        print(args.unblock)
+    #if hasattr( args, 'unblock' ):
+    if args.unblock:
         blocking = [ b for b in blocking if b not in args.unblock ]
-        print(blocking)
+
         
 
         
