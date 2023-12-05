@@ -12,6 +12,8 @@ import math
 import sh
 
 from slurptables import SPhnxProductionSetup
+from slurptables import SPhnxProductionStatus
+from slurptables import sphnx_production_status_table_def
 
 from dataclasses import dataclass, asdict, field
 
@@ -150,6 +152,89 @@ class SPhnxMatch:
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
 
+def table_exists( tablename ):
+    """
+    Returns true if the named table exists
+    """    
+    query = """
+    select exists ( 
+         select 1 from information_schema.tables where table_name='%s'
+    );
+    """%tablename
+
+    result = bool( fcc.execute( query ).fetchone()[0] )
+    fcc.execute( "select exists ( select 1 from information_schema.tables where table_name='production_setup' )" ).fetchone()
+
+    return result
+
+
+def fetch_production_status( setup, runmn=0, runmx=-1 ):
+    """
+    Given a production setup, returns the production status table....
+    """
+    result = [] # of SPhnxProductionStatus
+
+    #name = ("_".join( ["status", setup.name, setup.build, setup.dbtag ] )).replace(".","")   # eg DST_CALO_auau1_ana387_2023p003
+    # replace with "status_%s" % sphenix_dstname( setup.name, setup.build, setup.dbtag
+    name = "status_%s"% sphenix_dstname( setup.name, setup.build, setup.dbtag )
+
+    if table_exists( name ):
+
+        print("exists")
+
+        query = "select * from %s"%name
+        if ( runmn>runmx ): query = query + " where run>=%i;"            %(runmn)
+        else              : query = query + " where run>=%i and run<=%i;"%(runmn,runmx)
+
+        dbresult = fcc.execute( query ).fetchall();
+
+        print("dbresult = ")
+        pprint.pprint( dbresult )
+
+        # Transform the list of tuples from the db query to a list of prouction status dataclass objects
+        result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
+
+    else:
+
+        print("nada")
+        create = sphnx_production_status_table_def( setup.name, setup.build, setup.dbtag )
+        # replace with ???... down one level... sphenix_dstname( setup.name, setup.build, setup.dbtag )
+
+
+        fcc.execute(create) # 
+        fcc.commit()
+        
+
+    return result
+
+def insert_production_status( matching, setup, state ):
+
+# select * from status_dst_calor_auau23_ana387_2023p003;
+# id | run | segment | nsegments | inputs | prod_id | cluster | process | status | flags | exit_code 
+#----+-----+---------+-----------+--------+---------+---------+---------+--------+-------+-----------
+
+    # This can take a little bit of time...  TBD...
+    #name = '_'.join( [ setup.name, setup.build.replace('.',''), setup.dbtag ] )
+    # replace with sphenix_dstname( setup.name, setup.build, setup.dbtag )
+    name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
+
+    for m in matching:
+        run     = int(m['run'])
+        segment = int(m['seg'])
+        prod_id = setup.id
+        cluster = 0
+        process = 0
+        status  = state        
+        insert="""
+        insert into status_%s (run,segment,prod_id,cluster,process,status) values(%i,%i,%i,%i,%i,'%s');
+        """%(     name, run,segment,prod_id,cluster,process,status )
+
+        fcc.execute(insert)
+        fcc.commit()
+
+        
+
+
 def submit( rule, **kwargs ):
 
     # Will return cluster ID
@@ -217,25 +302,23 @@ def submit( rule, **kwargs ):
         if verbose==-10:
             print(submit_job)
         
-        schedd = htcondor.Schedd()    
+#$$$        schedd = htcondor.Schedd()    
 
-        # NEW: Iterate over all matches and insert a new row into the production table.  STATE="submitting"
+
+#$$$        submit_result = schedd.submit(submit_job, itemdata=iter(matching))  # submit one job for each item in the itemdata
+
+#$$$        schedd.query(
+#$$$            constraint=f"ClusterId == {submit_result.cluster()}",
+#$$$            projection=["ClusterId", "ProcId", "Out", "Args" ]
+#$$$            )
+
+#$$$        result = submit_result.cluster()
+
+        # NEW: Iterate over all matches and insert the row in the production table.  STATE="submitted"
         #
-        # insert_production_status( matching, state="submitting" )
-        #
-        submit_result = schedd.submit(submit_job, itemdata=iter(matching))  # submit one job for each item in the itemdata
-
-        schedd.query(
-            constraint=f"ClusterId == {submit_result.cluster()}",
-            projection=["ClusterId", "ProcId", "Out", "Args" ]
-            )
-
-        result = submit_result.cluster()
-
-        # NEW: Iterate over all matches and update the row in the production table.  STATE="submitted"
-        #
-        # update_production_status( matching, state="submitting" )
+        insert_production_status( matching, setup, state="submitted" )
         #        
+
 
     else:
         order=["script","name","nevents","run","seg","lfn","indir","dst","outdir","buildarg","tag","stdout","stderr","condor","mem"]           
@@ -323,7 +406,13 @@ def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
     return result
 
         
+def sphenix_dstname( dsttype, build, dbtag ):
+    result = "%s_%s_%s"%( dsttype, build.replace(".",""), dbtag )
+    return result
 
+def sphenix_base_filename( dsttype, build, dbtag, run, segment ):
+    result = "%s-%08i-%04i" %( sphenix_dstname(dsttype, build, dbtag), run, segment )
+    return result
     
 
 def matches( rule, kwargs={} ):
@@ -369,18 +458,16 @@ def matches( rule, kwargs={} ):
 
     setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
 
+    prod_status = fetch_production_status ( setup, 0, -1 )  # between run min and run max inclusive
 
-    # Replace the condor query with a query to the production table.  Production table has the name PROD_name_build_dbtag
-    # ... proddb_name = "%s_%s_%s"%(name,build,dbtag)
+    prod_status_map = {}
+    for stat in prod_status:
+        #name = "_".join( [setup.name,setup.build,setup.dbtag,str(stat.run),str(stat.segment) ] )
+        # replace with sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
+        name = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
+        prod_status_map = { name : stat.status }
 
-    # Lookup the named table.  If it doesn't exist, create it.  
-
-    # prod_status = fetch_production_status ( setup, runmn, runmx )  # between run min and run max inclusive
-    # prod_status_map = {}
-    # for status in prod_status:
-    #     dstname = setup.name + _ + setup.build + _ + setup.dbtag + _ + status.run + _ + status.segment
-    #     prod_status_map[ dstname ] = status.state
-    
+    pprint.pprint(prod_status_map)
 
     ##################################################################################################################################
     #
@@ -397,10 +484,12 @@ def matches( rule, kwargs={} ):
     
     for ((lfn,run,seg),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
 
-        #
-        # x = dst.replace(".root","")
-        # stat = prod_status_map.get( x, None )
-        # blocking = ["submitted","submitting","running","failed","evicted"]    # set of states which will block submission of a DS.
+        
+        x = dst.replace(".root","").strip()
+        stat = prod_status_map.get( x, None )
+        print( x + "-->" + str(stat) )
+
+        # blocking = ["submitted","running","failed","evicted"]    # set of states which will block submission of a DS.
         # if stat in blocking:
         #    print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat )
         #    continue
