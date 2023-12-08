@@ -37,6 +37,29 @@ parser.add_argument( "-r","--run"    , dest="run"       , default=None,help="Set
 parser.add_argument( "-s","--segment", dest="segment"   , default=None,help="Sets the segment number for the update",required=True)
 parser.add_argument( "--timestamp"   , dest="timestamp" , default=str(datetime.datetime.utcnow()),help="Sets the timestamp, default is now (and highly recommended)" )
 
+
+def handler( signum, frame ):
+    from sh import uname
+    from sh import ls
+    from sh import pwd
+    from sh import du
+    signame = signal.Signals(signum).name
+    eprint(f'Signal handler caught {signame} ({signum})')
+    unm = uname("-a")
+    eprint(f'{unm}')
+    pwd_ = pwd()
+    eprint(f'{pwd_}')
+    ls_ = ls("-la")
+    eprint(f'{ls_}')
+    du_ = du("--human-readable","--total","--summarize",".")
+            
+# Setup signal handling
+signal.signal(signal.SIGINT,  handler)
+signal.signal(signal.SIGTERM, handler)
+#signal.signal(signal.SIGSTOP, handler)
+#signal.signal(signal.SIGKILL, handler)
+
+
 def subcommand(args=[], parent=subparsers):
     def decorator(func):
         parser = parent.add_parser(func.__name__, description=func.__doc__)
@@ -131,9 +154,9 @@ def failed(args):
     seg=args.segment
     code=args.exit
     query="""update %s 
-             set status='running',failed='%s',exit_code=%i
+             set status='failed',failed='%s',exit_code=%i
              where dstname=%s  run=%i and segment=%i
-    """%(tablename,dstname,timestamp,int(code),int(run),int(seg))
+    """%(tablename,timestamp,int(code),dstname,int(run),int(seg))
     if args.noupdate:
         print(query)
 
@@ -214,13 +237,6 @@ def execute(args):
     finished.func(finished)
 
 
-def handler( signum, frame ):
-    from sh import uname
-    signame = signal.Signals(signum).name
-    unm = uname("-a")
-    eprint(f'Signal handler caught {signame} ({signum})')
-    eprint(f'{unm}')
-    
 
 def main():
 
