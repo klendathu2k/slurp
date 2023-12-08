@@ -607,15 +607,16 @@ def matches( rule, kwargs={} ):
 
 #__________________________________________________________________________________________________
 #
+arg_parser = argparse.ArgumentParser()    
+arg_parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=blocking )
+arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, action='store_true', 
+                         help='Existing filecatalog entry does not block a job')
+
 def parse_command_line():
     global blocking
     global args
 
-    parser = argparse.ArgumentParser()    
-    parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=blocking )
-    parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, action='store_true', 
-                         help='Existing filecatalog entry does not block a job')
-    args = parser.parse_args()
+    args = arg_parser.parse_args()
 
     if args.unblock:
         blocking = [ b for b in blocking if b not in args.unblock ]

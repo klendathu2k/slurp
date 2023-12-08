@@ -8,7 +8,12 @@ from slurp import SPhnxCondorJob as Job
 from slurp import matches
 from slurp import submit
 
+from slurp import arg_parser
+
 import pprint
+
+# Extend the command line arguments
+arg_parser.add_argument( '-n', '--nevents', default=0, dest='nevents', help='Number of events to process.  0=all.')
 
 # parse command line options
 slurp.parse_command_line()
@@ -25,7 +30,7 @@ select filename,runnumber,segment from datasets
    and runnumber > 0
    and runnumber = 22026
    order by runnumber,segment
-   limit 10
+   limit 1000
 """
 
 job=Job(
@@ -45,7 +50,7 @@ DST_CALOR_rule = Rule( name              = "DST_CALOR_auau23",
                        payload           = "/sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/",
                        job               = job)
 
-submit(DST_CALOR_rule, nevents=10, indir=indir, outdir=outdir, dump=False, resubmit=True, condor=condor ) 
+submit(DST_CALOR_rule, nevents=1000, indir=indir, outdir=outdir, dump=False, resubmit=True, condor=condor ) 
 
 
 #kw={ 'nevents':10, 'indir':indir, 'outdir':outdir, 'condor':condor, 'resubmit':True }
