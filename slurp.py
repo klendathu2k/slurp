@@ -11,6 +11,7 @@ import pprint
 import math
 import sh
 import argparse
+import datetime
 
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
@@ -19,7 +20,7 @@ from slurptables import sphnx_production_status_table_def
 from dataclasses import dataclass, asdict, field
 
 # List of states which block the job
-blocking = ["submitted","started","running","evicted","failed","finished"]
+blocking = ["submitting","submitted","started","running","evicted","failed","finished"]
 args = None
 
 verbose = 0
@@ -214,6 +215,31 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
 
     return result
 
+def update_production_status( matching, setup, condor, state ):
+
+    name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
+
+    for m in matching:
+        run     = int(m['run'])
+        segment = int(m['seg'])
+
+        key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
+        
+        dsttype=setup.name
+        dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
+        dstfile=dstname+'-%08i-%04i'%(run,segment)
+
+        # 1s time resolution
+        timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
+
+        update=f"""
+        update  status_{name} 
+        set     status='{state}',{state}='{timestamp}'
+        where   dstname='{dstname}' and run={run} and segment={segment}
+        """
+        fcc.execute(update)
+        fcc.commit()
+
 def insert_production_status( matching, setup, condor, state ):
 
     condor_map = {}
@@ -225,7 +251,7 @@ def insert_production_status( matching, setup, condor, state ):
         key    = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'Args':args }
 
-    pprint.pprint(condor_map)
+    #pprint.pprint(condor_map)
 
 # select * from status_dst_calor_auau23_ana387_2023p003;
 # id | run | segment | nsegments | inputs | prod_id | cluster | process | status | flags | exit_code 
@@ -242,13 +268,29 @@ def insert_production_status( matching, setup, condor, state ):
 
         key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
         
+        dsttype=setup.name
+        dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
+        dstfile=dstname+'-%08i-%04i'%(run,segment)
+        
         prod_id = setup.id
         cluster = condor_map[ key.lower() ][ 'ClusterId' ]
         process = condor_map[ key.lower() ][ 'ProcId'    ]
         status  = state        
-        insert="""
-        insert into status_%s (run,segment,prod_id,cluster,process,status) values(%i,%i,%i,%i,%i,'%s');
-        """%(     name, run,segment,prod_id,cluster,process,status )
+#        insert="""
+#        insert into status_%s 
+#               (run,segment,prod_id,cluster,process,status) 
+#        values (%i,%i,%i,%i,%i,'%s');
+#        """%(     name, run,segment,prod_id,cluster,process,status )
+        timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
+
+
+        insert=f"""
+        insert into status_{name}
+               (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting )
+        values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'',{prod_id},{cluster},{process},'{status}', '{timestamp}' )
+        """
+
+        #print(insert)
 
         fcc.execute(insert)
         fcc.commit()
@@ -335,12 +377,13 @@ def submit( rule, **kwargs ):
             constraint=f"ClusterId == {submit_result.cluster()}",
             projection=["ClusterId", "ProcId", "Out", "Args" ]
         )
- 
+
+        insert_production_status( matching, setup, schedd_query, state="submitting" ) 
+
         result = submit_result.cluster()
 
-        # NEW: Iterate over all matches and insert the row in the production table.  STATE="submitted"
-        #
-        insert_production_status( matching, setup, schedd_query, state="submitted" )
+        update_production_status( matching, setup, schedd_query, state="submitted" )
+
 
     else:
         order=["script","name","nevents","run","seg","lfn","indir","dst","outdir","buildarg","tag","stdout","stderr","condor","mem"]           
@@ -433,7 +476,7 @@ def sphenix_dstname( dsttype, build, dbtag ):
     return result
 
 def sphenix_base_filename( dsttype, build, dbtag, run, segment ):
-    result = "%s-%08i-%04i" %( sphenix_dstname(dsttype, build, dbtag), run, segment )
+    result = "%s-%08i-%04i" %( sphenix_dstname(dsttype, build, dbtag), int(run), int(segment) )
     return result
     
 

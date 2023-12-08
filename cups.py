@@ -35,7 +35,8 @@ parser.add_argument( "-t","--table"  , dest="table"     , default="status_dst_ca
 parser.add_argument( "-d","--dstname", dest="dstname"   ,                                                   help="Set the DST name eg DST_CALO_auau1", required=True)
 parser.add_argument( "-r","--run"    , dest="run"       , default=None,help="Sets the run number for the update",required=True)
 parser.add_argument( "-s","--segment", dest="segment"   , default=None,help="Sets the segment number for the update",required=True)
-parser.add_argument( "--timestamp"   , dest="timestamp" , default=str(datetime.datetime.utcnow()),help="Sets the timestamp, default is now (and highly recommended)" )
+parser.add_argument( "--timestamp"   , dest="timestamp" , default=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  ),
+                     help="Sets the timestamp, default is now (and highly recommended)" )
 
 
 def handler( signum, frame ):
@@ -77,18 +78,21 @@ def submitting(args):
     """
     Executed by slurp when the jobs are being submitted to condor.
     """
-    tablename=args.tabl
+    tablename=args.table
     dstname=args.dstname
     timestamp=args.timestamp
-    run=args.run
-    seg=args.segment
-    query="""update %s 
-             set status='submitting',submitting='%s'
-             where dstname=%s  run=%i and segment=%i
-    """%(tablename,dstname,timestamp,int(run),int(seg))
+    run=int(args.run)
+    seg=int(args.segment)
+    update = f"""
+    update {tablename}
+    set status='submitting',submitting='{timestamp}'
+    where dstname='{dstname}' and run={run} and segment={seg}
+    """
     if args.noupdate:
-        print(query)
-
+        print(update)
+    else:
+        fcc.execute( update )
+        fcc.commit()
 @subcommand()
 def submitted(args):
     """
@@ -97,15 +101,18 @@ def submitted(args):
     tablename=args.table
     dstname=args.dstname
     timestamp=args.timestamp
-    run=args.run
-    seg=args.segment
-    query="""update %s 
-             set status='submitted',submitted='%s'
-             where dstname=%s  run=%i and segment=%i
-    """%(tablename,dstname,timestamp,int(run),int(seg))
+    run=int(args.run)
+    seg=int(args.segment)
+    update = f"""
+    update {tablename}
+    set status='submitted',submitted='{timestamp}'
+    where dstname='{dstname}' and run={run} and segment={seg}
+    """
     if args.noupdate:
-        print(query)
-
+        print(update)
+    else:
+        fcc.execute( update )
+        fcc.commit()
 
 @subcommand()
 def started(args):
@@ -115,14 +122,18 @@ def started(args):
     tablename=args.table
     dstname=args.dstname
     timestamp=args.timestamp
-    run=args.run
-    seg=args.segment
-    query="""update %s 
-             set status='started',started='%s'
-             where dstname=%s  run=%i and segment=%i
-    """%(tablename,dstname,timestamp,int(run),int(seg))
+    run=int(args.run)
+    seg=int(args.segment)
+    update = f"""
+    update {tablename}
+    set status='started',started='{timestamp}'
+    where dstname='{dstname}' and run={run} and segment={seg}
+    """
     if args.noupdate:
-        print(query)
+        print(update)
+    else:
+        fcc.execute( update )
+        fcc.commit()
 
 @subcommand()
 def running(args):
@@ -132,35 +143,41 @@ def running(args):
     tablename=args.table
     dstname=args.dstname
     timestamp=args.timestamp
-    run=args.run
-    seg=args.segment
-    query="""update %s 
-             set status='running',running='%s'
-             where dstname=%s  run=%i and segment=%i
-    """%(tablename,dstname,timestamp,int(run),int(seg))
-    if args.noupdate:
-        print(query)
-
-@subcommand([
-    argument("-e","--exit",help="Exit code of the payload macro",dest="exit",default=-1),
-])
-def failed(args):
+    run=int(args.run)
+    seg=int(args.segment)
+    update = f"""
+    update {tablename}
+    set status='running',running='{timestamp}'
+    where dstname='{dstname}' and run={run} and segment={seg}
     """
-    Executed by the user payload script when the job begins executing the payload macro.
-    """
-    tablename=args.table
-    dstname=args.dstname
-    timestamp=args.timestamp
-    run=args.run
-    seg=args.segment
-    code=args.exit
-    query="""update %s 
-             set status='failed',failed='%s',exit_code=%i
-             where dstname=%s  run=%i and segment=%i
-    """%(tablename,timestamp,int(code),dstname,int(run),int(seg))
     if args.noupdate:
-        print(query)
+        print(update)
+    else:
+        fcc.execute( update )
+        fcc.commit()
 
+#@subcommand([
+#    argument("-e","--exit",help="Exit code of the payload macro",dest="exit",default=-1),
+#])
+#def failed(args):
+#    """
+#    Executed by the user payload script when the job begins executing the payload macro.
+#    """
+#    tablename=args.table
+#    dstname=args.dstname
+#    timestamp=args.timestamp
+#    run=int(args.run)
+#    seg=int(args.segment)
+#    update = f"""
+#    update {tablename}
+#    set status='failed',finished='{timestamp}'
+#    where dstname='{dstname}' and run={run} and segment={seg}
+#    """
+#    if args.noupdate:
+#        print(update)
+#    else:
+#        fcc.execute( update )
+#        fcc.commit()
 
 @subcommand([
     argument("-e","--exit",help="Exit code of the payload macro",dest="exit",default=-1),
@@ -174,25 +191,24 @@ def finished(args):
     tablename=args.table
     dstname=args.dstname
     timestamp=args.timestamp
-    run=args.run
-    seg=args.segment
-    ec=args.exit
-    ns=args.nsegments    
-    state=finished
-    if int(ec)>0:
-        state=failed
-    if int(ec)<0:
-        ec=0
-    
-    query="""update %s 
-             set status='%s',%s='%s',exit_code=%i,nsegments=%i
-             where dstname=%s  run=%i and segment=%i
-    """%(tablename,state,state,timestamp,int(ec),int(ns),dstname,int(run),int(seg))
-
-
-
+    run=int(args.run)
+    seg=int(args.segment)
+    ec=int(args.exit)
+    ns=int(args.nsegments)
+    state='finished'
+    if ec>0:
+        state='failed'
+    update = f"""
+    update {tablename}
+    set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec}
+    where dstname='{dstname}' and run={run} and segment={seg}
+    """
     if args.noupdate:
-        print(query)
+        print(update)
+    else:
+        fcc.execute( update )
+        fcc.commit()
+
 
 
 @subcommand([

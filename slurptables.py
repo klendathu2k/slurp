@@ -70,26 +70,27 @@ CREATE TABLE if not exists STATUS_%s_%s_%s
        dstfile   varchar(64)     not null,   --          eg DST_CALO_auau1_ana387_2023p003-12345678-1234.root
        run       int             not null,   -- runnumber
        segment   int             not null,   -- segment number
-       nsegments int                     ,   -- number of produced segments
-       inputs    text                    ,   -- array of input files (possibly null)
+       nsegments int             not null,   -- number of produced segments
+       inputs    text            not null,   -- array of input files (possibly null)
        prod_id   int             not null,   -- production id
 
        cluster   int             not null,   -- condor cluster
        process   int             not null,   -- condor process
 
-       submitting timestamp      not null,   -- timestamp when job is being submitted
-       submitted  timestamp      not null,   -- timestamp when job is submitted
-       started    timestamp      not null,   -- job script has started
-       running    timestamp      not null,   -- payload macro is running
-       ended      timestamp      not null,   -- job has ended (      
-
        status     prodstate       not null,   -- status
+
+       submitting timestamp              ,   -- timestamp when job is being submitted
+       submitted  timestamp              ,   -- timestamp when job is submitted
+       started    timestamp              ,   -- job script has started
+       running    timestamp              ,   -- payload macro is running
+       ended      timestamp              ,   -- job has ended (see prodstate and/or exit code for details)      
+
        flags      int                     ,   -- flags
        exit_code  int                     ,   -- exit code of user script
 
        foreign key (prod_id) references PRODUCTION_SETUP (id) ,
 
-       primary key (run,segment,id)         
+       primary key (id,run,segment,prod_id)         
 
 );    
 """%(dsttype,build.replace(".",""),dbtag)
@@ -100,6 +101,9 @@ CREATE TABLE if not exists STATUS_%s_%s_%s
 @dataclass( frozen=True )
 class SPhnxProductionStatus:
     id:        int
+    dsttype:   str
+    dstname:   str
+    dstfile:   str
     run:       int
     segment:   int
     nsegments: int 
@@ -108,6 +112,11 @@ class SPhnxProductionStatus:
     cluster:   int
     process:   int
     status:    str
+    submitting: str
+    submitted: str
+    started: str
+    running: str
+    ended: str
     flags:     str 
     exit_code: int 
     
