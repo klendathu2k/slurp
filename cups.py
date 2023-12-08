@@ -5,27 +5,34 @@ Common User Production Script
 """
 
 import pyodbc
-import sh
 import argparse
 import pprint
 import datetime
 import time
 import random
+import sh
+import sys
+import signal
 
 fc = pyodbc.connect("DSN=FileCatalog")
 fcc = fc.cursor()
 
-
 """
 cups.py -t tablename state  dstname run segment [-e exitcode -n nsegments]
 """
+
+# Little helper to print st8 to stderr
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 # https://mike.depalatis.net/blog/simplifying-argparse
 
 parser     = argparse.ArgumentParser(prog='cups')
 subparsers = parser.add_subparsers(dest="subcommand")
 
+parser.add_argument( "--no-update",    dest="noupdate"  , default=False, action="store_true", help="Does not update the DB table")
 parser.add_argument( "-t","--table"  , dest="table"     , default="status_dst_calor_auau23_ana387_2023p003",help="Sets the name of the production status table table")
+parser.add_argument( "-d","--dstname", dest="dstname"   ,                                                   help="Set the DST name eg DST_CALO_auau1", required=True)
 parser.add_argument( "-r","--run"    , dest="run"       , default=None,help="Sets the run number for the update",required=True)
 parser.add_argument( "-s","--segment", dest="segment"   , default=None,help="Sets the segment number for the update",required=True)
 parser.add_argument( "--timestamp"   , dest="timestamp" , default=str(datetime.datetime.utcnow()),help="Sets the timestamp, default is now (and highly recommended)" )
@@ -46,15 +53,17 @@ def submitting(args):
     """
     Executed by slurp when the jobs are being submitted to condor.
     """
-    tablename=args.table
+    tablename=args.tabl
+    dstname=args.dstname
     timestamp=args.timestamp
     run=args.run
     seg=args.segment
     query="""update %s 
-             set status='submitting',timestamp='%s'
-             where run=%i and segment=%i
-    """%(tablename,timestamp,int(run),int(seg))
-    print(query)
+             set status='submitting',submitting='%s'
+             where dstname=%s  run=%i and segment=%i
+    """%(tablename,dstname,timestamp,int(run),int(seg))
+    if args.noupdate:
+        print(query)
 
 @subcommand()
 def submitted(args):
@@ -62,14 +71,17 @@ def submitted(args):
     Executed by slurp when the jobs have been submitted to condor.
     """
     tablename=args.table
+    dstname=args.dstname
     timestamp=args.timestamp
     run=args.run
     seg=args.segment
     query="""update %s 
-             set status='submitted',timestamp='%s'
-             where run=%i and segment=%i
-    """%(tablename,timestamp,int(run),int(seg))
-    print(query)
+             set status='submitted',submitted='%s'
+             where dstname=%s  run=%i and segment=%i
+    """%(tablename,dstname,timestamp,int(run),int(seg))
+    if args.noupdate:
+        print(query)
+
 
 @subcommand()
 def started(args):
@@ -77,14 +89,16 @@ def started(args):
     Executed by the user payload script when the job is started
     """
     tablename=args.table
+    dstname=args.dstname
     timestamp=args.timestamp
     run=args.run
     seg=args.segment
     query="""update %s 
-             set status='started',timestamp='%s'
-             where run=%i and segment=%i
-    """%(tablename,timestamp,int(run),int(seg))
-    print(query)
+             set status='started',started='%s'
+             where dstname=%s  run=%i and segment=%i
+    """%(tablename,dstname,timestamp,int(run),int(seg))
+    if args.noupdate:
+        print(query)
 
 @subcommand()
 def running(args):
@@ -92,14 +106,36 @@ def running(args):
     Executed by the user payload script when the job begins executing the payload macro.
     """
     tablename=args.table
+    dstname=args.dstname
     timestamp=args.timestamp
     run=args.run
     seg=args.segment
     query="""update %s 
-             set status='running',timestamp='%s'
-             where run=%i and segment=%i
-    """%(tablename,timestamp,int(run),int(seg))
-    print(query)
+             set status='running',running='%s'
+             where dstname=%s  run=%i and segment=%i
+    """%(tablename,dstname,timestamp,int(run),int(seg))
+    if args.noupdate:
+        print(query)
+
+@subcommand([
+    argument("-e","--exit",help="Exit code of the payload macro",dest="exit",default=-1),
+])
+def failed(args):
+    """
+    Executed by the user payload script when the job begins executing the payload macro.
+    """
+    tablename=args.table
+    dstname=args.dstname
+    timestamp=args.timestamp
+    run=args.run
+    seg=args.segment
+    code=args.exit
+    query="""update %s 
+             set status='running',failed='%s',exit_code=%i
+             where dstname=%s  run=%i and segment=%i
+    """%(tablename,dstname,timestamp,int(code),int(run),int(seg))
+    if args.noupdate:
+        print(query)
 
 
 @subcommand([
@@ -112,6 +148,7 @@ def finished(args):
     If exit code is nonzer, state will be marked as failed.
     """
     tablename=args.table
+    dstname=args.dstname
     timestamp=args.timestamp
     run=args.run
     seg=args.segment
@@ -124,47 +161,65 @@ def finished(args):
         ec=0
     
     query="""update %s 
-             set status='%s',timestamp='%s',exit_code=%i,nsegments=%i
-             where run=%i and segment=%i
-    """%(tablename,state,timestamp,int(ec),int(ns),int(run),int(seg))
-    print(query)
+             set status='%s',%s='%s',exit_code=%i,nsegments=%i
+             where dstname=%s  run=%i and segment=%i
+    """%(tablename,state,state,timestamp,int(ec),int(ns),dstname,int(run),int(seg))
+
+
+
+    if args.noupdate:
+        print(query)
 
 
 @subcommand([
     argument( "script",       help="name of the script to exeute"),
     argument( "scriptargs",   help="arguments for the script", nargs="*" ),
+    argument( "--stdout", type=argparse.FileType(mode='a'), help="Open output file to redirect script stdout", default=sys.stdout, dest="stdout" ),
+    argument( "--stderr", type=argparse.FileType(mode='a'), help="Open output file to redirect script stderr", default=sys.stderr, dest="stderr" ),
 ])
 def execute(args):
     """
     Execute user script.  Exit code will be set to the exit status of the payload
     script, rather than the payload macro.
     """
-    
-    time.sleep( random.randint(1,10) )
+
+#   time.sleep( random.randint(1,10) )
+
 
     # We have to go through the parser to run these subcommands, and we don't want
     # to shell out... otherwise we make another DB connection
 
     # Flag job as started...
-    started = parser.parse_args( ["-r",args.run,"-s",args.segment,"started"] ); 
+    started = parser.parse_args( ["-d", args.dstname, "-r", args.run,"-s",args.segment,"started"] ); 
     started.func( started )
 
-    time.sleep( random.randint(1,10) )
-
     # And immediately drop into running
-    running = parser.parse_args( ["-r","12345","-s","6789","running"] );
+    running = parser.parse_args( ["-d", args.dstname, "-r", args.run, "-s", args.segment, "running"] );
     running.func(running)
 
-    time.sleep( random.randint(1,10) )
-
-    # Execute the user payload
-    print(args)
-
-    time.sleep( random.randint(1,10) )
-
-    # And finally handle the finished state
-    finished=parser.parse_args( ["-r","12345","-s","6789","finished","-e","0"] ); 
+    #
+    # Execute the user payload.  Exit 
+    #
+    exit_code = 0
+    cmd = sh.Command(args.script)    
+        
+    result = cmd( args.scriptargs, _out=args.stdout, _err=args.stderr, _ok_code=range(1,255) )
+    exit_code = result.exit_code
+        
+    state = "finished"
+    if exit_code>0: 
+        state = "failed"
+            
+    finished=parser.parse_args( ["-d", args.dstname, "-r", args.run, "-s", args.segment, state, "-e","%s"%result.exit_code ] ); 
     finished.func(finished)
+
+
+def handler( signum, frame ):
+    from sh import uname
+    signame = signal.Signals(signum).name
+    unm = uname("-a")
+    eprint(f'Signal handler caught {signame} ({signum})')
+    eprint(f'{unm}')
     
 
 def main():
@@ -175,12 +230,6 @@ def main():
         parser.print_help()
     else:
         args.func(args)        
-
-
-
-
-
-
 
 if __name__ == '__main__':
     main()
