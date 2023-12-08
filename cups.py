@@ -52,6 +52,7 @@ def handler( signum, frame ):
     ls_ = ls("-la")
     eprint(f'{ls_}')
     du_ = du("--human-readable","--total","--summarize",".")
+    eprint(f'{du_}')
             
 # Setup signal handling
 signal.signal(signal.SIGINT,  handler)
