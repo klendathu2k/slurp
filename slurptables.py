@@ -123,4 +123,5 @@ class SPhnxProductionStatus:
     ended: str
     flags:     str 
     exit_code: int 
+    nevents : int
     

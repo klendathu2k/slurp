@@ -275,6 +275,8 @@ def insert_production_status( matching, setup, condor, state ):
 
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
 
+        # Consider deleting the entry here...
+
         insert=f"""
         insert into production_status
                (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents )
