@@ -40,6 +40,8 @@ class SPhnxProductionSetup:
     repo:       str
     dir_:       str
     hash_:      str
+#   fromrun:    int
+#   lastrun:    int
     is_clean:   bool
     is_current: bool
 
@@ -50,6 +52,7 @@ def sphnx_production_status_table_state_enum_def():
     result = """
 CREATE TYPE prodstate as ENUM 
 (
+       'submitting',       -- job is being submitted (set by slurp)
        'submitted',        -- job is submitted (set by slurp)
        'started',          -- job has started on the worker node (set by cups)
        'running',          -- job is running (set by cups periodically)
@@ -60,9 +63,9 @@ CREATE TYPE prodstate as ENUM
     """
     return result
 
-def sphnx_production_status_table_def( dsttype, build, dbtag ):
+def sphnx_production_status_table_def( dsttype=None, build=None, dbtag=None ):
     result="""
-CREATE TABLE if not exists STATUS_%s_%s_%s 
+CREATE TABLE if not exists PRODUCTION_STATUS
 (
        id        serial          unique  ,   -- unique identifier
        dsttype   varchar(16)     not null,   -- dst type eg DST_CALO
@@ -88,13 +91,14 @@ CREATE TABLE if not exists STATUS_%s_%s_%s
        flags      int                     ,   -- flags
        exit_code  int                     ,   -- exit code of user script
 
+       nevents    int                     ,   -- number of events
+
        foreign key (prod_id) references PRODUCTION_SETUP (id) ,
 
        primary key (id,run,segment,prod_id)         
 
 );    
-"""%(dsttype,build.replace(".",""),dbtag)
-    print(result)
+"""   
     return result
 
 

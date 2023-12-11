@@ -188,7 +188,8 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
     """
     result = [] # of SPhnxProductionStatus
 
-    name = "STATUS_%s"% sphenix_dstname( setup.name, setup.build, setup.dbtag )
+    #name = "STATUS_%s"% sphenix_dstname( setup.name, setup.build, setup.dbtag )
+    name = "PRODUCTION_STATUS"
     
     if table_exists( name ):
 
@@ -231,7 +232,7 @@ def update_production_status( matching, setup, condor, state ):
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
 
         update=f"""
-        update  status_{name} 
+        update  production_status
         set     status='{state}',{state}='{timestamp}'
         where   dstname='{dstname}' and run={run} and segment={segment}
         """
@@ -275,9 +276,9 @@ def insert_production_status( matching, setup, condor, state ):
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
 
         insert=f"""
-        insert into status_{name}
-               (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting )
-        values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'',{prod_id},{cluster},{process},'{status}', '{timestamp}' )
+        insert into production_status
+               (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents )
+        values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0 )
         """
 
         fcc.execute(insert)
@@ -340,17 +341,11 @@ def submit( rule, **kwargs ):
 
     jobd = rule.job.dict()
 
-    print("Job dict:")
-    pprint.pprint(jobd)
-
-
     submit_job = htcondor.Submit( jobd )
     if verbose>0:
         print(submit_job)
         for m in matching:
             pprint.pprint(m)
-
-
 
     if dump==False:
 
@@ -390,9 +385,6 @@ def submit( rule, **kwargs ):
                     line.append( str(m[k]) )
                 line = ','.join(line)                
                 f.write(line+"\n")
-
-    print("result="+str(result))
-
 
     return result                
 
@@ -539,8 +531,6 @@ def matches( rule, kwargs={} ):
             if verbose>10:
                 print (lfn, run, seg, dst, "\n");
 
-            print ("match name=" + name)
-                
             match = SPhnxMatch(
                 name,
                 script,

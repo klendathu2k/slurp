@@ -31,7 +31,7 @@ parser     = argparse.ArgumentParser(prog='cups')
 subparsers = parser.add_subparsers(dest="subcommand")
 
 parser.add_argument( "--no-update",    dest="noupdate"  , default=False, action="store_true", help="Does not update the DB table")
-parser.add_argument( "-t","--table"  , dest="table"     , default="status_dst_calor_auau23_ana387_2023p003",help="Sets the name of the production status table table")
+parser.add_argument( "-t","--table"  , dest="table"     , default="production_status",help="Sets the name of the production status table table")
 parser.add_argument( "-d","--dstname", dest="dstname"   ,                                                   help="Set the DST name eg DST_CALO_auau1", required=True)
 parser.add_argument( "-r","--run"    , dest="run"       , default=None,help="Sets the run number for the update",required=True)
 parser.add_argument( "-s","--segment", dest="segment"   , default=None,help="Sets the segment number for the update",required=True)
