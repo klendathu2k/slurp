@@ -247,8 +247,6 @@ def execute(args):
     exit_code = result.exit_code
         
     state = "finished"
-    if exit_code>0: 
-        state = "failed"
             
     finished=parser.parse_args( ["-d", args.dstname, "-r", args.run, "-s", args.segment, state, "-e","%s"%result.exit_code ] ); 
     finished.func(finished)
