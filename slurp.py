@@ -188,8 +188,6 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
     """
     result = [] # of SPhnxProductionStatus
 
-    #name = ("_".join( ["status", setup.name, setup.build, setup.dbtag ] )).replace(".","")   # eg DST_CALO_auau1_ana387_2023p003
-    # replace with "status_%s" % sphenix_dstname( setup.name, setup.build, setup.dbtag
     name = "STATUS_%s"% sphenix_dstname( setup.name, setup.build, setup.dbtag )
     
     if table_exists( name ):
@@ -251,14 +249,11 @@ def insert_production_status( matching, setup, condor, state ):
         key    = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'Args':args }
 
-    #pprint.pprint(condor_map)
 
 # select * from status_dst_calor_auau23_ana387_2023p003;
 # id | run | segment | nsegments | inputs | prod_id | cluster | process | status | flags | exit_code 
 #----+-----+---------+-----------+--------+---------+---------+---------+--------+-------+-----------
 
-    # This can take a little bit of time...  TBD...
-    #name = '_'.join( [ setup.name, setup.build.replace('.',''), setup.dbtag ] )
     # replace with sphenix_dstname( setup.name, setup.build, setup.dbtag )
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
 
@@ -276,21 +271,14 @@ def insert_production_status( matching, setup, condor, state ):
         cluster = condor_map[ key.lower() ][ 'ClusterId' ]
         process = condor_map[ key.lower() ][ 'ProcId'    ]
         status  = state        
-#        insert="""
-#        insert into status_%s 
-#               (run,segment,prod_id,cluster,process,status) 
-#        values (%i,%i,%i,%i,%i,'%s');
-#        """%(     name, run,segment,prod_id,cluster,process,status )
-        timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
 
+        timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
 
         insert=f"""
         insert into status_{name}
                (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting )
         values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'',{prod_id},{cluster},{process},'{status}', '{timestamp}' )
         """
-
-        #print(insert)
 
         fcc.execute(insert)
         fcc.commit()
@@ -435,17 +423,16 @@ def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
         insert into production_setup(name,build,dbtag,repo,dir,hash)
                values('%s','%s','%s','%s','%s','%s');
         """%(name,build,dbtag,repo,dir_,hash_)
-        #print ("Will perform the following insert...")
-        #print( insert )
+
         fcc.execute( insert )
         fcc.commit()
+
         result = fetch_production_setup(name, build, dbtag, repo, dir_, hash_)
 
     elif len(array)==1:
 
 
         # Check to see if the payload has any local modifications
-        #print("Checking is directory is clean: ", dir_)
         is_clean = len( sh.git("-c","color.status=no","status","-uno","--short",_cwd=dir_).strip().split('\n') ) == 0;
 
         # git show origin/main --format=%h -s
@@ -497,7 +484,6 @@ def matches( rule, kwargs={} ):
     script    = kwargs.get('script',    rule.script)
     resubmit  = kwargs.get('resubmit',  rule.resubmit)
     payload   = kwargs.get('payload',   rule.payload)
-    #manifest  = kwargs.get('manifest',  rule.manifest)
 
     outputs = []
 
@@ -530,19 +516,6 @@ def matches( rule, kwargs={} ):
         # replace with sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
         file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        
         prod_status_map[file_basename] = stat.status
-
-    ##################################################################################################################################
-    #
-    # Query the sched for all running jobs.  
-    #
-    #schedd = htcondor.Schedd()
-    #query  = schedd.query( projection=["Out","ClusterId","ProcId"] )
-    #stdout = {}
-    #for q in query:
-    #    x = os.path.basename( q['Out'] )
-    #    stdout[x]=( q['ClusterId'], q['ProcId'] )
-    #
-    ##################################################################################################################################
     
     for ((lfn,run,seg),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
 
@@ -554,17 +527,6 @@ def matches( rule, kwargs={} ):
            print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat ))
            continue
         
-
-        ##############################################################################################################################
-        #
-        #x = dst.replace(".root",".stdout").rstrip()
-        #test=stdout.get( dst.replace(".root",".stdout"), None )
-        #if test:
-        #    print("Warning: %s is already being produced by %s.%s, skipping."%( dst, str(test[0]), (test[1]) ))
-        #    continue
-        #
-        ##############################################################################################################################
-
         test=exists.get( dst, None )
         if test and not resubmit:
             print("Warning: %s has already been produced, skipping."%dst)
