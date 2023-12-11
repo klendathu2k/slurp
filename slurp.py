@@ -85,6 +85,7 @@ class SPhnxRule:
     buildarg:          str  = ""    # The build tag passed as an argument (leaves the "." in place).
     payload:  str = "";      # Payload directory (condor transfers inputs from)
     #manifest: list[str] = None;      # List of files in the payload directory
+    limit:    int = 0 # maximum number of matches to return 0=all
 
     def __eq__(self, that ):
         return self.name == that.name
@@ -510,9 +511,9 @@ def matches( rule, kwargs={} ):
         # replace with sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
         file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        
         prod_status_map[file_basename] = stat.status
-    
-    for ((lfn,run,seg),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
 
+    # Build the list of matches    
+    for ((lfn,run,seg),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
         
         x = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
@@ -554,6 +555,14 @@ def matches( rule, kwargs={} ):
                 match[k]=str(v)              # coerce any ints to string
             
             result.append(match)
+
+            # Terminate the loop if we exceed the maximum number of matches
+            if rule.limit and len(result)>= rule.limit:
+                break
+
+
+                
+                
 
     return result, setup
 

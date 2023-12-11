@@ -15,6 +15,7 @@ import pprint
 # Extend the command line arguments
 arg_parser.add_argument( '-n', '--nevents', default=0, dest='nevents', help='Number of events to process.  0=all.', type=int)
 arg_parser.add_argument( '--rule', help="Submit against specified rule", default="DST_CALOR" )
+arg_parser.add_argument( '--limit', help="Maximum number of jobs to submit", default=0, type=int )
 
 # parse command line options
 args = slurp.parse_command_line()
@@ -50,7 +51,9 @@ if args.rule == "DST_CALOR":
                            build             = "ana.387",        
                            tag               = "2023p003",
                            payload           = "/sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/",
-                           job               = job)
+                           job               = job,
+                           limit             = args.limit
+    )
 
     submit(DST_CALOR_rule, nevents=args.nevents, indir=indir, outdir=outdir, dump=False, resubmit=True, condor=condor ) 
 
