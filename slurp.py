@@ -621,6 +621,8 @@ def parse_command_line():
     if args.unblock:
         blocking = [ b for b in blocking if b not in args.unblock ]
 
+    return args
+
         
 
         
