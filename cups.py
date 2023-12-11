@@ -129,6 +129,7 @@ def started(args):
     set status='started',started='{timestamp}'
     where dstname='{dstname}' and run={run} and segment={seg}
     """
+    print(update)
     if args.noupdate:
         print(update)
     else:
@@ -150,6 +151,7 @@ def running(args):
     set status='running',running='{timestamp}'
     where dstname='{dstname}' and run={run} and segment={seg}
     """
+    print(update)
     if args.noupdate:
         print(update)
     else:
@@ -181,7 +183,8 @@ def running(args):
 
 @subcommand([
     argument("-e","--exit",help="Exit code of the payload macro",dest="exit",default=-1),
-    argument("-n","--nsegments",help="Number of segments produced",dest="nsegments",default=1),
+    argument(     "--nsegments",help="Number of segments produced",dest="nsegments",default=1),
+    argument(     "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0)
 ])
 def finished(args):
     """
@@ -195,14 +198,16 @@ def finished(args):
     seg=int(args.segment)
     ec=int(args.exit)
     ns=int(args.nsegments)
+    ne=int(args.nevents)
     state='finished'
     if ec>0:
         state='failed'
     update = f"""
     update {tablename}
-    set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec}
+    set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
     where dstname='{dstname}' and run={run} and segment={seg}
     """
+    print(update)
     if args.noupdate:
         print(update)
     else:
