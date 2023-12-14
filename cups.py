@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 Common User Production Script
@@ -136,19 +136,23 @@ def started(args):
         fcc.execute( update )
         fcc.commit()
 
-@subcommand()
+@subcommand(
+    argument(     "--nsegments",help="Number of segments produced",dest="nsegments",default=1),
+)
 def running(args):
     """
     Executed by the user payload script when the job begins executing the payload macro.
+    May be used to update the number of produced segments.
     """
     tablename=args.table
     dstname=args.dstname
     timestamp=args.timestamp
     run=int(args.run)
     seg=int(args.segment)
+    nseg=int(args.nsegments)
     update = f"""
     update {tablename}
-    set status='running',running='{timestamp}'
+    set status='running',running='{timestamp}',nsegments={nsegments}
     where dstname='{dstname}' and run={run} and segment={seg}
     """
     print(update)
