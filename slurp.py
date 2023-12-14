@@ -183,31 +183,28 @@ def table_exists( tablename ):
 
 
 
-def fetch_production_status( setup, runmn=0, runmx=-1 ):
+def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
     """
     Given a production setup, returns the production status table....
     """
     result = [] # of SPhnxProductionStatus
 
-    #name = "STATUS_%s"% sphenix_dstname( setup.name, setup.build, setup.dbtag )
     name = "PRODUCTION_STATUS"
     
     if table_exists( name ):
 
-        query = "select * from %s"%name
-        if ( runmn>runmx ): query = query + " where run>=%i;"            %(runmn)
-        else              : query = query + " where run>=%i and run<=%i;"%(runmn,runmx)
+        query = f"select * from {name} where prod_id={setup.id}"
+        if ( runmn>runmx ): query = query + f" and run>={runmn};"
+        else              : query = query + f" and run>={runmn} and run<={runmx};"
 
         dbresult = fcc.execute( query ).fetchall();
 
         # Transform the list of tuples from the db query to a list of prouction status dataclass objects
         result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
 
-    else:
+    elif update==True:
 
         create = sphnx_production_status_table_def( setup.name, setup.build, setup.dbtag )
-        # replace with ???... down one level... sphenix_dstname( setup.name, setup.build, setup.dbtag )
-
 
         fcc.execute(create) # 
         fcc.commit()
@@ -245,10 +242,11 @@ def insert_production_status( matching, setup, condor, state ):
     condor_map = {}
     for ad in condor:
         clusterId = ad['ClusterId']
-        procId = ad['ProcId']
-        out    = ad['Out']
-        args   = ad['Args']
-        key    = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
+        procId    = ad['ProcId']
+        out       = ad['Out']
+        args      = ad['Args']
+        key       = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
+        
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'Args':args }
 
 
@@ -479,6 +477,7 @@ def matches( rule, kwargs={} ):
     script    = kwargs.get('script',    rule.script)
     resubmit  = kwargs.get('resubmit',  rule.resubmit)
     payload   = kwargs.get('payload',   rule.payload)
+    update    = kwargs.get('update',    True ) # update the DB
 
     outputs = []
 
@@ -504,7 +503,7 @@ def matches( rule, kwargs={} ):
 
     setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
     
-    prod_status = fetch_production_status ( setup, 0, -1 )  # between run min and run max inclusive
+    prod_status = fetch_production_status ( setup, 0, -1, update )  # between run min and run max inclusive
 
     prod_status_map = {}
     for stat in prod_status:
@@ -520,6 +519,7 @@ def matches( rule, kwargs={} ):
 
         if stat in blocking:
            print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat ))
+           pprint.pprint(prod_status_map)
            continue
         
         test=exists.get( dst, None )
@@ -558,11 +558,7 @@ def matches( rule, kwargs={} ):
 
             # Terminate the loop if we exceed the maximum number of matches
             if rule.limit and len(result)>= rule.limit:
-                break
-
-
-                
-                
+                break                                
 
     return result, setup
 
