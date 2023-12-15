@@ -93,8 +93,6 @@ elif args.rule == 'DST_EVENT':
     Xjob=Job(
         executable            = "/sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/hello_world.sh",
         arguments             =  script_cmd,
-        #executable            = "cups.py",
-        #arguments             = cups_cmd,
         output_destination    = f"{logdir}",
         #transfer_output_files = f"{logbase}.out,{logbase}.err",
         #transfer_output_files = "hello_world.sh",
@@ -107,11 +105,7 @@ elif args.rule == 'DST_EVENT':
     job=Job(
         executable            = "/sphenix/u/sphnxpro/slurp/eventcombine/run.csh",
         arguments             =  script_cmd,
-        #executable            = "cups.py",
-        #arguments             = cups_cmd,
         output_destination    = f"{logdir}",
-        #transfer_output_files = f"{logbase}.out,{logbase}.err",
-        #transfer_output_files = "hello_world.sh",
         transfer_input_files  =  "$(payload),cups.py,"+file_lists,
         output                = f'{logbase}.condor.stdout',
         error                 = f'{logbase}.condor.stderr',
