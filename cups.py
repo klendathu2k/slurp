@@ -91,6 +91,7 @@ def submitting(args):
     if args.noupdate:
         print(update)
     else:
+        print(update)
         fcc.execute( update )
         fcc.commit()
 @subcommand()
@@ -111,6 +112,7 @@ def submitted(args):
     if args.noupdate:
         print(update)
     else:
+        print(update)
         fcc.execute( update )
         fcc.commit()
 
@@ -133,12 +135,13 @@ def started(args):
     if args.noupdate:
         print(update)
     else:
+        print(update)
         fcc.execute( update )
         fcc.commit()
 
-@subcommand(
+@subcommand([
     argument(     "--nsegments",help="Number of segments produced",dest="nsegments",default=1),
-)
+])
 def running(args):
     """
     Executed by the user payload script when the job begins executing the payload macro.
@@ -149,7 +152,7 @@ def running(args):
     timestamp=args.timestamp
     run=int(args.run)
     seg=int(args.segment)
-    nseg=int(args.nsegments)
+    nsegments=int(args.nsegments)
     update = f"""
     update {tablename}
     set status='running',running='{timestamp}',nsegments={nsegments}
@@ -159,6 +162,7 @@ def running(args):
     if args.noupdate:
         print(update)
     else:
+        print(update)
         fcc.execute( update )
         fcc.commit()
 
@@ -215,6 +219,7 @@ def finished(args):
     if args.noupdate:
         print(update)
     else:
+        print(update)
         fcc.execute( update )
         fcc.commit()
 
