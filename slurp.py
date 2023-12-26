@@ -20,7 +20,8 @@ from slurptables import sphnx_production_status_table_def
 from dataclasses import dataclass, asdict, field
 
 # List of states which block the job
-blocking = ["submitting","submitted","started","running","evicted","failed","finished"]
+#blocking = ["submitting","submitted","started","running","evicted","failed","finished"]
+blocking = []
 args = None
 
 verbose = 0
@@ -212,6 +213,13 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
 
     return result
 
+def getLatestId( tablename, dstname, run, seg ):
+    query=f"""
+    select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
+    """
+    result = fcc.execute(query).fetchone()[0]
+    return result
+
 def update_production_status( matching, setup, condor, state ):
 
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
@@ -229,10 +237,12 @@ def update_production_status( matching, setup, condor, state ):
         # 1s time resolution
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
 
+        id_ = getLatestId( 'production_status', dstname, run, segment )
+
         update=f"""
         update  production_status
         set     status='{state}',{state}='{timestamp}'
-        where   dstname='{dstname}' and run={run} and segment={segment}
+        where   dstname='{dstname}' and run={run} and segment={segment} and id={id_}
         """
         fcc.execute(update)
         fcc.commit()
@@ -512,6 +522,7 @@ def matches( rule, kwargs={} ):
         prod_status_map[file_basename] = stat.status
 
     # Build the list of matches    
+    
     for ((lfn,run,seg),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
         
         x = dst.replace(".root","").strip()
@@ -519,7 +530,6 @@ def matches( rule, kwargs={} ):
 
         if stat in blocking:
            print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat ))
-           pprint.pprint(prod_status_map)
            continue
         
         test=exists.get( dst, None )
@@ -567,7 +577,7 @@ def matches( rule, kwargs={} ):
 #__________________________________________________________________________________________________
 #
 arg_parser = argparse.ArgumentParser()    
-arg_parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=blocking )
+arg_parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=["submitting","submitted","started","running","evicted","failed","finished"] )
 arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, action='store_true', 
                          help='Existing filecatalog entry does not block a job')
 
@@ -576,9 +586,10 @@ def parse_command_line():
     global args
 
     args = arg_parser.parse_args()
+    blocking_ = ["submitting","submitted","started","running","evicted","failed","finished"]
 
     if args.unblock:
-        blocking = [ b for b in blocking if b not in args.unblock ]
+        blocking = [ b for b in blocking_ if b not in args.unblock ]
 
     return args
 
