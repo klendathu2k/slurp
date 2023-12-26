@@ -73,6 +73,14 @@ def subcommand(args=[], parent=subparsers):
 def argument(*name_or_flags, **kwargs):
     return ([*name_or_flags], kwargs)
 
+def getLatestId( tablename, dstname, run, seg ):
+    query=f"""
+    select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
+    """
+    print(query)
+    result = fcc.execute(query).fetchone()[0]
+    return result
+
 @subcommand()
 def submitting(args):
     """
@@ -83,10 +91,11 @@ def submitting(args):
     timestamp=args.timestamp
     run=int(args.run)
     seg=int(args.segment)
+    id_ = getLatestId( tablename, dstname, run, seg )
     update = f"""
     update {tablename}
     set status='submitting',submitting='{timestamp}'
-    where dstname='{dstname}' and run={run} and segment={seg}
+    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
     if args.noupdate:
         print(update)
@@ -104,10 +113,11 @@ def submitted(args):
     timestamp=args.timestamp
     run=int(args.run)
     seg=int(args.segment)
+    id_ = getLatestId( tablename, dstname, run, seg )
     update = f"""
     update {tablename}
     set status='submitted',submitted='{timestamp}'
-    where dstname='{dstname}' and run={run} and segment={seg}
+    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
     if args.noupdate:
         print(update)
@@ -126,12 +136,12 @@ def started(args):
     timestamp=args.timestamp
     run=int(args.run)
     seg=int(args.segment)
+    id_ = getLatestId( tablename, dstname, run, seg )
     update = f"""
     update {tablename}
     set status='started',started='{timestamp}'
-    where dstname='{dstname}' and run={run} and segment={seg}
+    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
-    print(update)
     if args.noupdate:
         print(update)
     else:
@@ -153,12 +163,12 @@ def running(args):
     run=int(args.run)
     seg=int(args.segment)
     nsegments=int(args.nsegments)
+    id_ = getLatestId( tablename, dstname, run, seg )
     update = f"""
     update {tablename}
     set status='running',running='{timestamp}',nsegments={nsegments}
-    where dstname='{dstname}' and run={run} and segment={seg}
+    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
-    print(update)
     if args.noupdate:
         print(update)
     else:
@@ -204,6 +214,7 @@ def finished(args):
     timestamp=args.timestamp
     run=int(args.run)
     seg=int(args.segment)
+    id_ = getLatestId( tablename, dstname, run, seg )
     ec=int(args.exit)
     ns=int(args.nsegments)
     ne=int(args.nevents)
@@ -213,9 +224,8 @@ def finished(args):
     update = f"""
     update {tablename}
     set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
-    where dstname='{dstname}' and run={run} and segment={seg}
+    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
-    print(update)
     if args.noupdate:
         print(update)
     else:
