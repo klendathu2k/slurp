@@ -67,6 +67,7 @@ class SPhnxCondorJob:
     accounting_group_user: str = None
     transfer_output_files: str = None
     transfer_input_files:  str = None
+    user_job_wrapper:      str = None
 
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v }

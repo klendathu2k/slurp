@@ -90,23 +90,12 @@ elif args.rule == 'DST_EVENT':
     outbase = "$(name)_$(build)_$(tag)"
     script_cmd = f"$(nevents) {outbase} {logbase} {outdir} $(run) $(ClusterId) $(ProcId) $(build) $(tag)"
 
-    Xjob=Job(
-        executable            = "/sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/hello_world.sh",
-        arguments             =  script_cmd,
-        output_destination    = f"{logdir}",
-        #transfer_output_files = f"{logbase}.out,{logbase}.err",
-        #transfer_output_files = "hello_world.sh",
-        transfer_input_files  =  "$(payload),cups.py,"+file_lists,
-        output                = f'{logbase}.condor.stdout',
-        error                 = f'{logbase}.condor.stderr',
-        log                   = f'$(condor)/{logbase}.condor',
-    )
-
     job=Job(
-        executable            = "/sphenix/u/sphnxpro/slurp/eventcombine/run.csh",
+        executable            = "/sphenix/u/sphnxpro/slurp/eventcombine/run.sh",
+        user_job_wrapper      = "init.sh",
         arguments             =  script_cmd,
         output_destination    = f"{logdir}",
-        transfer_input_files  =  "$(payload),cups.py,"+file_lists,
+        transfer_input_files  =  "$(payload),cups.py,init.sh,"+file_lists,
         output                = f'{logbase}.condor.stdout',
         error                 = f'{logbase}.condor.stderr',
         log                   = f'$(condor)/{logbase}.condor',
@@ -115,7 +104,7 @@ elif args.rule == 'DST_EVENT':
     if args.submit:
         DST_EVENT_rule = Rule( name   = "DST_EVENT_auau23",
                                files  = DST_EVENT_query,
-                               script = "run.csh",
+                               script = "run.sh",
                                build  = "ana.393",
                                tag    = "2023p009",
                                payload = "/sphenix/u/sphnxpro/slurp/eventcombine/",
