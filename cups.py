@@ -103,6 +103,7 @@ def submitting(args):
         print(update)
         fcc.execute( update )
         fcc.commit()
+
 @subcommand()
 def submitted(args):
     """
@@ -176,28 +177,6 @@ def running(args):
         fcc.execute( update )
         fcc.commit()
 
-#@subcommand([
-#    argument("-e","--exit",help="Exit code of the payload macro",dest="exit",default=-1),
-#])
-#def failed(args):
-#    """
-#    Executed by the user payload script when the job begins executing the payload macro.
-#    """
-#    tablename=args.table
-#    dstname=args.dstname
-#    timestamp=args.timestamp
-#    run=int(args.run)
-#    seg=int(args.segment)
-#    update = f"""
-#    update {tablename}
-#    set status='failed',finished='{timestamp}'
-#    where dstname='{dstname}' and run={run} and segment={seg}
-#    """
-#    if args.noupdate:
-#        print(update)
-#    else:
-#        fcc.execute( update )
-#        fcc.commit()
 
 @subcommand([
     argument("-e","--exit",help="Exit code of the payload macro",dest="exit",default=-1),
@@ -233,6 +212,78 @@ def finished(args):
         fcc.execute( update )
         fcc.commit()
 
+# files
+# lfn | full_host_name | full_file_path | time | size | md5 
+# datasets
+# filename | runnumber | segment | size | dataset | dsttype | events 
+
+#parser.add_argument( "--ext", help="file extension, e.g. root, prdf, ...", default="prdf" )
+#parser.add_argument( "--path", help="path to output file", default="./" )
+
+@subcommand([
+    argument( "--replace",    help="remove and replace existing entries.", action="store_true", default=True ),
+    argument( "--no-replace", help="remove and replace existing entries.", action="store_false", dest="replace" ),
+    argument( "--ext", help="file extension, e.g. root, prdf, ...", default="prdf" ),
+    argument( "--path", help="path to output file", default="./" ),
+    argument( "--hostname", help="host name of the filesystem", default="lustre" ),
+    argument( "--dataset", help="sets the name of the dataset", default="mdc2" ),
+])
+def catalog(args):
+    """
+    Add the file to the file catalog
+    """
+    replace  = args.replace
+    tablename= args.table
+    dstname  = args.dstname
+    timestamp= args.timestamp
+    run      = int(args.run)
+    seg      = int(args.segment)
+    ext      = args.ext
+    host     = args.hostname
+
+    # n.b. not the slurp convention for dsttype
+    dsttype='_'.join( dstname.split('_')[-2:] )
+
+    filename = f"{dstname}-{run:08}-{seg:04}.{ext}"
+
+    #checkdataset= f"select size from datasets where filename={filename} and dataset='mdc2';"
+    
+    #print( f"select size,full_file_path from files where lfn='{filename}'" )
+    checkfile = fcc.execute( f"select size,full_file_path from files where lfn='{filename}';" ).fetchall()
+    if checkfile and replace:
+        print(f"delete from files where lfn='{filename}';")
+        pprint.pprint(checkfile)
+        
+
+    checkdataset = fcc.execute( f"select size from datasets where filename='{filename}' and dataset='mdc2';" ).fetchall()
+    if checkdataset and replace:
+        print(f"delete from datasets where  filename='{filename}' and dataset='mdc2';" )
+        pprint.pprint(checkdataset)
+
+    # Calculate md5 checksum
+    md5 = sh.md5sum( f"{args.path}/{filename}").split()[0]
+#stat --printf="%s"
+    sz  = int( sh.stat( '--printf=%s', f"{args.path}/{filename}" ) )
+
+    print( md5, sz )
+
+    # Insert into files
+    insert=f"""
+    insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
+    values ('{filename}','{host}','{args.path}/{filename}','now',{sz},'{md5}');
+    """
+    #fcc.execute(insert)
+    #fcc.commit()
+    print(insert)
+
+    events=0
+
+    # Insert into datasets
+    insert=f"""
+    insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
+    values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{events})
+    """
+    print(insert)
 
 
 @subcommand([
