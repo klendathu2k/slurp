@@ -182,7 +182,7 @@ def running(args):
         statusdbc.execute( update )
         statusdbc.commit()
 
-
+#_______________________________________________________________________________________________________
 @subcommand([
     argument("-e","--exit",help="Exit code of the payload macro",dest="exit",default=-1),
     argument(     "--nsegments",help="Number of segments produced",dest="nsegments",default=1),
@@ -208,6 +208,36 @@ def finished(args):
     update = f"""
     update {tablename}
     set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
+    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+    """
+    if args.noupdate:
+        print(update)
+    else:
+        print(update)
+        statusdbc.execute( update )
+        statusdbc.commit()
+
+#_______________________________________________________________________________________________________
+@subcommand([
+    argument("-e","--exit",help="Exit code of the payload macro",dest="exit",default=-1),
+])
+def exitcode(args):
+    """
+    Executed by the user payload script when the job finishes executing the payload macro.
+    If exit code is nonzer, state will be marked as failed.
+    """
+    tablename=args.table
+    dstname=args.dstname
+    run=int(args.run)
+    seg=int(args.segment)
+    id_ = getLatestId( tablename, dstname, run, seg )
+    ec=int(args.exit)
+    state='finished'
+    if ec>0:
+        state='failed'
+    update = f"""
+    update {tablename}
+    set status='{state}',exit_code={ec}
     where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
     if args.noupdate:
