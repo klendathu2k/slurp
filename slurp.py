@@ -20,11 +20,9 @@ from slurptables import sphnx_production_status_table_def
 from dataclasses import dataclass, asdict, field
 
 # List of states which block the job
-#blocking = ["submitting","submitted","started","running","evicted","failed","finished"]
-blocking = []
+blocking = ["submitting","submitted","started","running","evicted","failed","finished"]
+#blocking = []
 args = None
-
-verbose = 0
 
 __frozen__ = True
 __rules__  = []
@@ -38,6 +36,7 @@ fcc = fc.cursor()
 # FileCatalog Cache
 fc_cache = {}
 
+verbose=0
 
 @dataclass
 class SPhnxCondorJob:
@@ -330,7 +329,10 @@ def submit( rule, **kwargs ):
     for (p,v) in mkpaths.items():
         if not os.path.exists(p): os.makedirs( p )
 
-
+    #
+    # Resubmit is only a manual operation.  Existing files must be removed or the DB query adjusted to avoid
+    # stomping on previous output files.
+    #
     if kwargs.get('resubmit',False):
         reply = None
         while reply not in ['y','yes','Y','YES','Yes','n','N','no','No','NO']:
@@ -339,8 +341,11 @@ def submit( rule, **kwargs ):
         if reply in ['n','N','No','no','NO']:
             return result
 
-
-    if not ( setup.is_clean and setup.is_current ):
+    #
+    # An unclean setup is also cause for manual intervention.  It will hold up any data production.
+    #    (but we will allow override with the batch flag)
+    #
+    if not ( setup.is_clean and setup.is_current ) and not args.batch:
         print("Warning: the macros/scripts directory is not at the same commit as its github repo and/or")
         print("         there are uncommitted local changes.")
         
@@ -578,6 +583,7 @@ def matches( rule, kwargs={} ):
 #__________________________________________________________________________________________________
 #
 arg_parser = argparse.ArgumentParser()    
+arg_parser.add_argument( "--batch", default="False", action="store_true",help="Batch mode...")
 arg_parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=["submitting","submitted","started","running","evicted","failed","finished"] )
 arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, action='store_true', 
                          help='Existing filecatalog entry does not block a job')
@@ -587,10 +593,10 @@ def parse_command_line():
     global args
 
     args = arg_parser.parse_args()
-    blocking_ = ["submitting","submitted","started","running","evicted","failed","finished"]
+    #blocking_ = ["submitting","submitted","started","running","evicted","failed","finished"]
 
     if args.unblock:
-        blocking = [ b for b in blocking_ if b not in args.unblock ]
+        blocking = [ b for b in blocking if b not in args.unblock ]
 
     return args
 
