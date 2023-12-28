@@ -29,6 +29,43 @@ condor = logdir.replace("file://","")
 
 if args.rule == "DST_CALOR":
 
+#                      filename                       | runnumber | segment |    size     | dataset |     dsttype     | events 
+#-----------------------------------------------------+-----------+---------+-------------+---------+-----------------+--------
+# DST_EVENT_auau23_ana393_2023p009-00022026-0008.prdf |     22026 |       8 | 20986167296 | mdc2    | ana393_2023p009 |      0
+
+
+    DST_CALOR_query = """
+    select filename,runnumber,segment from datasets where
+        filename like 'DST_EVENT_auau23_ana393_2023p009-%'
+    and runnumber > 0
+    and runnumber = 22026
+    order by runnumber,segment
+    """
+
+    job=Job(
+        executable            = "/sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/run_caloreco.sh",
+        output_destination    = logdir,
+        transfer_output_files = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).out,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).err",
+        transfer_input_files  = "$(payload),cups.py",
+    )
+
+
+    # DST_CALOR rule
+    DST_CALOR_rule = Rule( name              = "DST_CALOR_auau23",
+                           files             = DST_CALOR_query,
+                           script            = "run_caloreco.sh",
+                           build             = "ana.387",        
+                           tag               = "2023p003",
+                           payload           = "/sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/",
+                           job               = job,
+                           limit             = args.limit
+    )
+
+    submit(DST_CALOR_rule, nevents=args.nevents, indir=indir, outdir=outdir, dump=False, resubmit=True, condor=condor ) 
+
+
+elif args.rule == "DST_CALOR.old":
+
     DST_CALOR_query = """
     select filename,runnumber,segment from datasets
     where dsttype = 'beam'
