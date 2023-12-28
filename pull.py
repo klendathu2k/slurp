@@ -71,5 +71,5 @@ cups([
     '--dstname',  f'{dstname}',     
     'finished',
     '-e', '-1',
-    '--nsegments', f'{count}'m
+    '--nsegments', f'{count}'
 ])
