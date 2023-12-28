@@ -36,6 +36,7 @@ if args.rule == "DST_CALOR":
     and runnumber > 0
     and runnumber = 22026
     order by runnumber,segment
+    limit 10
     """
 
     job=Job(
@@ -95,7 +96,7 @@ elif args.rule == 'DST_EVENT':
         user_job_wrapper      = "init.sh",
         arguments             =  script_cmd,
         output_destination    = f"{logdir}",
-        transfer_input_files  =  "$(payload),cups.py,init.sh,"+file_lists,
+        transfer_input_files  =  "$(payload),cups.py,init.sh,pull.py,"+file_lists,
         output                = f'{logbase}.condor.stdout',
         error                 = f'{logbase}.condor.stderr',
         log                   = f'$(condor)/{logbase}.condor',
