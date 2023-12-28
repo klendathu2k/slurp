@@ -14,8 +14,13 @@ import sh
 import sys
 import signal
 
-fc = pyodbc.connect("DSN=FileCatalog")
+# File catalog
+fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
 fcc = fc.cursor()
+
+# Production status ... TODO: refactor production_status table to use "ps" and "psc"... to support different DB's...
+statusdb = pyodbc.connect("DSN=FileCatalog")
+statusdbc = statusdb.cursor()
 
 """
 cups.py -t tablename state  dstname run segment [-e exitcode -n nsegments]
@@ -78,7 +83,7 @@ def getLatestId( tablename, dstname, run, seg ):
     select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
     """
     print(query)
-    result = fcc.execute(query).fetchone()[0]
+    result = statusdbc.execute(query).fetchone()[0]
     return result
 
 @subcommand()
@@ -101,8 +106,8 @@ def submitting(args):
         print(update)
     else:
         print(update)
-        fcc.execute( update )
-        fcc.commit()
+        statusdbc.execute( update )
+        statusdbc.commit()
 
 @subcommand()
 def submitted(args):
@@ -124,8 +129,8 @@ def submitted(args):
         print(update)
     else:
         print(update)
-        fcc.execute( update )
-        fcc.commit()
+        statusdbc.execute( update )
+        statusdbc.commit()
 
 @subcommand()
 def started(args):
@@ -147,8 +152,8 @@ def started(args):
         print(update)
     else:
         print(update)
-        fcc.execute( update )
-        fcc.commit()
+        statusdbc.execute( update )
+        statusdbc.commit()
 
 @subcommand([
     argument(     "--nsegments",help="Number of segments produced",dest="nsegments",default=1),
@@ -174,8 +179,8 @@ def running(args):
         print(update)
     else:
         print(update)
-        fcc.execute( update )
-        fcc.commit()
+        statusdbc.execute( update )
+        statusdbc.commit()
 
 
 @subcommand([
@@ -209,8 +214,8 @@ def finished(args):
         print(update)
     else:
         print(update)
-        fcc.execute( update )
-        fcc.commit()
+        statusdbc.execute( update )
+        statusdbc.commit()
 
 # files
 # lfn | full_host_name | full_file_path | time | size | md5 
@@ -223,9 +228,9 @@ def finished(args):
 @subcommand([
     argument( "--replace",    help="remove and replace existing entries.", action="store_true", default=True ),
     argument( "--no-replace", help="remove and replace existing entries.", action="store_false", dest="replace" ),
-    argument( "--ext", help="file extension, e.g. root, prdf, ...", default="prdf" ),
+    argument( "--ext", help="file extension, e.g. root, prdf, ...", default="prdf", choices=["root","prdf"] ),
     argument( "--path", help="path to output file", default="./" ),
-    argument( "--hostname", help="host name of the filesystem", default="lustre" ),
+    argument( "--hostname", help="host name of the filesystem", default="lustre", choices=["lustre","gpfs"] ),
     argument( "--dataset", help="sets the name of the dataset", default="mdc2" ),
 ])
 def catalog(args):
@@ -246,35 +251,28 @@ def catalog(args):
 
     filename = f"{dstname}-{run:08}-{seg:04}.{ext}"
 
-    #checkdataset= f"select size from datasets where filename={filename} and dataset='mdc2';"
-    
-    #print( f"select size,full_file_path from files where lfn='{filename}'" )
     checkfile = fcc.execute( f"select size,full_file_path from files where lfn='{filename}';" ).fetchall()
     if checkfile and replace:
-        print(f"delete from files where lfn='{filename}';")
-        pprint.pprint(checkfile)
+        fcc.execute(f"delete from files where lfn='{filename}';")
+        fcc.commit()
         
 
     checkdataset = fcc.execute( f"select size from datasets where filename='{filename}' and dataset='mdc2';" ).fetchall()
     if checkdataset and replace:
-        print(f"delete from datasets where  filename='{filename}' and dataset='mdc2';" )
-        pprint.pprint(checkdataset)
+        fcc.execute(f"delete from datasets where  filename='{filename}' and dataset='mdc2';" )
+        fcc.commit()
 
     # Calculate md5 checksum
     md5 = sh.md5sum( f"{args.path}/{filename}").split()[0]
-#stat --printf="%s"
     sz  = int( sh.stat( '--printf=%s', f"{args.path}/{filename}" ) )
-
-    print( md5, sz )
 
     # Insert into files
     insert=f"""
     insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
     values ('{filename}','{host}','{args.path}/{filename}','now',{sz},'{md5}');
     """
-    #fcc.execute(insert)
-    #fcc.commit()
-    print(insert)
+    fcc.execute(insert)
+    fcc.commit()
 
     events=0
 
@@ -283,7 +281,10 @@ def catalog(args):
     insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
     values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{events})
     """
-    print(insert)
+    fcc.execute(insert)
+    fcc.commit()
+
+
 
 
 @subcommand([
