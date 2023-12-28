@@ -14,6 +14,9 @@ hostname='lustre'
 pipeline = deque([])
 count = 0
 
+runnumber = 0
+dstname = ""
+
 for line in sys.stdin:
     if 'Fun4AllRolloverFileOutStream' in line:
         print( line.strip() )
@@ -34,10 +37,13 @@ for line in sys.stdin:
             #print(outfile)
             array=outfile.strip(".prdf").split('-')
             #print(array)            
-            dstname=array[0].split('/')[-1]
+            dstname=array[0].split('/')[-1]     
 
             runnumber=int(array[1])
             segment=int(array[2])
+
+
+
             #print( dstname, runnumber, segment )
 
             # ./cups.py -r 22026 -s 41 -d DST_EVENT_auau23_ana393_2023p009 catalog --ext prdf --path ... --dataset mdc2 --hostname lustre
@@ -57,3 +63,13 @@ for line in sys.stdin:
 
             time.sleep(120)
                 
+#./cups.py -r ${runnumber} -s 0 -d DST_EVENT_auau23_${build}_${dbtag} finished -e ${status_f4a} --nsegments ${count}
+
+cups([
+    '--run',      f'{runnumber}', 
+    '--segment',  '0',
+    '--dstname',  f'{dstname}',     
+    'finished',
+    '-e', '-1',
+    '--nsegments', f'{count}'m
+])
