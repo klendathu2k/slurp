@@ -270,6 +270,7 @@ def insert_production_status( matching, setup, condor, state ):
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
+        dstfileinput = m['lfn'].split('.')[0]
 
         key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
         
@@ -289,7 +290,7 @@ def insert_production_status( matching, setup, condor, state ):
         insert=f"""
         insert into production_status
                (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents )
-        values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0 )
+        values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0 )
         """
 
         fcc.execute(insert)
@@ -553,7 +554,7 @@ def matches( rule, kwargs={} ):
             match = SPhnxMatch(
                 name,
                 script,
-                lfn,
+                lfn,        # lfn of the input file
                 dst,
                 str(run),
                 str(seg),
