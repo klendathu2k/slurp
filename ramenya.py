@@ -10,14 +10,18 @@ psql     = sh.Command("psql")
 
 
 def main():
+    first=True
     while (True):
         print("Running the DST_EVENT rule")
-        kaedama( rule="DST_EVENT", batch=True, _out=sys.stdout )
+        if first:
+            kaedama( rule="DST_EVENT", batch=True, u="failed",  _out=sys.stdout )
+            first=False
+        else:
+            kaedama( rule="DST_EVENT", batch=True,              _out=sys.stdout )
         print("Running the DST_CALOR rule")
         kaedama( rule="DST_CALOR", batch=True )
         condor_q("-batch","sphnxpro",_out=sys.stdout)        
-        # b'  id  |     dsttype      |             dstname              |                    dstfile                     |  run  | segment | nsegments | inputs | prod_id | cluster | process | status  |     submitting      |      submitted      |       started       |       running       | ended | flags | exit_code | nevents \n'
-        psql(dbname="FileCatalog", command="select dsttype,run,segment,cluster,process,status,started,running,ended,exit_code from production_status order by id;", _out=sys.stdout);
+        psql(dbname="FileCatalog", command="select dsttype,run,segment,cluster,process,status,started,running,ended,exit_code from production_status where status<'finished' order by dsttype,submitted,run,segment;", _out=sys.stdout);
         print("Pausing loop for 2min")
         sleep(120)
 
