@@ -21,9 +21,8 @@ from dataclasses import dataclass, asdict, field
 
 # List of states which block the job
 blocking = ["submitting","submitted","started","running","evicted","failed","finished"]
+#blocking = []
 args = None
-
-verbose = 0
 
 __frozen__ = True
 __rules__  = []
@@ -37,6 +36,7 @@ fcc = fc.cursor()
 # FileCatalog Cache
 fc_cache = {}
 
+verbose=0
 
 @dataclass
 class SPhnxCondorJob:
@@ -66,6 +66,7 @@ class SPhnxCondorJob:
     accounting_group_user: str = None
     transfer_output_files: str = None
     transfer_input_files:  str = None
+    user_job_wrapper:      str = None
 
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v }
@@ -183,36 +184,40 @@ def table_exists( tablename ):
 
 
 
-def fetch_production_status( setup, runmn=0, runmx=-1 ):
+def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
     """
     Given a production setup, returns the production status table....
     """
     result = [] # of SPhnxProductionStatus
 
-    #name = "STATUS_%s"% sphenix_dstname( setup.name, setup.build, setup.dbtag )
     name = "PRODUCTION_STATUS"
     
     if table_exists( name ):
 
-        query = "select * from %s"%name
-        if ( runmn>runmx ): query = query + " where run>=%i;"            %(runmn)
-        else              : query = query + " where run>=%i and run<=%i;"%(runmn,runmx)
+        query = f"select * from {name} where prod_id={setup.id}"
+        if ( runmn>runmx ): query = query + f" and run>={runmn};"
+        else              : query = query + f" and run>={runmn} and run<={runmx};"
 
         dbresult = fcc.execute( query ).fetchall();
 
         # Transform the list of tuples from the db query to a list of prouction status dataclass objects
         result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
 
-    else:
+    elif update==True:
 
         create = sphnx_production_status_table_def( setup.name, setup.build, setup.dbtag )
-        # replace with ???... down one level... sphenix_dstname( setup.name, setup.build, setup.dbtag )
-
 
         fcc.execute(create) # 
         fcc.commit()
         
 
+    return result
+
+def getLatestId( tablename, dstname, run, seg ):
+    query=f"""
+    select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
+    """
+    result = fcc.execute(query).fetchone()[0]
     return result
 
 def update_production_status( matching, setup, condor, state ):
@@ -232,10 +237,12 @@ def update_production_status( matching, setup, condor, state ):
         # 1s time resolution
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
 
+        id_ = getLatestId( 'production_status', dstname, run, segment )
+
         update=f"""
         update  production_status
         set     status='{state}',{state}='{timestamp}'
-        where   dstname='{dstname}' and run={run} and segment={segment}
+        where   dstname='{dstname}' and run={run} and segment={segment} and id={id_}
         """
         fcc.execute(update)
         fcc.commit()
@@ -245,10 +252,11 @@ def insert_production_status( matching, setup, condor, state ):
     condor_map = {}
     for ad in condor:
         clusterId = ad['ClusterId']
-        procId = ad['ProcId']
-        out    = ad['Out']
-        args   = ad['Args']
-        key    = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
+        procId    = ad['ProcId']
+        out       = ad['Out']
+        args      = ad['Args']
+        key       = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
+        
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'Args':args }
 
 
@@ -321,7 +329,10 @@ def submit( rule, **kwargs ):
     for (p,v) in mkpaths.items():
         if not os.path.exists(p): os.makedirs( p )
 
-
+    #
+    # Resubmit is only a manual operation.  Existing files must be removed or the DB query adjusted to avoid
+    # stomping on previous output files.
+    #
     if kwargs.get('resubmit',False):
         reply = None
         while reply not in ['y','yes','Y','YES','Yes','n','N','no','No','NO']:
@@ -330,8 +341,11 @@ def submit( rule, **kwargs ):
         if reply in ['n','N','No','no','NO']:
             return result
 
-
-    if not ( setup.is_clean and setup.is_current ):
+    #
+    # An unclean setup is also cause for manual intervention.  It will hold up any data production.
+    #    (but we will allow override with the batch flag)
+    #
+    if not ( setup.is_clean and setup.is_current ) and not args.batch:
         print("Warning: the macros/scripts directory is not at the same commit as its github repo and/or")
         print("         there are uncommitted local changes.")
         
@@ -479,6 +493,7 @@ def matches( rule, kwargs={} ):
     script    = kwargs.get('script',    rule.script)
     resubmit  = kwargs.get('resubmit',  rule.resubmit)
     payload   = kwargs.get('payload',   rule.payload)
+    update    = kwargs.get('update',    True ) # update the DB
 
     outputs = []
 
@@ -504,7 +519,7 @@ def matches( rule, kwargs={} ):
 
     setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
     
-    prod_status = fetch_production_status ( setup, 0, -1 )  # between run min and run max inclusive
+    prod_status = fetch_production_status ( setup, 0, -1, update )  # between run min and run max inclusive
 
     prod_status_map = {}
     for stat in prod_status:
@@ -513,6 +528,7 @@ def matches( rule, kwargs={} ):
         prod_status_map[file_basename] = stat.status
 
     # Build the list of matches    
+    
     for ((lfn,run,seg),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
         
         x = dst.replace(".root","").strip()
@@ -558,11 +574,7 @@ def matches( rule, kwargs={} ):
 
             # Terminate the loop if we exceed the maximum number of matches
             if rule.limit and len(result)>= rule.limit:
-                break
-
-
-                
-                
+                break                                
 
     return result, setup
 
@@ -571,7 +583,8 @@ def matches( rule, kwargs={} ):
 #__________________________________________________________________________________________________
 #
 arg_parser = argparse.ArgumentParser()    
-arg_parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=blocking )
+arg_parser.add_argument( "--batch", default="False", action="store_true",help="Batch mode...")
+arg_parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=["submitting","submitted","started","running","evicted","failed","finished"] )
 arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, action='store_true', 
                          help='Existing filecatalog entry does not block a job')
 
@@ -580,6 +593,7 @@ def parse_command_line():
     global args
 
     args = arg_parser.parse_args()
+    #blocking_ = ["submitting","submitted","started","running","evicted","failed","finished"]
 
     if args.unblock:
         blocking = [ b for b in blocking if b not in args.unblock ]
