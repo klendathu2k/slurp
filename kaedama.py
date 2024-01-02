@@ -127,7 +127,6 @@ def main():
         """
 
         print(DST_EVENT_query)
-        return
 
         file_lists = ','.join("""
         eventcombine/lists/hcaleast_$(run).list

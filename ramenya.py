@@ -13,15 +13,24 @@ def main():
     first=True
     while (True):
         print("Running the DST_EVENT rule")
-        if first:
-            kaedama( rule="DST_EVENT", batch=True, u="failed",  _out=sys.stdout )
-            first=False
-        else:
-            kaedama( rule="DST_EVENT", batch=True,              _out=sys.stdout )
+
+        kaedama( "--runs", "22026", "22027", 
+                 rule="DST_EVENT", 
+                 batch=True, 
+                 _out=sys.stdout )
+
+
         print("Running the DST_CALOR rule")
-        kaedama( rule="DST_CALOR", batch=True )
+        kaedama( 
+            "--runs", "22026", "22027",
+            rule="DST_CALOR", batch=True )
         condor_q("-batch","sphnxpro",_out=sys.stdout)        
-        psql(dbname="FileCatalog", command="select dsttype,run,segment,cluster,process,status,started,running,ended,exit_code from production_status where status<'finished' order by dsttype,submitted,run,segment;", _out=sys.stdout);
+
+
+        psql(dbname="FileCatalog", 
+             command="select dsttype,run,segment,cluster,process,status,started,running,ended,exit_code from production_status where run<=22027 and run>=22026 order by id;", _out=sys.stdout);
+
+
         print("Pausing loop for 2min")
         sleep(120)
 
