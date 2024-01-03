@@ -19,6 +19,7 @@ arg_parser.add_argument( '--limit', help="Maximum number of jobs to submit", def
 arg_parser.add_argument( '--submit',help="Job will be submitted", dest="submit", default="True", action="store_true")
 arg_parser.add_argument( '--no-submit', help="Job will not be submitted... print things", dest="submit", action="store_false")
 arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=['26022'] )
+arg_parser.add_argument( '--segments', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[] )
 
 def main():
 
@@ -32,6 +33,14 @@ def main():
         run_condition = f"and runnumber>={args.runs[0]} and runnumber<={args.runs[1]}"
     else:
         run_condition = "and runnumber in ( %s )" % ','.join( args.runs )
+
+    seg_condition = ""
+    if len(args.segments)==1:
+        seg_condition = f"and segment={args.segments[0]}"
+    elif len(args.segments)==2:
+        seg_condition = f"and segment>={args.segments[0]} and segment<={args.segments[1]}"
+    else:
+        seg_condition = "and segment in ( %s )" % ','.join( args.segments )
 
     limit_condition=""
     if args.limit>0:
@@ -56,7 +65,7 @@ def main():
         DST_CALOR_query = f"""
         select filename,runnumber,segment from datasets where
         filename like 'DST_EVENT_auau23_ana393_2023p009-%'
-        {run_condition}
+        {run_condition} {seg_condition}
         order by runnumber,segment
         {limit_condition}
         """
@@ -89,7 +98,7 @@ def main():
         select filename,runnumber,segment from datasets
         where dsttype = 'beam'
         and filename like 'beam-%'
-        {run_condition}
+        {run_condition} {seg_condition}
         order by runnumber,segment
         {limit_condition}
         """
@@ -121,7 +130,7 @@ def main():
         DST_EVENT_query = f"""
         select DISTINCT ON (runnumber) filename,runnumber,segment from datasets 
         where ( filename like 'beam_seb%' or filename like 'beam_East%' or filename like 'beam_West%' or filename like 'beam_LL1%' or filename like 'GL1_beam%') 
-        {run_condition}
+        {run_condition} {seg_condition}
         order by runnumber,segment
         {limit_condition}
         """
