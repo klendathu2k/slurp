@@ -31,7 +31,7 @@ def main():
         run_condition = f"and runnumber={args.runs[0]}"
     elif len(args.runs)==2:
         run_condition = f"and runnumber>={args.runs[0]} and runnumber<={args.runs[1]}"
-    else:
+    elif len(args.runs)==3:
         run_condition = "and runnumber in ( %s )" % ','.join( args.runs )
 
     seg_condition = ""
@@ -39,7 +39,7 @@ def main():
         seg_condition = f"and segment={args.segments[0]}"
     elif len(args.segments)==2:
         seg_condition = f"and segment>={args.segments[0]} and segment<={args.segments[1]}"
-    else:
+    elif len(args.segments)==3:
         seg_condition = "and segment in ( %s )" % ','.join( args.segments )
 
     limit_condition=""
@@ -55,7 +55,12 @@ def main():
     logdir = "file:///sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
     condor = logdir.replace("file://","") 
 
-    if args.rule == "DST_CALOR":
+    if args.rule == 'INFO':
+        print( "INDIR:   ", indir )
+        print( "OUTDIR:  ", outdir )
+        print( "LOGDIR:  ", logdir )
+
+    elif args.rule == "DST_CALOR":
 
 #                      filename                       | runnumber | segment |    size     | dataset |     dsttype     | events 
 #-----------------------------------------------------+-----------+---------+-------------+---------+-----------------+--------
@@ -75,6 +80,8 @@ def main():
             output_destination    = logdir,
             transfer_output_files = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).out,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).err",
             transfer_input_files  = "$(payload),cups.py",
+            accounting_group      = "group_sphenix.mdc2",
+            accounting_group_user = "sphnxpro",
         )
 
 
@@ -89,7 +96,7 @@ def main():
                                limit             = args.limit
         )
 
-        submit(DST_CALOR_rule, nevents=args.nevents, indir=indir, outdir=outdir, dump=False, resubmit=True, condor=condor ) 
+        submit (DST_CALOR_rule, nevents=args.nevents, indir=indir, outdir=outdir, dump=False, resubmit=True, condor=condor, mem="2048MB", disk="2GB" ) 
 
 
     elif args.rule == "DST_CALOR.old":
@@ -167,6 +174,8 @@ def main():
             output                = f'{logbase}.condor.stdout',
             error                 = f'{logbase}.condor.stderr',
             log                   = f'$(condor)/{logbase}.condor',
+            accounting_group      = "group_sphenix.mdc2",
+            accounting_group_user = "sphnxpro",
         )
 
         if args.submit:
