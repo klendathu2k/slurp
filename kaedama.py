@@ -75,6 +75,8 @@ def main():
             output_destination    = logdir,
             transfer_output_files = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).out,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).err",
             transfer_input_files  = "$(payload),cups.py",
+            accounting_group      = "group_sphenix.mdc2",
+            accounting_group_user = "sphnxpro",
         )
 
 
@@ -89,7 +91,7 @@ def main():
                                limit             = args.limit
         )
 
-        submit(DST_CALOR_rule, nevents=args.nevents, indir=indir, outdir=outdir, dump=False, resubmit=True, condor=condor ) 
+        submit (DST_CALOR_rule, nevents=args.nevents, indir=indir, outdir=outdir, dump=False, resubmit=True, condor=condor, mem="2048MB", disk="2GB" ) 
 
 
     elif args.rule == "DST_CALOR.old":
@@ -167,6 +169,8 @@ def main():
             output                = f'{logbase}.condor.stdout',
             error                 = f'{logbase}.condor.stderr',
             log                   = f'$(condor)/{logbase}.condor',
+            accounting_group      = "group_sphenix.mdc2",
+            accounting_group_user = "sphnxpro",
         )
 
         if args.submit:

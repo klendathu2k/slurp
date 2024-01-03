@@ -53,7 +53,7 @@ class SPhnxCondorJob:
     periodichold: 	       str = "(NumJobStarts>=1 && JobStatus == 1)"
     priority:              str = "1958"
     job_lease_duration:    str = "3600"
-    requirements:          str = '(CPU_Type == "mdc2")\n';    
+    requirements:          str = '(CPU_Type == "mdc2")';    
     request_cpus:          str = "1"
     request_memory:        str = "$(mem)"
     should_transfer_files: str = "YES"
