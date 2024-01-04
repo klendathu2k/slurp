@@ -54,13 +54,9 @@ dst_calor_running   = [ roundoff(t[3]) for t in dst_calor_timestamps if t[3] ]
 dst_calor_finished  = [ roundoff(t[4]) for t in dst_calor_timestamps if t[4] and t[5] == 'finished' ] 
 dst_calor_failed    = [ roundoff(t[4]) for t in dst_calor_timestamps if t[4] and t[5] == 'failed' ] 
 
+fig, axs = plt.subplots(2, 1, sharex=True)
 
-
-
-
-fig, axs = plt.subplots(2, 1)
-
-axs[0].hist( 
+dst_event_values, dst_event_bins, dst_event_bars = axs[0].hist( 
     [dst_event_submiting,
      dst_event_submitted,
      dst_event_started,
@@ -68,8 +64,9 @@ axs[0].hist(
      dst_event_finished,
      dst_event_failed ],
      label=dst_event_label,
-     color=dst_event_colors)
-#dst_event_bar_labels = [ b if b>0 else "" for b in dst_event_bars ]
+     color=dst_event_colors
+)
+
 
 count=0
 for c in axs[0].containers:
@@ -87,7 +84,7 @@ axs[0].legend(prop={'size': 10})
 axs[0].set_title(f'DST_EVENT Production Status {str(now)}')
 
 
-axs[1].hist( 
+dst_calor_values, dst_calor_bins, dst_calor_bars = axs[1].hist( 
     [dst_calor_submiting,
      dst_calor_submitted,
      dst_calor_started,
@@ -95,7 +92,39 @@ axs[1].hist(
      dst_calor_finished,
      dst_calor_failed],
      label=dst_calor_label,
-     color=dst_calor_colors)
+     color=dst_calor_colors
+)
+
+#pprint.pprint( dst_calor_values )
+#dst_calor_csum = [
+#    np.cumsum( dst_calor_values[0] ),
+#    np.cumsum( dst_calor_values[1] ),
+#    np.cumsum( dst_calor_values[2] ),
+#    np.cumsum( dst_calor_values[3] ),
+#    np.cumsum( dst_calor_values[4] ),
+#    np.cumsum( dst_calor_values[5] ),
+#]
+#pprint.pprint( dst_calor_csum )
+#dst_calor_finished_sum = np.cumsum( dst_calor_values[4] )
+#axs[1].plot( dst_calor_bins, dst_calor_finished_sum, alpha=0.7, color="forestgreen", label="finished sum" )
+
+#axs[1].hist( dst_calor_finished, cumulative=True, color="forestgreen", label="sum finished" )
+axs[1].hist(    
+    [
+        dst_calor_submiting,
+        dst_calor_submitted,
+        dst_calor_started,
+        dst_calor_running,
+        dst_calor_finished,
+        dst_calor_failed
+    ],
+    cumulative=True,
+    color=dst_calor_colors,
+    alpha=0.125
+)
+    
+
+
 
 count=0
 for c in axs[1].containers:
@@ -114,7 +143,7 @@ axs[1].set_title(f'DST_CALOR Production Status {str(now)}')
 
 fig.tight_layout()
 plt.show( block=False )
-plt.pause(30)
+plt.pause(120)
 #time.sleep(120)
 
 
