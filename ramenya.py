@@ -12,6 +12,7 @@ psql     = sh.Command("psql")
 
 arg_parser = argparse.ArgumentParser()    
 arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=['26022'] )
+arg_parser.add_argument( '--delay', help="Delay between loop executions",default=600)
 args = arg_parser.parse_args()
 
 
@@ -44,12 +45,12 @@ def main():
         condor_q("-batch","sphnxpro",_out=sys.stdout)        
 
 
-        psql(dbname="FileCatalog", 
-             command="select dsttype,run,segment,cluster,process,status,started,running,ended,exit_code from production_status order by id desc limit 20;", _out=sys.stdout);
+        #psql(dbname="FileCatalog", 
+        #     command="select dsttype,run,segment,cluster,process,status,started,running,ended,exit_code from production_status order by id desc limit 20;", _out=sys.stdout);
 
 
-        print("Pausing loop for 2min")
-        sleep(120)
+        #print("Pausing loop for 2min")
+        sleep(args.delay)
 
 if __name__ == '__main__':
     main()
