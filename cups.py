@@ -247,6 +247,34 @@ def exitcode(args):
         statusdbc.execute( update )
         statusdbc.commit()
 
+
+#_______________________________________________________________________________________________________
+@subcommand([
+    argument(     "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
+])
+def nevents(args):
+    """
+    Updates the number of events processed
+    """
+    tablename=args.table
+    dstname=args.dstname
+    run=int(args.run)
+    seg=int(args.segment)
+    id_ = getLatestId( tablename, dstname, run, seg )
+    ne=int(args.nevents)
+    update = f"""
+    update {tablename}
+    set nevents={ne}
+    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+    """
+    if args.noupdate:
+        print(update)
+    else:
+        print(update)
+        statusdbc.execute( update )
+        statusdbc.commit()
+
+
 # files
 # lfn | full_host_name | full_file_path | time | size | md5 
 # datasets
