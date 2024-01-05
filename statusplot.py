@@ -64,7 +64,21 @@ dst_event_values, dst_event_bins, dst_event_bars = axs[0].hist(
      dst_event_finished,
      dst_event_failed ],
      label=dst_event_label,
-     color=dst_event_colors
+     color=dst_event_colors,
+    bins=12,
+)
+
+dst_event_values, dst_event_bins, dst_event_bars = axs[0].hist( 
+    [dst_event_submiting,
+     dst_event_submitted,
+     dst_event_started,
+     dst_event_running,
+     dst_event_finished,
+     dst_event_failed ],
+     color=dst_event_colors,
+     alpha=0.125,
+     cumulative=True,
+    bins=12,
 )
 
 
@@ -72,12 +86,13 @@ count=0
 for c in axs[0].containers:
     labels = [ b if b > 0 else "" for b in c.datavalues ]
     axs[0].bar_label( c, labels=labels, fmt="%i", 
-                      rotation=90, 
-                      size=10, 
+                      rotation=80, 
+                      size=20, 
                       padding=10, 
                       color=dst_event_colors[count%len(dst_event_colors)] 
     )
     count=count+1
+#    if count==6: break
 count=0
 
 axs[0].legend(prop={'size': 10})
@@ -91,8 +106,9 @@ dst_calor_values, dst_calor_bins, dst_calor_bars = axs[1].hist(
      dst_calor_running,
      dst_calor_finished,
      dst_calor_failed],
-     label=dst_calor_label,
-     color=dst_calor_colors
+#    label=dst_calor_label,
+     color=dst_calor_colors,
+    bins=12,
 )
 
 #pprint.pprint( dst_calor_values )
@@ -120,7 +136,8 @@ axs[1].hist(
     ],
     cumulative=True,
     color=dst_calor_colors,
-    alpha=0.125
+    alpha=0.125,
+    bins=12
 )
     
 
@@ -130,20 +147,21 @@ count=0
 for c in axs[1].containers:
     labels = [ b if b > 0 else "" for b in c.datavalues ]
     axs[1].bar_label( c, labels=labels, fmt="%i", 
-                      rotation=90, 
-                      size=10, 
+                      rotation=80, 
+                      size=20, 
                       padding=10, 
                       color=dst_calor_colors[count%len(dst_calor_colors)] 
     )
     count=count+1
+#    if count==6: break
 count=0
 
-axs[1].legend(prop={'size': 10})
+axs[1].legend(prop={'size': 20})
 axs[1].set_title(f'DST_CALOR Production Status {str(now)}')
 
 fig.tight_layout()
-plt.show( block=False )
-plt.pause(120)
+plt.show( block=True )
+#plt.pause(120)
 #time.sleep(120)
 
 
