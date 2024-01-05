@@ -290,6 +290,7 @@ def nevents(args):
     argument( "--path", help="path to output file", default="./" ),
     argument( "--hostname", help="host name of the filesystem", default="lustre", choices=["lustre","gpfs"] ),
     argument( "--dataset", help="sets the name of the dataset", default="mdc2" ),
+    argument( "--nevents", help="sets number of events", default=0 )
 ])
 def catalog(args):
     """
@@ -303,6 +304,7 @@ def catalog(args):
     seg      = int(args.segment)
     ext      = args.ext
     host     = args.hostname
+    nevents  = args.nevents
 
     # n.b. not the slurp convention for dsttype
     dsttype='_'.join( dstname.split('_')[-2:] )
@@ -332,12 +334,10 @@ def catalog(args):
     fcc.execute(insert)
     fcc.commit()
 
-    events=0
-
     # Insert into datasets
     insert=f"""
     insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
-    values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{events})
+    values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
     """
     fcc.execute(insert)
     fcc.commit()
