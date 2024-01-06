@@ -74,6 +74,15 @@ for line in sys.stdin:
                 '--nevents',  f'{counter.nevents}',
                 ])
 
+            cups([
+                '--run',      f'{runnumber}', 
+                '--segment',  '0',
+                '--dstname',  f'{dstname}',     
+                'nevents',
+                '--nevents', f'{nevents}',
+            ])
+
+
 print(nevents)
 
 cups([
