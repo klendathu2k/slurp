@@ -45,12 +45,13 @@ def main():
         condor_q("-batch","sphnxpro",_out=sys.stdout)        
 
 
-        #psql(dbname="FileCatalog", 
-        #     command="select dsttype,run,segment,cluster,process,status,started,running,ended,exit_code from production_status order by id desc limit 20;", _out=sys.stdout);
+
+        psql(dbname="FileCatalog", 
+             command="select dsttype,run,segment,cluster,process,status,nevents,started,running,ended,exit_code from production_status order by id;", _out=sys.stdout);
 
 
         #print("Pausing loop for 2min")
-        sleep(args.delay)
+        sleep(int(args.delay))
 
 if __name__ == '__main__':
     main()
