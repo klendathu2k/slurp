@@ -45,9 +45,48 @@ def main():
         condor_q("-batch","sphnxpro",_out=sys.stdout)        
 
 
+        print("Summary of jobs which have not reached staus='started'")
+        print("------------------------------------------------------")
+        psqlquery="""
+        select dsttype,
+               run,
+               count(run)                        as num_jobs,
+               avg(age(submitting,submitted))    as avg_time_to_submit
+       
+        from   production_status 
+        where  status<='started' 
+        group by dsttype,run
+        order by dsttype desc,run asc
+               ;
+        """
+        psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
 
-        psql(dbname="FileCatalog", 
-             command="select dsttype,run,segment,cluster,process,status,nevents,started,running,ended,exit_code from production_status order by id;", _out=sys.stdout);
+
+        print("Summary of jobs which have reached staus='started'")
+        print("--------------------------------------------------")
+        psqlquery="""
+        select dsttype,
+               run,
+               count(run)                      as num_jobs,
+               avg(age(started,submitting))    as avg_time_to_start,
+               avg(age(ended,started))         as avg_job_duration,
+               min(age(ended,started))         as min_job_duration,
+               max(age(ended,started))         as max_job_duration,
+               sum(nevents)                    as sum_events 
+       
+        from   production_status 
+        where  status>='started' 
+        group by dsttype,run
+        order by dsttype desc,run asc
+               ;
+        """
+        psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
+
+
+#        psql(dbname="FileCatalog", 
+ #            command="select dsttype,run,segment,cluster,process,status,nevents,started,running,ended,exit_code from production_status order by id;", _out=sys.stdout);
+
+ 
 
 
         #print("Pausing loop for 2min")
