@@ -49,14 +49,15 @@ def main():
         print("------------------------------------------------------")
         psqlquery="""
         select dsttype,
-               run,
-               count(run)                        as num_jobs,
-               avg(age(submitting,submitted))    as avg_time_to_submit
+               count(run)                        as num_jobs           ,
+               avg(age(submitted,submitting))    as avg_time_to_submit ,
+               min(age(submitted,submitting))    as min_time_to_submit ,
+               max(age(submitted,submitting))    as max_time_to_submit
        
         from   production_status 
         where  status<='started' 
-        group by dsttype,run
-        order by dsttype desc,run asc
+        group by dsttype
+        order by dsttype desc
                ;
         """
         psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
@@ -66,9 +67,14 @@ def main():
         print("--------------------------------------------------")
         psqlquery="""
         select dsttype,
-               run,
                count(run)                      as num_jobs,
                avg(age(started,submitting))    as avg_time_to_start,
+               count( case status when 'running' then 1 else null end )
+                                               as num_running,
+               count( case status when 'finished' then 1 else null end )
+                                               as num_finished,
+               count( case status when 'failed' then 1 else null end )
+                                               as num_failed,
                avg(age(ended,started))         as avg_job_duration,
                min(age(ended,started))         as min_job_duration,
                max(age(ended,started))         as max_job_duration,
@@ -76,8 +82,8 @@ def main():
        
         from   production_status 
         where  status>='started' 
-        group by dsttype,run
-        order by dsttype desc,run asc
+        group by dsttype
+        order by dsttype desc
                ;
         """
         psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
