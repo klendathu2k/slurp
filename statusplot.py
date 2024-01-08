@@ -87,7 +87,7 @@ for c in axs[0].containers:
     labels = [ b if b > 0 else "" for b in c.datavalues ]
     axs[0].bar_label( c, labels=labels, fmt="%i", 
                       rotation=80, 
-                      size=20, 
+                      size=12, 
                       padding=10, 
                       color=dst_event_colors[count%len(dst_event_colors)] 
     )
@@ -148,7 +148,7 @@ for c in axs[1].containers:
     labels = [ b if b > 0 else "" for b in c.datavalues ]
     axs[1].bar_label( c, labels=labels, fmt="%i", 
                       rotation=80, 
-                      size=20, 
+                      size=12, 
                       padding=10, 
                       color=dst_calor_colors[count%len(dst_calor_colors)] 
     )
@@ -156,7 +156,7 @@ for c in axs[1].containers:
 #    if count==6: break
 count=0
 
-axs[1].legend(prop={'size': 20})
+axs[1].legend(prop={'size': 12})
 axs[1].set_title(f'DST_CALOR Production Status {str(now)}')
 
 fig.tight_layout()
