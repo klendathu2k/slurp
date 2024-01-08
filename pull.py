@@ -16,6 +16,7 @@ pipeline = deque([])
 count = 0
 
 runnumber = 0
+segment   = 0
 dstname = ""
 
 class EventCounter:
@@ -34,6 +35,8 @@ class EventCounter:
 nevents = 0
 
 for line in sys.stdin:
+
+    # Handle PRDF processing
     if 'Fun4AllRolloverFileOutStream' in line:
         print( line.strip() )
         pipeline.append( line.strip() )
@@ -82,12 +85,30 @@ for line in sys.stdin:
                 '--nevents', f'{nevents}',
             ])
 
+    # file DST_CALOR_auau23_ana387_2023p003-00022027-0099.root, entries: 661
+    elif "file" in line and ", entries:" in line:
+
+        array = line.strip().split()
+        #print(array)
+        #print(array[1])
+
+        nevents=array[-1]
+        filename=array[1]
+        print(filename, nevents)
+
+        filename = filename.split('.')[0]
+
+        dstname, runnumber, segment = filename.split('-')
+
+        #print(dstname,run,seg)
+        
+
 
 print(nevents)
 
 cups([
     '--run',      f'{runnumber}', 
-    '--segment',  '0',
+    '--segment',  f'{segment}',
     '--dstname',  f'{dstname}',     
     'finished',
     '-e', '-1',
