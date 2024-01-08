@@ -36,9 +36,11 @@ nevents = 0
 
 for line in sys.stdin:
 
+    print( line.strip() )
+
     # Handle PRDF processing
     if 'Fun4AllRolloverFileOutStream' in line:
-        print( line.strip() )
+
         pipeline.append( line.strip() )
         if len(pipeline)>1:
 
@@ -85,6 +87,9 @@ for line in sys.stdin:
                 '--nevents', f'{nevents}',
             ])
 
+            # And this is important... zero out the segment so that the aggregate count at the end iw correct
+            segment = 0
+
     # file DST_CALOR_auau23_ana387_2023p003-00022027-0099.root, entries: 661
     elif "file" in line and ", entries:" in line:
 
@@ -100,11 +105,7 @@ for line in sys.stdin:
 
         dstname, runnumber, segment = filename.split('-')
 
-        #print(dstname,run,seg)
-        
-
-
-print(nevents)
+        # Fall through to the aggregate below...
 
 cups([
     '--run',      f'{runnumber}', 

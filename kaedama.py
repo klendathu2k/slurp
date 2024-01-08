@@ -79,7 +79,7 @@ def main():
             executable            = "/sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/run_caloreco.sh",
             output_destination    = logdir,
             transfer_output_files = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).out,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).err",
-            transfer_input_files  = "$(payload),cups.py",
+            transfer_input_files  = "$(payload),cups.py,pull.py",
             accounting_group      = "group_sphenix.mdc2",
             accounting_group_user = "sphnxpro",
         )
