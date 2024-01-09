@@ -1,3 +1,67 @@
+  
+#__________________________________________________________________________________________________________________
+#_______________________________________________________________________________________________________DST_CALOR__
+DST_CALOR:
+
+   #
+   # Params defines replacement variables which can be used in the job
+   # definition below.  It also defines condor requirements, such as 
+   # memory and disk.  The condor parameters $(par) will be replaced by
+   # condor at submission time with values determined in matching the
+   # input files to the required output through the kaedama rule.
+   # 
+   params:
+     name:       DST_CALOR_auau23                                                        # name of the production series / dataset type
+     build:      ana.387                                                                 # software build
+     build_name: ana387                                                                  # ... stripped of the period
+     dbtag:      2023p003                                                                # database tag
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d)                   # naming convention for logfiles (condor substitution...)
+     outbase :   $(name)_$(build)_$(tag)                                                 # naming convention for the output files (run and segment will be applied by user macro)
+     script  :   run_caloreco.sh                                                         # name of the user production script
+     payload :   /sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/          # github directory where production scripts, macros, etc... are found
+     mem     :   2048MB                                                                  # memory requirement
+     disk    :   2GB                                                                     # disk requirement
+
+   # Database query to find input files.  Note that the {run_condition}, {seg_condition} and
+   # {limit_condition} are defined in kaedama from command line arguments.  These should be 
+   # left in the query.
+   input_query: |-
+        select filename,runnumber,segment from datasets
+            where filename like 'DST_EVENT_auau23_ana393_2023p009-%'
+        {run_condition} 
+        {seg_condition}
+        order by runnumber,segment
+        {limit_condition}
+
+   # Declares the directory where input files are found, output files are stored, and
+   # log/condor files should be placed.
+   filesystem:
+     indir  : "/sphenix/lustre01/sphnxpro/commissioning/aligned_2Gprdf/"    # ??? think we pick these up from the filecatalog now
+     outdir : "/sphenix/lustre01/sphnxpro/slurp/$$([$(run)/100])00"
+     logdir : "file:///sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
+     condor :        "/sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
+
+   # 
+   # Specifies the condor job submission file.  Variables declared in the params
+   # and filesystem block may be substituded here using the syntax {variable}.
+   # 
+   # Condor variables are defined using the syntax $(variable).  
+   #
+   job:
+     executable            : "{payload}/run_caloreco.sh"
+     arguments             : "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
+     user_job_wrapper      : "init.sh"
+     output_destination    : 'file://{condor}'
+     transfer_input_files  : "{payload},cups.py,init.sh,pull.py"
+     output                : "{logbase}.condor.stdout"
+     error                 : "{logbase}.condor.stderr"
+     log                   : "{condor}/{logbase}.condor"
+     accounting_group      : "group_sphenix.mdc2"
+     accounting_group_user : "sphnxpro"
+
+
+#__________________________________________________________________________________________________________________
+#_______________________________________________________________________________________________________DST_EVENT__
 DST_EVENT:
  
    params:
@@ -5,10 +69,11 @@ DST_EVENT:
      build:      ana.393
      build_name: ana393
      dbtag:      2023p009
-     logbase :   $(name)_$(build)_$(tag)-$INT(run,%08d)-0000
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d)
      outbase :   $(name)_$(build)_$(tag)
      script  :   run.sh
      payload :   /sphenix/u/sphnxpro/slurp/eventcombine/
+     mem     :   4096MB   
      file_lists:
         - eventcombine/lists/hcaleast_$(run).list
         - eventcombine/lists/hcalwest_$(run).list
@@ -45,56 +110,14 @@ DST_EVENT:
      condor :        "/sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
 
    job:
-     executable            : "/sphenix/u/sphnxpro/slurp/eventcombine/run.sh"
+     executable            : "{payload}/run.sh"
      user_job_wrapper      : "init.sh"
      arguments             : "$(nevents) {outbase} {logbase} {outdir} $(run) $(ClusterId) $(ProcId) $(build) $(tag)"
-     output_destination    : "{logdir}"
-     transfer_input_files  : "$(payload),cups.py,init.sh,pull.py,{file_lists}"
+     output_destination    : 'file://{condor}'
+     transfer_input_files  : "{payload},cups.py,init.sh,pull.py,{file_lists}"
      output                : '{logbase}.condor.stdout'
      error                 : '{logbase}.condor.stderr'
-     log                   : '$(condor)/{logbase}.condor'
-     accounting_group      : "group_sphenix.mdc2"
-     accounting_group_user : "sphnxpro"
-
-
-
-  
-
-DST_CALOR:
- 
-   params:
-     name:       DST_CALOR_auau23
-     build:      ana.387
-     build_name: ana387
-     dbtag:      2023p003
-     logbase :   $(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d)
-     outbase :   $(name)_$(build)_$(tag)
-     script  :   run_caloreco.sh
-     payload :   /sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/
-
-   input_query: |-
-        select filename,runnumber,segment from datasets
-            where filename like 'DST_EVENT_auau23_ana393_2023p009-%'
-        {run_condition} 
-        {seg_condition}
-        order by runnumber,segment
-        {limit_condition}
-
-   filesystem:
-     indir  : "/sphenix/lustre01/sphnxpro/commissioning/aligned_2Gprdf/"
-     outdir : "/sphenix/lustre01/sphnxpro/slurp/$$([$(run)/100])00"
-     logdir : "file:///sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
-     condor :        "/sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
-
-   job:
-     executable            : "/sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/run_caloreco.sh"
-     arguments             : "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
-     user_job_wrapper      : "init.sh"
-     output_destination    : "{logdir}"
-     transfer_input_files  : "$(payload),cups.py,init.sh,pull.py"
-     output                : "{logbase}.condor.stdout"
-     error                 : "{logbase}.condor.stderr"
-     log                   : "$(condor)/{logbase}.condor"
+     log                   : '{condor}/{logbase}.condor'
      accounting_group      : "group_sphenix.mdc2"
      accounting_group_user : "sphnxpro"
 

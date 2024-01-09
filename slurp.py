@@ -375,7 +375,6 @@ def submit( rule, **kwargs ):
             pprint.pprint(m)
 
     if dump==False:
-
         if verbose==-10:
             print(submit_job)
         

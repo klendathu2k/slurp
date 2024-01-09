@@ -55,20 +55,9 @@ def main():
     if args.limit>0:
         limit_condition = f"limit {args.limit}"
         
-    indir  = "/sphenix/lustre01/sphnxpro/commissioning/aligned_2Gprdf/"
-    outdir = "/sphenix/lustre01/sphnxpro/slurp/$$([$(run)/100])00"
-    logdir = "file:///sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
-    condor = logdir.replace("file://","") 
-
-    
-    if args.rule == 'INFO':
-        print( "INDIR:   ", indir )
-        print( "OUTDIR:  ", outdir )
-        print( "LOGDIR:  ", logdir )
-
     #_______________________________________________________________________________________________
     #___________________________________________________________________________________DST_CALOR___
-    elif args.rule == "DST_CALOR":
+    if args.rule == "DST_CALOR":
 
         # Reduce configuration to this rule
         config = config[ args.rule ]
@@ -79,37 +68,39 @@ def main():
         filesystem = config['filesystem']
         job_       = config['job']
 
-        logbase = params['logbase']
-        outbase = params['outbase']
+        if isinstance( params.get( 'file_lists', False ), list ):
+            params['file_lists'] = ','.join( params['file_lists'] )
 
         jobkw = {}
         for k,v in job_.items():
-            jobkw[k] = v.format( **locals() )
-        
+            jobkw[k] = v.format( **locals(), **filesystem, **params )
+
         # And now we can create the job definition thusly
         job = Job( **jobkw )
 
         # DST_CALOR rule
-        DST_CALOR_rule = Rule( name              = params['name'],
-                               files             = input_query,
-                               script            = params['script'],
-                               build             = params['build'],
-                               tag               = params['dbtag'],
-                               payload           = params['payload'],
-                               job               = job,
-                               limit             = args.limit
-        )
+        if args.submit:
+            DST_CALOR_rule = Rule( name              = params['name'],
+                                   files             = input_query,
+                                   script            = params['script'],
+                                   build             = params['build'],
+                                   tag               = params['dbtag'],
+                                   payload           = params['payload'],
+                                   job               = job,
+                                   limit             = args.limit
+            )
 
-        submit (DST_CALOR_rule, 
-                nevents=args.nevents, 
-                indir=filesystem['indir'], 
-                outdir=filesystem['outdir'], 
-                dump=False, 
-                resubmit=True, 
-                condor=filesystem['condor'], 
-                mem="2048MB", 
-                disk="2GB" 
-        ) 
+            # Extract the subset of parameters that we need to pass to submit
+            submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump"] }
+
+            submit (DST_CALOR_rule, nevents=args.nevents, 
+                    **submitkw,
+                    **filesystem
+            ) 
+
+        else:            
+            pprint.pprint(job)
+
 
     #_______________________________________________________________________________________________
     #___________________________________________________________________________________DST_EVENT___
@@ -117,7 +108,7 @@ def main():
     elif args.rule == 'DST_EVENT':
 
         # Get configuration for this rule
-        config     = config['DST_EVENT']
+        config     = config[args.rule]
 
         # Input query specifies the source of the input files
         input_query= config['input_query'].format(**locals())
@@ -125,15 +116,13 @@ def main():
         filesystem = config['filesystem']
         job_       = config['job']
 
-        file_lists = ','.join( params['file_lists'] )
-
-        logbase = params['logbase']
-        outbase = params['outbase']
+        if isinstance( params.get( 'file_lists', False ), list ):
+            params['file_lists'] = ','.join( params['file_lists'] )
         
         # Need to apply string formatting to all values in the job_ dictionary
         jobkw = {}
         for k,v in job_.items():
-            jobkw[k] = v.format( **locals() )
+            jobkw[k] = v.format( **locals(), **filesystem, **params )
         
         # And now we can create the job definition thusly
         job = Job( **jobkw )
@@ -149,13 +138,13 @@ def main():
                                    limit  = args.limit         
             )
 
+            # Extract the subset of parameters that we need to pass to submit
+            submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump"] }
+
             submit(DST_EVENT_rule, 
                    nevents = args.nevents, 
-                   indir   = filesystem['indir'], 
-                   outdir  = filesystem['outdir'], 
-                   dump    = False, 
-                   resubmit= True, 
-                   condor  = filesystem['condor'] 
+                   **submitkw,
+                   **filesystem
             ) 
 
         else:
