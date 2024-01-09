@@ -256,7 +256,7 @@ def insert_production_status( matching, setup, condor, state ):
         out       = ad['Out']
         args      = ad['Args']
         key       = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
-        
+
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'Args':args }
 
 
@@ -279,8 +279,17 @@ def insert_production_status( matching, setup, condor, state ):
         dstfile=dstname+'-%08i-%04i'%(run,segment)
         
         prod_id = setup.id
-        cluster = condor_map[ key.lower() ][ 'ClusterId' ]
-        process = condor_map[ key.lower() ][ 'ProcId'    ]
+        try:
+            cluster = condor_map[ key.lower() ][ 'ClusterId' ]
+            process = condor_map[ key.lower() ][ 'ProcId'    ]
+        except KeyError:
+            print("Key Error getting cluster and/or process number from the class ads map.")
+            print(f"  key={key}")
+            pprint.pprint( condor_map )
+            print("Assuming this is an issue with condor, setting cluster=0, process=0 and trying to continue...")
+            cluster = 0
+            process = 0
+
         status  = state        
 
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )

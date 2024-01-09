@@ -1,0 +1,103 @@
+DST_EVENT:
+ 
+   params:
+     name:       DST_EVENT_auau23
+     build:      ana.393
+     build_name: ana393
+     dbtag:      2023p009
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,%08d)-0000
+     outbase :   $(name)_$(build)_$(tag)
+     script  :   run.sh
+     payload :   /sphenix/u/sphnxpro/slurp/eventcombine/
+     file_lists:
+        - eventcombine/lists/hcaleast_$(run).list
+        - eventcombine/lists/hcalwest_$(run).list
+        - eventcombine/lists/ll1_$(run).list
+        - eventcombine/lists/mbd_$(run).list
+        - eventcombine/lists/seb00_$(run).list
+        - eventcombine/lists/seb01_$(run).list
+        - eventcombine/lists/seb02_$(run).list
+        - eventcombine/lists/seb03_$(run).list
+        - eventcombine/lists/seb04_$(run).list
+        - eventcombine/lists/seb05_$(run).list
+        - eventcombine/lists/seb06_$(run).list
+        - eventcombine/lists/seb07_$(run).list
+        - eventcombine/lists/zdc_$(run).list
+
+   input_query: |-
+        select DISTINCT ON (runnumber) filename,runnumber,segment from datasets 
+        where ( 
+              filename like 'beam_seb%' 
+           or filename like 'beam_East%' 
+           or filename like 'beam_West%' 
+           or filename like 'beam_LL1%' 
+           or filename like 'GL1_beam%'
+        ) 
+        {run_condition} 
+        {seg_condition}
+        order by runnumber,segment
+        {limit_condition}
+
+   filesystem:
+     indir  : "/sphenix/lustre01/sphnxpro/commissioning/aligned_2Gprdf/"
+     outdir : "/sphenix/lustre01/sphnxpro/slurp/$$([$(run)/100])00"
+     logdir : "file:///sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
+     condor :        "/sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
+
+   job:
+     executable            : "/sphenix/u/sphnxpro/slurp/eventcombine/run.sh"
+     user_job_wrapper      : "init.sh"
+     arguments             : "$(nevents) {outbase} {logbase} {outdir} $(run) $(ClusterId) $(ProcId) $(build) $(tag)"
+     output_destination    : "{logdir}"
+     transfer_input_files  : "$(payload),cups.py,init.sh,pull.py,{file_lists}"
+     output                : '{logbase}.condor.stdout'
+     error                 : '{logbase}.condor.stderr'
+     log                   : '$(condor)/{logbase}.condor'
+     accounting_group      : "group_sphenix.mdc2"
+     accounting_group_user : "sphnxpro"
+
+
+
+  
+
+DST_CALOR:
+ 
+   params:
+     name:       DST_CALOR_auau23
+     build:      ana.387
+     build_name: ana387
+     dbtag:      2023p003
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d)
+     outbase :   $(name)_$(build)_$(tag)
+     script  :   run_caloreco.sh
+     payload :   /sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/
+
+   input_query: |-
+        select filename,runnumber,segment from datasets
+            where filename like 'DST_EVENT_auau23_ana393_2023p009-%'
+        {run_condition} 
+        {seg_condition}
+        order by runnumber,segment
+        {limit_condition}
+
+   filesystem:
+     indir  : "/sphenix/lustre01/sphnxpro/commissioning/aligned_2Gprdf/"
+     outdir : "/sphenix/lustre01/sphnxpro/slurp/$$([$(run)/100])00"
+     logdir : "file:///sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
+     condor :        "/sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
+
+   job:
+     executable            : "/sphenix/u/sphnxpro/slurp/MDC2/submit/rawdata/caloreco/rundir/run_caloreco.sh"
+     arguments             : "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
+     user_job_wrapper      : "init.sh"
+     output_destination    : "{logdir}"
+     transfer_input_files  : "$(payload),cups.py,init.sh,pull.py"
+     output                : "{logbase}.condor.stdout"
+     error                 : "{logbase}.condor.stderr"
+     log                   : "$(condor)/{logbase}.condor"
+     accounting_group      : "group_sphenix.mdc2"
+     accounting_group_user : "sphnxpro"
+
+
+
+  
