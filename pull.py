@@ -5,6 +5,7 @@ import pathlib
 from collections import deque
 import sh
 import time
+from io import StringIO
 
 cups = sh.Command("./cups.py")
 
@@ -15,11 +16,31 @@ pipeline = deque([])
 count = 0
 
 runnumber = 0
+segment   = 0
 dstname = ""
 
+class EventCounter:
+    def __init__(self):
+        self.nevents=0
+        self.firstline=None
+        self.lastline=""
+    def __call__(self,data):
+        self.nevents=self.nevents+1
+        self.lastline=data.strip()
+        if self.firstline==None:
+            self.firstline=self.lastline
+
+
+# Total number of events produced
+nevents = 0
+
 for line in sys.stdin:
+
+    print( line.strip() )
+
+    # Handle PRDF processing
     if 'Fun4AllRolloverFileOutStream' in line:
-        print( line.strip() )
+
         pipeline.append( line.strip() )
         if len(pipeline)>1:
 
@@ -31,23 +52,19 @@ for line in sys.stdin:
             procline2 = procline.split('/')[-1]
 
             outfile = procline.split()[-1]
-            #print(outfile)
 
-
-            #print(outfile)
             array=outfile.strip(".prdf").split('-')
-            #print(array)            
+
             dstname=array[0].split('/')[-1]     
 
             runnumber=int(array[1])
             segment=int(array[2])
 
 
+            counter = EventCounter()
+            sh.dpipe( procline, w=0,s='f',d='n',i=True, _out=counter )
+            nevents = nevents + counter.nevents  # an actual event count (via dpipe)
 
-            #print( dstname, runnumber, segment )
-
-            # ./cups.py -r 22026 -s 41 -d DST_EVENT_auau23_ana393_2023p009 catalog --ext prdf --path ... --dataset mdc2 --hostname lustre
-            # print(f"cups.py -r {runnumber} -s {segment} -d {dstname} catalog --ext prdf --path {pathname} --dataset mdc2 --hostname lustre")
 
             # Register the file with the file catalog
             cups([ 
@@ -59,17 +76,43 @@ for line in sys.stdin:
                 '--path',     f'{pathname}',
                 '--dataset',  f'{dataset}',
                 '--hostname', f'{hostname}',
+                '--nevents',  f'{counter.nevents}',
                 ])
 
-            time.sleep(120)
-                
-#./cups.py -r ${runnumber} -s 0 -d DST_EVENT_auau23_${build}_${dbtag} finished -e ${status_f4a} --nsegments ${count}
+            cups([
+                '--run',      f'{runnumber}', 
+                '--segment',  '0',
+                '--dstname',  f'{dstname}',     
+                'nevents',
+                '--nevents', f'{nevents}',
+            ])
+
+            # And this is important... zero out the segment so that the aggregate count at the end iw correct
+            segment = 0
+
+    # file DST_CALOR_auau23_ana387_2023p003-00022027-0099.root, entries: 661
+    elif "file" in line and ", entries:" in line:
+
+        array = line.strip().split()
+        #print(array)
+        #print(array[1])
+
+        nevents=array[-1]
+        filename=array[1]
+        print(filename, nevents)
+
+        filename = filename.split('.')[0]
+
+        dstname, runnumber, segment = filename.split('-')
+
+        # Fall through to the aggregate below...
 
 cups([
     '--run',      f'{runnumber}', 
-    '--segment',  '0',
+    '--segment',  f'{segment}',
     '--dstname',  f'{dstname}',     
     'finished',
     '-e', '-1',
-    '--nsegments', f'{count}'
+    '--nsegments', f'{count}',
+    '--nevents', f'{nevents}',
 ])
