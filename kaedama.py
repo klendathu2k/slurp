@@ -55,100 +55,43 @@ def main():
     if args.limit>0:
         limit_condition = f"limit {args.limit}"
         
-    #_______________________________________________________________________________________________
-    #___________________________________________________________________________________DST_CALOR___
-    if args.rule == "DST_CALOR":
+    # Reduce configuration to this rule
+    config = config[ args.rule ]
 
-        # Reduce configuration to this rule
-        config = config[ args.rule ]
+    # Input query specifies the source of the input files
+    input_query= config['input_query'].format(**locals())
+    params     = config['params']
+    filesystem = config['filesystem']
+    job_       = config['job']
+    
+    if isinstance( params.get( 'file_lists', False ), list ):
+        params['file_lists'] = ','.join( params['file_lists'] )
 
-        # Input query specifies the source of the input files
-        input_query= config['input_query'].format(**locals())
-        params     = config['params']
-        filesystem = config['filesystem']
-        job_       = config['job']
+    jobkw = {}
+    for k,v in job_.items():
+        jobkw[k] = v.format( **locals(), **filesystem, **params )
 
-        if isinstance( params.get( 'file_lists', False ), list ):
-            params['file_lists'] = ','.join( params['file_lists'] )
+    # And now we can create the job definition thusly
+    job = Job( **jobkw )
 
-        jobkw = {}
-        for k,v in job_.items():
-            jobkw[k] = v.format( **locals(), **filesystem, **params )
+    if args.submit:
+        dst_rule = Rule( name              = params['name'],
+                         files             = input_query,
+                         script            = params['script'],
+                         build             = params['build'],
+                         tag               = params['dbtag'],
+                         payload           = params['payload'],
+                         job               = job,
+                         limit             = args.limit
+                     )
 
-        # And now we can create the job definition thusly
-        job = Job( **jobkw )
+        # Extract the subset of parameters that we need to pass to submit
+        submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump"] }
 
-        # DST_CALOR rule
-        if args.submit:
-            DST_CALOR_rule = Rule( name              = params['name'],
-                                   files             = input_query,
-                                   script            = params['script'],
-                                   build             = params['build'],
-                                   tag               = params['dbtag'],
-                                   payload           = params['payload'],
-                                   job               = job,
-                                   limit             = args.limit
-            )
+        submit (dst_rule, nevents=args.nevents, **submitkw, **filesystem ) 
 
-            # Extract the subset of parameters that we need to pass to submit
-            submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump"] }
-
-            submit (DST_CALOR_rule, nevents=args.nevents, 
-                    **submitkw,
-                    **filesystem
-            ) 
-
-        else:            
-            pprint.pprint(job)
-
-
-    #_______________________________________________________________________________________________
-    #___________________________________________________________________________________DST_EVENT___
-
-    elif args.rule == 'DST_EVENT':
-
-        # Get configuration for this rule
-        config     = config[args.rule]
-
-        # Input query specifies the source of the input files
-        input_query= config['input_query'].format(**locals())
-        params     = config['params']
-        filesystem = config['filesystem']
-        job_       = config['job']
-
-        if isinstance( params.get( 'file_lists', False ), list ):
-            params['file_lists'] = ','.join( params['file_lists'] )
-        
-        # Need to apply string formatting to all values in the job_ dictionary
-        jobkw = {}
-        for k,v in job_.items():
-            jobkw[k] = v.format( **locals(), **filesystem, **params )
-        
-        # And now we can create the job definition thusly
-        job = Job( **jobkw )
-        
-        if args.submit:
-            DST_EVENT_rule = Rule( name    = params['name']    ,
-                                   files   = input_query       ,
-                                   script  = params['script']  ,
-                                   build   = params['build']   ,
-                                   tag     = params['dbtag']   ,
-                                   payload = params['payload'] ,
-                                   job    = job                ,
-                                   limit  = args.limit         
-            )
-
-            # Extract the subset of parameters that we need to pass to submit
-            submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump"] }
-
-            submit(DST_EVENT_rule, 
-                   nevents = args.nevents, 
-                   **submitkw,
-                   **filesystem
-            ) 
-
-        else:
-            pprint.pprint(job)
+    else:            
+        pprint.pprint(job)
 
 
 if __name__ == '__main__': main()
