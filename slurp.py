@@ -141,14 +141,14 @@ class SPhnxMatch:
         object.__setattr__(self, 'buildarg', self.build)
         b = self.build
         b = b.replace(".","")
-        object.__setattr__(self, 'build', b)        
-        
+        object.__setattr__(self, 'build', b)                
         run = int(self.run)
-        sldir = "/tmp/slurp/%i"%( math.trunc(run/100)*100 )
-        if self.condor == None: object.__setattr__(self, 'condor', sldir )
-        sldir = "/sphenix/data/data02/sphnxpro/condorlogs/%i"%( math.trunc(run/100)*100 )            
-        if self.stdout == None: object.__setattr__(self, 'stdout', sldir )
-        if self.stderr == None: object.__setattr__(self, 'stderr', sldir )
+
+        #sldir = "/tmp/slurp/%i"%( math.trunc(run/100)*100 )
+        #if self.condor == None: object.__setattr__(self, 'condor', sldir )
+        #sldir = "/sphenix/data/data02/sphnxpro/condorlogs/%i"%( math.trunc(run/100)*100 )            
+        #if self.stdout == None: object.__setattr__(self, 'stdout', sldir )
+        #if self.stderr == None: object.__setattr__(self, 'stderr', sldir )
 
 #    def __post_init__(self):
 #        if self.condor == None:
@@ -330,14 +330,14 @@ def submit( rule, **kwargs ):
         return result
 
     # Build "list" of paths which need to be created before submitting
-    mkpaths = {}
-    for m in matching:        
-        mkpaths[ m["condor"] ] = 1;
-        mkpaths[ m["stdout"] ] = 2;
-        mkpaths[ m["stderr"] ] = 3;
+    #$$$mkpaths = {}
+    #$$$for m in matching:        
+    #$$$    mkpaths[ m["condor"] ] = 1;
+    #$$$    mkpaths[ m["stdout"] ] = 2;
+    #$$$    mkpaths[ m["stderr"] ] = 3;
 
-    for (p,v) in mkpaths.items():
-        if not os.path.exists(p): os.makedirs( p )
+    #$$$for (p,v) in mkpaths.items():
+    #$$$    if not os.path.exists(p): os.makedirs( p )
 
     #
     # Resubmit is only a manual operation.  Existing files must be removed or the DB query adjusted to avoid
@@ -380,7 +380,15 @@ def submit( rule, **kwargs ):
         
         schedd = htcondor.Schedd()    
 
-        submit_result = schedd.submit(submit_job, itemdata=iter(matching))  # submit one job for each item in the itemdata
+        mymatching = []
+        for m in iter(matching):
+            d = {}
+            for k,v in m.items():
+                if k in str(submit_job):
+                    d[k] = v
+                    mymatching.append(d)        
+
+        submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
  
         schedd_query = schedd.query(
             constraint=f"ClusterId == {submit_result.cluster()}",
