@@ -12,6 +12,7 @@ import math
 import sh
 import argparse
 import datetime
+import time
 
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
@@ -387,19 +388,38 @@ def submit( rule, **kwargs ):
                 if k in str(submit_job):
                     d[k] = v
                     mymatching.append(d)        
+        
+        run_submit_loop=30
+        schedd_query = None
+        for run_submit_loop in [120,180,300,600]:
+            try:
+                submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
 
-        submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
+                schedd_query = schedd.query(
+                    constraint=f"ClusterId == {submit_result.cluster()}",
+                    projection=["ClusterId", "ProcId", "Out", "Args" ]
+                )
+                break # success... break past the else clause
+            
+            except htcondor.HTCondorIOError:
+
+                print(f"WARNING: could not submit jobs to condor.  Retry in {run_submit_loop} seconds")
+                time.sleep( run_submit_loop )
+
+        else:
+            # Executes after final iteration
+            print(f"ERROR: could not submit jobs to condor after several retries")
+            
+            
  
-        schedd_query = schedd.query(
-            constraint=f"ClusterId == {submit_result.cluster()}",
-            projection=["ClusterId", "ProcId", "Out", "Args" ]
-        )
+        # Update DB IFF we have a valid submission
+        if ( schedd_query ):
 
-        insert_production_status( matching, setup, schedd_query, state="submitting" ) 
+            insert_production_status( matching, setup, schedd_query, state="submitting" ) 
 
-        result = submit_result.cluster()
+            result = submit_result.cluster()
 
-        update_production_status( matching, setup, schedd_query, state="submitted" )
+            update_production_status( matching, setup, schedd_query, state="submitted" )
 
 
     else:
@@ -551,12 +571,12 @@ def matches( rule, kwargs={} ):
         x = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
 
-        if stat in blocking:
+        if stat in blocking and args.batch==False:
            print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat ))
            continue
         
         test=exists.get( dst, None )
-        if test and not resubmit:
+        if test and not resubmit and args.batch==False:
             print("Warning: %s has already been produced, skipping."%dst)
             continue
 
