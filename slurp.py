@@ -387,7 +387,7 @@ def submit( rule, **kwargs ):
             for k,v in m.items():
                 if k in str(submit_job):
                     d[k] = v
-                    mymatching.append(d)        
+            mymatching.append(d)        
         
         run_submit_loop=30
         schedd_query = None
