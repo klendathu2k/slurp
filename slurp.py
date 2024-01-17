@@ -65,7 +65,7 @@ class SPhnxCondorJob:
     initialdir:            str = None
     accounting_group:      str = None
     accounting_group_user: str = None
-    transfer_output_files: str = None
+    transfer_output_files: str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).out,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).err"
     transfer_input_files:  str = None
     user_job_wrapper:      str = None
 

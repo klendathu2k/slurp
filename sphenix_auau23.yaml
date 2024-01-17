@@ -56,6 +56,7 @@ DST_CALOR:
      log                   : "{condor}/{logbase}.condor"
      accounting_group      : "group_sphenix.mdc2"
      accounting_group_user : "sphnxpro"
+     transfer_output_files : "$(name)_$(build)_$(tag)-$INT(run,%010d)-$INT(seg,%05d).out,$(name)_$(build)_$(tag)-$INT(run,%010d)-$INT(seg,%05d).err"
 
 
 #__________________________________________________________________________________________________________________
