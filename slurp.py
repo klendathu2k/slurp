@@ -359,10 +359,10 @@ def submit( rule, **kwargs ):
     # An unclean setup is also cause for manual intervention.  It will hold up any data production.
     #    (but we will allow override with the batch flag)
     #
-    if not ( setup.is_clean and setup.is_current ):
+    if not ( setup.is_clean and setup.is_current ) and args.batch==False:
         print("Warning: the macros/scripts directory is not at the same commit as its github repo and/or")
         print("         there are uncommitted local changes.")
-        
+
         reply=None
         while reply not in ['y','yes','Y','YES','Yes','n','N','no','No','NO']:
             reply = "N"
