@@ -359,7 +359,7 @@ def submit( rule, **kwargs ):
     # An unclean setup is also cause for manual intervention.  It will hold up any data production.
     #    (but we will allow override with the batch flag)
     #
-    if not ( setup.is_clean and setup.is_current ) and not args.batch:
+    if not ( setup.is_clean and setup.is_current ):
         print("Warning: the macros/scripts directory is not at the same commit as its github repo and/or")
         print("         there are uncommitted local changes.")
         
@@ -568,6 +568,8 @@ def matches( rule, kwargs={} ):
         file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        
         prod_status_map[file_basename] = stat.status
 
+    pprint.pprint(prod_status_map)
+
     # Build the list of matches    
     
     for ((lfn,run,seg),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
@@ -575,13 +577,17 @@ def matches( rule, kwargs={} ):
         x = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
 
-        if stat in blocking and args.batch==False:
-           print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat ))
-           continue
+        print( lfn, run, seg, dst, x, stat )
+
+        pprint.pprint(blocking)
+
+        if stat in blocking:
+            if args.batch==False:           print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat ))
+            continue
         
         test=exists.get( dst, None )
-        if test and not resubmit and args.batch==False:
-            print("Warning: %s has already been produced, skipping."%dst)
+        if test and not resubmit:
+            if args.batch==False:           print("Warning: %s has already been produced, skipping."%dst)
             continue
 
         if test and resubmit:
