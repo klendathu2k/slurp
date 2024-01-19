@@ -568,18 +568,12 @@ def matches( rule, kwargs={} ):
         file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        
         prod_status_map[file_basename] = stat.status
 
-    pprint.pprint(prod_status_map)
-
     # Build the list of matches    
     
     for ((lfn,run,seg),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
         
         x = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
-
-        print( lfn, run, seg, dst, x, stat )
-
-        pprint.pprint(blocking)
 
         if stat in blocking:
             if args.batch==False:           print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat ))
