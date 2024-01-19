@@ -46,17 +46,18 @@ DST_CALOR:
    # Condor variables are defined using the syntax $(variable).  
    #
    job:
-     executable            : "{payload}/run_caloreco.sh"
-     arguments             : "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
-     user_job_wrapper      : "init.sh"
-     output_destination    : 'file://{condor}'
-     transfer_input_files  : "{payload},cups.py,init.sh,pull.py"
-     output                : "{logbase}.condor.stdout"
-     error                 : "{logbase}.condor.stderr"
-     log                   : "{condor}/{logbase}.condor"
-     accounting_group      : "group_sphenix.mdc2"
-     accounting_group_user : "sphnxpro"
-
+     executable             : "{payload}/run_caloreco.sh"
+     arguments              : "$(nevents) $(run) $(seg) $(lfn) . $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
+     user_job_wrapper       : "init.sh"
+     output_destination     : 'file://{condor}'
+     transfer_input_files   : "{payload},cups.py,init.sh,pull.py"
+     output                 : "{logbase}.condor.stdout"
+     error                  : "{logbase}.condor.stderr"
+     log                    : "{condor}/{logbase}.condor"
+     accounting_group       : "group_sphenix.mdc2"
+     accounting_group_user  : "sphnxpro"
+     transfer_output_files  : '$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).out,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).err'
+#    transfer_output_files  : 'stdout.log,stderr.log'
 
 #__________________________________________________________________________________________________________________
 #_______________________________________________________________________________________________________DST_EVENT__

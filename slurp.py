@@ -65,7 +65,10 @@ class SPhnxCondorJob:
     initialdir:            str = None
     accounting_group:      str = None
     accounting_group_user: str = None
+#   transfer_output_files: str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).out,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).err"
     transfer_output_files: str = None
+    transfer_output_remaps: str = None
+    
     transfer_input_files:  str = None
     user_job_wrapper:      str = None
 
@@ -356,10 +359,10 @@ def submit( rule, **kwargs ):
     # An unclean setup is also cause for manual intervention.  It will hold up any data production.
     #    (but we will allow override with the batch flag)
     #
-    if not ( setup.is_clean and setup.is_current ) and not args.batch:
+    if not ( setup.is_clean and setup.is_current ) and args.batch==False:
         print("Warning: the macros/scripts directory is not at the same commit as its github repo and/or")
         print("         there are uncommitted local changes.")
-        
+
         reply=None
         while reply not in ['y','yes','Y','YES','Yes','n','N','no','No','NO']:
             reply = "N"
@@ -370,6 +373,7 @@ def submit( rule, **kwargs ):
     jobd = rule.job.dict()
 
     submit_job = htcondor.Submit( jobd )
+    print(submit_job)
     if verbose>0:
         print(submit_job)
         for m in matching:
@@ -571,13 +575,13 @@ def matches( rule, kwargs={} ):
         x = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
 
-        if stat in blocking and args.batch==False:
-           print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat ))
-           continue
+        if stat in blocking:
+            if args.batch==False:           print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat ))
+            continue
         
         test=exists.get( dst, None )
-        if test and not resubmit and args.batch==False:
-            print("Warning: %s has already been produced, skipping."%dst)
+        if test and not resubmit:
+            if args.batch==False:           print("Warning: %s has already been produced, skipping."%dst)
             continue
 
         if test and resubmit:
