@@ -89,8 +89,35 @@ def main():
                avg(age(ended,started))         as avg_job_duration,
                min(age(ended,started))         as min_job_duration,
                max(age(ended,started))         as max_job_duration,
-               sum(nevents)                    as sum_events,
-               cluster
+               sum(nevents)                    as sum_events
+       
+            from   production_status 
+            where  status>='started' 
+            group by dsttype
+            order by dsttype desc
+               ;
+            """
+            psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
+
+        if 'clusters' in args.outputs:
+            print("Summary of jobs which have reached staus='started'")
+            print("--------------------------------------------------")
+            psqlquery="""
+            select dsttype,cluster,
+               count(run)                      as num_jobs,
+               avg(age(started,submitting))    as avg_time_to_start,
+               count( case status when 'submitted' then 1 else null end )
+                                               as num_submitted,
+               count( case status when 'running' then 1 else null end )
+                                               as num_running,
+               count( case status when 'finished' then 1 else null end )
+                                               as num_finished,
+               count( case status when 'failed' then 1 else null end )
+                                               as num_failed,
+               avg(age(ended,started))         as avg_job_duration,
+               min(age(ended,started))         as min_job_duration,
+               max(age(ended,started))         as max_job_duration,
+               sum(nevents)                    as sum_events
        
             from   production_status 
             where  status>='started' 
