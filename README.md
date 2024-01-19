@@ -37,9 +37,11 @@ Support for quality assesment tables a work in progress.
 
   Run dispatch loops over single rules with different delays, and a seperate monitoring
   process.
-  $ ramenya.py --runs 22000 23000 --rules DST_EVENT --delay 300 --outputs none &
-  $ ramenya.py --runs 22000 23000 --rules DST_CALOR --delay 600 --outputs none &
+  $ ramenya.py --runs 22000 23000 --rules DST_EVENT --delay 300 --outputs none --config sphenix_auau23.yaml &
+  $ ramenya.py --runs 22000 23000 --rules DST_CALOR --delay 600 --outputs none --config sphenix_auau23.yaml &
   $ ramenya.py --runs 22000 23000 --rules none      --delay  60 --outputs pending started clusters
+
+  You may provide the option "--once" to exit after one iteration of the loop.
 
 - A yaml-based job definition file.  e.g. sphenix_auau23.yaml
 
