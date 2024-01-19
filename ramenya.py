@@ -16,6 +16,7 @@ arg_parser.add_argument( '--rules', nargs='+', default="['all']" )
 arg_parser.add_argument( '--delay', help="Delay between loop executions",default=600)
 arg_parser.add_argument( '--submit', help="Submit jobs to condor",default=True,action="store_true")
 arg_parser.add_argument( '--no-submit', help="No submission, just print the summary information",action="store_false",dest="submit")
+arg_parser.add_argument( '--outputs',help="Information printed at each loop",nargs='+', default=['started'] )
 
 args = arg_parser.parse_args()
 
@@ -47,32 +48,34 @@ def main():
                     for r in args.runs:
                         kaedama( "--runs", r, rule="DST_CALOR", config="sphenix_auau23.yaml", batch=True, _out=sys.stdout )
 
-                
-        condor_q("-batch","sphnxpro",_out=sys.stdout)        
+
+        if 'condorq' in args.outputs:
+            condor_q("-batch","sphnxpro",_out=sys.stdout)        
 
 
-        print("Summary of jobs which have not reached staus='started'")
-        print("------------------------------------------------------")
-        psqlquery="""
-        select dsttype,
+        if 'pending' in args.outputs:
+            print("Summary of jobs which have not reached staus='started'")
+            print("------------------------------------------------------")
+            psqlquery="""
+            select dsttype,
                count(run)                        as num_jobs           ,
                avg(age(submitted,submitting))    as avg_time_to_submit ,
                min(age(submitted,submitting))    as min_time_to_submit ,
                max(age(submitted,submitting))    as max_time_to_submit
        
-        from   production_status 
-        where  status<='started' 
-        group by dsttype
-        order by dsttype desc
-               ;
-        """
-        psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
+            from   production_status 
+            where  status<='started' 
+            group by dsttype
+            order by dsttype desc
+            ;
+            """
+            psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
 
-
-        print("Summary of jobs which have reached staus='started'")
-        print("--------------------------------------------------")
-        psqlquery="""
-        select dsttype,
+        if 'started' in args.outputs:
+            print("Summary of jobs which have reached staus='started'")
+            print("--------------------------------------------------")
+            psqlquery="""
+            select dsttype,
                count(run)                      as num_jobs,
                avg(age(started,submitting))    as avg_time_to_start,
                count( case status when 'submitted' then 1 else null end )
@@ -86,19 +89,21 @@ def main():
                avg(age(ended,started))         as avg_job_duration,
                min(age(ended,started))         as min_job_duration,
                max(age(ended,started))         as max_job_duration,
-               sum(nevents)                    as sum_events 
+               sum(nevents)                    as sum_events,
+               cluster
        
-        from   production_status 
-        where  status>='started' 
-        group by dsttype
-        order by dsttype desc
+            from   production_status 
+            where  status>='started' 
+            group by dsttype,cluster
+            order by dsttype desc
                ;
-        """
-        psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
+            """
+            psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
 
 
-        psql(dbname="FileCatalog", 
-             command="select dsttype,run,segment,cluster,process,status,nevents,started,running,ended,exit_code from production_status order by id;", _out=sys.stdout);
+        if 'everything' in args.outputs:
+            psql(dbname="FileCatalog", 
+                 command="select dsttype,run,segment,cluster,process,status,nevents,started,running,ended,exit_code from production_status order by id;", _out=sys.stdout);
 
  
 
