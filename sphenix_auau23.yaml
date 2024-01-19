@@ -45,6 +45,9 @@ DST_CALOR:
    # 
    # Condor variables are defined using the syntax $(variable).  
    #
+   # Note well -- it is important to ensure that the list of arguments is correctly
+   # defined and maps onto the expected input of the payload script.
+   #
    job:
      executable             : "{payload}/run_caloreco.sh"
      arguments              : "$(nevents) $(run) $(seg) $(lfn) . $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
@@ -63,6 +66,7 @@ DST_CALOR:
 #_______________________________________________________________________________________________________DST_EVENT__
 DST_EVENT:
  
+   # DST_EVENT works from a pre-built set of run lists.
    params:
      name:       DST_EVENT_auau23
      build:      ana.393
@@ -88,6 +92,12 @@ DST_EVENT:
         - eventcombine/lists/seb07_$(run).list
         - eventcombine/lists/zdc_$(run).list
 
+   #
+   # This query builds a list of runs where we have one or more input files to
+   # the event builder.  Future version of this will be more complicated to 
+   # lookup runs that have been completed, transfered, and have all files expected
+   # based on the online run configuration.
+   #
    input_query: |-
         select DISTINCT ON (runnumber) filename,runnumber,segment from datasets 
         where ( 
@@ -107,6 +117,10 @@ DST_EVENT:
      logdir : "file:///sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
      condor :        "/sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
 
+   #
+   # Again I note the need to ensure that the arguments are properly specified given the
+   # definition of the payload script.
+   #
    job:
      executable            : "{payload}/run.sh"
      user_job_wrapper      : "init.sh"
