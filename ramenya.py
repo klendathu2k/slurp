@@ -17,13 +17,14 @@ arg_parser.add_argument( '--delay', help="Delay between loop executions",default
 arg_parser.add_argument( '--submit', help="Submit jobs to condor",default=True,action="store_true")
 arg_parser.add_argument( '--no-submit', help="No submission, just print the summary information",action="store_false",dest="submit")
 arg_parser.add_argument( '--outputs',help="Information printed at each loop",nargs='+', default=['started'] )
+arg_parser.add_argument( '--once',help="Break out of the loop after one iteration",default=False,action="store_true")
 
 args = arg_parser.parse_args()
 
 
 
 def main():
-    first=True
+    
     while (True):
 
         if args.submit:
@@ -131,11 +132,10 @@ def main():
         if 'everything' in args.outputs:
             psql(dbname="FileCatalog", 
                  command="select dsttype,run,segment,cluster,process,status,nevents,started,running,ended,exit_code from production_status order by id;", _out=sys.stdout);
-
  
+        if args.once:
+            break
 
-
-        #print("Pausing loop for 2min")
         sleep(int(args.delay))
 
 if __name__ == '__main__':
