@@ -373,7 +373,7 @@ def submit( rule, **kwargs ):
     jobd = rule.job.dict()
 
     submit_job = htcondor.Submit( jobd )
-    print(submit_job)
+
     if verbose>0:
         print(submit_job)
         for m in matching:
