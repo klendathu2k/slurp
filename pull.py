@@ -107,12 +107,15 @@ for line in sys.stdin:
 
         # Fall through to the aggregate below...
 
-cups([
-    '--run',      f'{runnumber}', 
-    '--segment',  f'{segment}',
-    '--dstname',  f'{dstname}',     
-    'finished',
-    '-e', '-1',
-    '--nsegments', f'{count}',
-    '--nevents', f'{nevents}',
-])
+if runnumber>0: 
+    cups([
+        '--run',      f'{runnumber}', 
+        '--segment',  f'{segment}',
+        '--dstname',  f'{dstname}',     
+        'finished',
+        '-e', '-1',
+        '--nsegments', f'{count}',
+        '--nevents', f'{nevents}',
+    ])
+else:
+    print("WARNING: ... no output to grep")
