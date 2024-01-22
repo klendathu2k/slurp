@@ -125,3 +125,20 @@ class SPhnxProductionStatus:
     exit_code: int 
     nevents : int
     
+
+
+def sphnx_production_quality_table_def():
+    return """
+    CREATE TABLE if not exists PRODUCTION_QUALITY (
+       id        serial          unique  ,   -- unique identifier
+       dstname   varchar(32)     not null,   -- dst name eg DST_CALO_auau1_ana387_2023p003
+       run       int             not null,   -- runnumber
+       segment   int             not null,   -- segment number
+       stat_id   int             not null,   -- corresponding entry in the status table
+       qual      jsonb           not null,   -- quality
+
+       foreign key (stat_id) references PRODUCTION_STATUS (id) ,
+       primary key (id, dstname, run, segment )
+
+    );
+    """

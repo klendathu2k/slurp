@@ -13,6 +13,7 @@ import random
 import sh
 import sys
 import signal
+import json
 
 # File catalog
 fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
@@ -283,6 +284,7 @@ def nevents(args):
 #parser.add_argument( "--ext", help="file extension, e.g. root, prdf, ...", default="prdf" )
 #parser.add_argument( "--path", help="path to output file", default="./" )
 
+#_______________________________________________________________________________________________________
 @subcommand([
     argument( "--replace",    help="remove and replace existing entries.", action="store_true", default=True ),
     argument( "--no-replace", help="remove and replace existing entries.", action="store_false", dest="replace" ),
@@ -344,7 +346,7 @@ def catalog(args):
 
 
 
-
+#_______________________________________________________________________________________________________
 @subcommand([
     argument( "script",       help="name of the script to exeute"),
     argument( "scriptargs",   help="arguments for the script", nargs="*" ),
@@ -385,6 +387,31 @@ def execute(args):
     finished=parser.parse_args( ["-d", args.dstname, "-r", args.run, "-s", args.segment, state, "-e","%s"%result.exit_code ] ); 
     finished.func(finished)
 
+#_______________________________________________________________________________________________________
+@subcommand([
+    argument( "--qafile", help="Read the given QA file and save as a jsonb entry in the production quality table" )
+])
+def quality(args):
+    tablename = args.table             # the production_status table
+    dstname   = args.dstname
+    run       = int( args.run )
+    segment   = int( args.segment )
+    id_       = getLatestId( tablename, dstname, run, segment )    # the corresponding production status entry
+    qastring  = None
+    with open( args.qafile, 'r') as qafile:
+        qastring = str( json.load( qafile ) )
+
+    # Make sure to replace the single quotes with double
+    qastring = qastring.replace("'",'"')
+
+    qaentry=f"""
+    INSERT INTO production_quality (stat_id,dstname,run,segment,qual) values
+      ( {id_},'{dstname}',{run},{segment},'{qastring}' );   
+    """
+    print(qaentry)
+
+    fcc.execute(qaentry)
+    fcc.commit()    
 
 
 def main():
