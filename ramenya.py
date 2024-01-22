@@ -11,7 +11,7 @@ condor_q = sh.Command("condor_q")
 psql     = sh.Command("psql")
 
 arg_parser = argparse.ArgumentParser()    
-arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=['26022'] )
+arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[] )
 arg_parser.add_argument( '--rules', nargs='+', default="['all']" )
 arg_parser.add_argument( '--delay', help="Delay between loop executions",default=600)
 arg_parser.add_argument( '--submit', help="Submit jobs to condor",default=True,action="store_true")
@@ -22,8 +22,18 @@ arg_parser.add_argument( '--config',help="Specifies the configuration file used 
 
 args = arg_parser.parse_args()
 
+def makeRunCondition( runs ):
+    result = ""
+    if len(runs)==1 and int(runs[0])>0:
+        result = f" and run={runs[0]} ";
+    if len(runs)==2:
+        result = f" and run>={runs[0]} and run<={runs[1]}";
+    if len(runs)==3:
+        result = f" and runnumber in ({','.join(runs)})"
+    return result
+
 def main():
-    
+
     while (True):
 
         if args.submit:
@@ -49,6 +59,11 @@ def main():
                         kaedama( "--runs", r, rule="DST_CALOR", config=args.config, batch=True, _out=sys.stdout )
 
 
+        # Build conditions for output queries
+        conditions = ""
+        conditions += makeRunCondition( args.runs )
+
+
         if 'condorq' in args.outputs:
             condor_q("-batch","sphnxpro",_out=sys.stdout)        
 
@@ -64,7 +79,7 @@ def main():
                max(age(submitted,submitting))    as max_time_to_submit
        
             from   production_status 
-            where  status<='started' 
+            where  status<='started'  {conditions}
             group by dsttype
             order by dsttype desc
             ;
@@ -74,7 +89,7 @@ def main():
         if 'started' in args.outputs:
             print("Summary of jobs which have reached staus='started'")
             print("--------------------------------------------------")
-            psqlquery="""
+            psqlquery=f"""
             select dsttype,
                run,
                count(run)                      as num_jobs,
@@ -93,11 +108,12 @@ def main():
                sum(nevents)                    as sum_events
        
             from   production_status 
-            where  status>='started' 
+            where  status>='started' {conditions}
             group by dsttype,run
             order by dsttype,run desc
                ;
             """
+            print(psqlquery)
             psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
 
         if 'clusters' in args.outputs:
@@ -121,7 +137,7 @@ def main():
                sum(nevents)                    as sum_events
        
             from   production_status 
-            where  status>='started' 
+            where  status>='started'  {conditions}
             group by dsttype,cluster
             order by dsttype desc
                ;
