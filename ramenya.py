@@ -71,7 +71,7 @@ def main():
         if 'pending' in args.outputs:
             print("Summary of jobs which have not reached staus='started'")
             print("------------------------------------------------------")
-            psqlquery="""
+            psqlquery=f"""
             select dsttype,
                count(run)                        as num_jobs           ,
                avg(age(submitted,submitting))    as avg_time_to_submit ,
@@ -113,13 +113,12 @@ def main():
             order by dsttype,run desc
                ;
             """
-            print(psqlquery)
             psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
 
         if 'clusters' in args.outputs:
             print("Summary of jobs which have reached staus='started'")
             print("--------------------------------------------------")
-            psqlquery="""
+            psqlquery=f"""
             select dsttype,cluster,
                count(run)                      as num_jobs,
                avg(age(started,submitting))    as avg_time_to_start,
