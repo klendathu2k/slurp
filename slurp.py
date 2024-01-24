@@ -34,9 +34,6 @@ __rules__  = []
 fc = pyodbc.connect("DSN=FileCatalog")
 fcc = fc.cursor()
 
-# FileCatalog Cache
-fc_cache = {}
-
 verbose=0
 
 @dataclass
@@ -538,12 +535,10 @@ def matches( rule, kwargs={} ):
 
     outputs = []
 
-    # Retrieve from cache if we can, otherwise go to the DB
-    fc_result = fc_cache.get( rule.files, None )
-    if fc_result == None:
-        fc_result = list( fcc.execute( rule.files ).fetchall() )
-        fc_cache[ rule.files ] = fc_result
-        outputs = [ "%s_%s_%s-%08i-%04i.root"%(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
+    # Build list of possible outputs from filelist query... (requires run,sequence as 2nd and 3rd
+    # elements in the query result)
+    fc_result = list( fcc.execute( rule.files ).fetchall() )
+    outputs = [ "%s_%s_%s-%08i-%04i.root"%(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
 
     # Build dictionary of existing dsts
     dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
