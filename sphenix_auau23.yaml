@@ -99,18 +99,40 @@ DST_EVENT:
    # based on the online run configuration.
    #
    input_query: |-
-        select DISTINCT ON (runnumber) filename,runnumber,segment from datasets 
-        where ( 
-              filename like 'beam_seb%' 
-           or filename like 'beam_East%' 
-           or filename like 'beam_West%' 
-           or filename like 'beam_LL1%' 
-           or filename like 'GL1_beam%'
-        ) 
-        {run_condition} 
-        {seg_condition}
-        order by runnumber,segment
-        {limit_condition}
+         select 
+                'dummy'     as dummy,
+                runnumber           ,
+                0 as segment        ,
+                string_agg( distinct split_part(filename,'/',-1), ' ' ) as files
+         from 
+                datasets
+         where
+                dsttype='beam' and dataset='rawdata1008'
+         {run_condition} 
+         {seg_condition}
+         group by 
+                runnumber
+         order by 
+                runnumber
+         {limit_condition}
+         ;
+
+   runlist_query: |-
+        select 'dummy'                                                  as dummy   ,
+                runnumber                                                          ,
+                0                                                       as segment ,
+                string_agg( distinct split_part(filename,'/',-1), ' ' ) as files   ,
+                string_agg( distinct hostname,' ')                      as hosts   
+        from filelist
+        where transferred_to_sdcc
+              and filename like '/bbox%'
+              and hostname in ( 'seb00','seb01','seb02','seb03','seb04','seb05','seb06','seb07','seb14','seb15','seb16','seb17','seb18' )
+              {run_condition}
+              group by runnumber
+              order by runnumber
+              {limit_condition}
+              ;
+
 
    filesystem:
      outdir : "/sphenix/lustre01/sphnxpro/slurp/$$([$(run)/100])00"
