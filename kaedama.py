@@ -59,10 +59,13 @@ def main():
     config = config[ args.rule ]
 
     # Input query specifies the source of the input files
-    input_query= config['input_query'].format(**locals())
+    input_query   = config['input_query'].format(**locals())
+    runlist_query = config.get('runlist_query','').format(**locals())
     params     = config['params']
     filesystem = config['filesystem']
     job_       = config['job']
+
+    if runlist_query=='': runlist_query = None
     
     if isinstance( params.get( 'file_lists', False ), list ):
         params['file_lists'] = ','.join( params['file_lists'] )
@@ -77,6 +80,7 @@ def main():
     if args.submit:
         dst_rule = Rule( name              = params['name'],
                          files             = input_query,
+                         runlist           = runlist_query,            # may be None
                          script            = params['script'],
                          build             = params['build'],
                          tag               = params['dbtag'],
