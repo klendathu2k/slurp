@@ -11,6 +11,8 @@ from slurp import submit
 
 from slurp import arg_parser
 
+from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
+
 import pprint
 
 # Extend the command line arguments

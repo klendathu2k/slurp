@@ -20,6 +20,8 @@ from slurptables import sphnx_production_status_table_def
 
 from dataclasses import dataclass, asdict, field
 
+from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
+
 # List of states which block the job
 blocking = ["submitting","submitted","started","running","evicted","failed","finished"]
 #blocking = []
@@ -288,10 +290,10 @@ def insert_production_status( matching, setup, condor, state ):
             cluster = condor_map[ key.lower() ][ 'ClusterId' ]
             process = condor_map[ key.lower() ][ 'ProcId'    ]
         except KeyError:
-            print("Key Error getting cluster and/or process number from the class ads map.")
-            print(f"  key={key}")
+            ERROR("Key Error getting cluster and/or process number from the class ads map.")
+            ERROR(f"  key={key}")
             pprint.pprint( condor_map )
-            print("Assuming this is an issue with condor, setting cluster=0, process=0 and trying to continue...")
+            ERROR("Assuming this is an issue with condor, setting cluster=0, process=0 and trying to continue...")
             cluster = 0
             process = 0
 
@@ -331,7 +333,7 @@ def submit( rule, **kwargs ):
     matching, setup = matches( rule, kwargs )
 
     if len(matching)==0:
-        print("Warning: no input files match the specifed rule.  Done.")
+        WARN("No input files match the specifed rule.")
         return result
 
     # Build "list" of paths which need to be created before submitting
@@ -355,14 +357,14 @@ def submit( rule, **kwargs ):
             reply = input("Warning: resubmit option may overwrite previous production.  Continue (y/N)?")
         if reply in ['n','N','No','no','NO']:
             return result
-
+ 
     #
     # An unclean setup is also cause for manual intervention.  It will hold up any data production.
     #    (but we will allow override with the batch flag)
     #
     if not ( setup.is_clean and setup.is_current ) and args.batch==False:
-        print("Warning: the macros/scripts directory is not at the same commit as its github repo and/or")
-        print("         there are uncommitted local changes.")
+        if setup.is_clean  ==False: WARN("Uncommitted local changes detected")
+        if setup.is_current==False: WARN("Local repo needs to be updated")
 
         reply=None
         while reply not in ['y','yes','Y','YES','Yes','n','N','no','No','NO']:
@@ -376,13 +378,13 @@ def submit( rule, **kwargs ):
     submit_job = htcondor.Submit( jobd )
 
     if verbose>0:
-        print(submit_job)
+        INFO(submit_job)
         for m in matching:
             pprint.pprint(m)
 
     if dump==False:
         if verbose==-10:
-            print(submit_job)
+            INFO(submit_job)
         
         schedd = htcondor.Schedd()    
 
@@ -408,12 +410,12 @@ def submit( rule, **kwargs ):
             
             except htcondor.HTCondorIOError:
 
-                print(f"WARNING: could not submit jobs to condor.  Retry in {run_submit_loop} seconds")
+                WARN(f"Could not submit jobs to condor.  Retry in {run_submit_loop} seconds")
                 time.sleep( run_submit_loop )
 
         else:
             # Executes after final iteration
-            print(f"ERROR: could not submit jobs to condor after several retries")
+            ERROR(f"ERROR: could not submit jobs to condor after several retries")
             
             
  
@@ -588,12 +590,12 @@ def matches( rule, kwargs={} ):
         stat = prod_status_map.get( x, None )
 
         if stat in blocking:
-            if args.batch==False:           print("Warning: %s is blocked by production status=%s, skipping."%( dst, stat ))
+            if args.batch==False:           WARN("%s is blocked by production status=%s, skipping."%( dst, stat ))
             continue
         
         test=exists.get( dst, None )
         if test and not resubmit:
-            if args.batch==False:           print("Warning: %s has already been produced, skipping."%dst)
+            if args.batch==False:           WARN("%s has already been produced, skipping."%dst)
             continue
 
         #
@@ -611,21 +613,21 @@ def matches( rule, kwargs={} ):
             # Loop over the difference between the sets of files
             for f in test:
                 if f in rfiles: 
-                    if args.batch==False: print (f"Info: {f} has been transferred to SDCC but is not in the filecatalog, skipping")
+                    if args.batch==False: INFO (f"{f} has been transferred to SDCC but is not in the filecatalog, skipping")
                     skip = True
                 if f in ffiles: 
-                    print (f"Warning: {f} is in the filecatalog but does not appear in the daq filelist (accpt for now/will reject in production).")
+                    INFO (f"{f} in filecatalog missing in the daq filelist.") # accepting for now but will reject in production
                     #$$$ skip = True 
             if skip: continue
 
 
 
         if test and resubmit:
-            print("Warning: %s exists and will be overwritten"%dst)
+            WARN("%s exists and will be overwritten"%dst)
 
         if True:
             if verbose>10:
-                print (lfn, run, seg, dst, "\n");
+                INFO (lfn, run, seg, dst, "\n");
 
             match = SPhnxMatch(
                 name,
