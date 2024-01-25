@@ -34,6 +34,9 @@ __rules__  = []
 fc = pyodbc.connect("DSN=FileCatalog")
 fcc = fc.cursor()
 
+daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;SERVER=sphnxdaqdbreplica.sdcc.bnl.gov");
+daqc = daqdb.cursor()
+
 verbose=0
 
 @dataclass
@@ -77,17 +80,17 @@ class SPhnxCondorJob:
 
 @dataclass( frozen= __frozen__ )
 class SPhnxRule:
-    name:              str          # Name of the rule
-    files:             str          # FileCatalog DB query
-    script:            str          # Production script
-    build:             str          # Build tag
-    tag:               str          # Database tag
+    name:              str            # Name of the rule
+    script:            str            # Production script
+    build:             str            # Build tag
+    tag:               str            # Database tag
+    files:             str  = None    # FileCatalog DB query
+    runlist:           str  = None    # Input run list query from daq
     job:               SPhnxCondorJob = SPhnxCondorJob()
-    resubmit:          bool = False # Set true if job should overwrite existing job
-    buildarg:          str  = ""    # The build tag passed as an argument (leaves the "." in place).
-    payload:  str = "";      # Payload directory (condor transfers inputs from)
-    #manifest: list[str] = None;      # List of files in the payload directory
-    limit:    int = 0 # maximum number of matches to return 0=all
+    resubmit:          bool = False   # Set true if job should overwrite existing job
+    buildarg:          str  = ""      # The build tag passed as an argument (leaves the "." in place).
+    payload:           str = "";      # Payload directory (condor transfers inputs from)
+    limit:    int = 0                 # maximum number of matches to return 0=all
 
     def __eq__(self, that ):
         return self.name == that.name
@@ -131,6 +134,7 @@ class SPhnxMatch:
     stderr:   str = None; 
     condor:   str = None;
     buildarg: str = None;
+    inputs:   str = None;
 
     
 
@@ -537,7 +541,20 @@ def matches( rule, kwargs={} ):
 
     # Build list of possible outputs from filelist query... (requires run,sequence as 2nd and 3rd
     # elements in the query result)
-    fc_result = list( fcc.execute( rule.files ).fetchall() )
+    fc_result = []
+    fc_map    = None
+
+    rl_result = None
+    rl_map    = None
+
+    if rule.files:
+        fc_result = list( fcc.execute( rule.files ).fetchall() )
+        fc_map = { f[1] : f for f in fc_result }
+
+    if rule.runlist:
+        rl_result = list( daqc.execute( rule.runlist ).fetchall() )
+        rl_map = { r[1] : r for r in rl_result }
+    
     outputs = [ "%s_%s_%s-%08i-%04i.root"%(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
 
     # Build dictionary of existing dsts
@@ -565,7 +582,7 @@ def matches( rule, kwargs={} ):
 
     # Build the list of matches    
     
-    for ((lfn,run,seg),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
+    for ((lfn,run,seg,*fc_rest),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
         
         x = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
@@ -578,6 +595,30 @@ def matches( rule, kwargs={} ):
         if test and not resubmit:
             if args.batch==False:           print("Warning: %s has already been produced, skipping."%dst)
             continue
+
+        #
+        # Runlist query from the daq was specified.  This requires that all files transferred to SDCC
+        # show up in the datasets catalog (a separate filelist build to be done...)
+        #
+        inputs_ = None
+        if fc_map and rl_map:
+            (fdum, frun, fseg, ffiles, *frest) = fc_map[run]
+            (rdum, rrun, rseg, rfiles, *rrest) = rl_map[run]
+            ffiles=ffiles.split()
+            rfiles=rfiles.split()
+            test =  set(ffiles) ^ set(rfiles)
+            skip = False
+            # Loop over the difference between the sets of files
+            for f in test:
+                if f in rfiles: 
+                    if args.batch==False: print (f"Info: {f} has been transferred to SDCC but is not in the filecatalog, skipping")
+                    skip = True
+                if f in ffiles: 
+                    print (f"Warning: {f} is in the filecatalog but does not appear in the daq filelist (accpt for now/will reject in production).")
+                    #$$$ skip = True 
+            if skip: continue
+
+
 
         if test and resubmit:
             print("Warning: %s exists and will be overwritten"%dst)
@@ -597,7 +638,8 @@ def matches( rule, kwargs={} ):
                 tag,
                 "4096MB",
                 "10GB",
-                payload
+                payload,
+                inputs=inputs_
                 )
 
             match = match.dict()
