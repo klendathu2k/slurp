@@ -93,16 +93,26 @@ DST_EVENT:
         - eventcombine/lists/zdc_$(run).list
 
    #
-   # This query builds a list of runs where we have one or more input files to
-   # the event builder.  Future version of this will be more complicated to 
-   # lookup runs that have been completed, transfered, and have all files expected
-   # based on the online run configuration.
+   # input_query:
    #
+   # This builds a list of all runs known to the file catalog "datasets" table.
+   # The query should return:
+   # 1. The source of the information (formatted as database name/table name)
+   # 2. The run number
+   # 3. A sequence number (a placeholder fixed at zero for event builders)
+   # 4. And a space-separated list of logical filenames 
+   #
+   # The input query below accesses the datasets table of the file catalog.
+   # The dsttype is "beam" and the dataset is rawdata1008.
+   #
+   # The {*_condition} parameters (run, seg, limit) are substituted by kaedama
+   # based on (optional) command line options.
+   #   
    input_query: |-
          select 
-                'dummy'     as dummy,
-                runnumber           ,
-                0 as segment        ,
+                'filecatalog/datasets'                                  as source  ,
+                runnumber                                                          ,
+                0                                                       as segment ,        
                 string_agg( distinct split_part(filename,'/',-1), ' ' ) as files
          from 
                 datasets
@@ -117,8 +127,20 @@ DST_EVENT:
          {limit_condition}
          ;
 
+   #
+   # runlist_query:
+   #
+   # This builds a list of all runs known to the daq database "filelist" table. 
+   # 
+   # The query should return:
+   # 1. The source of the information (formatted as database name/table name)
+   # 2. The run number
+   # 3. A sequence number (a placeholder fixed at zero for event builders)
+   # 4. A space-separated list of logical filenames 
+   # 5. A space-separated list of daq hosts.
+   # 
    runlist_query: |-
-        select 'dummy'                                                  as dummy   ,
+        select 'daq/filelist'                                           as source  ,
                 runnumber                                                          ,
                 0                                                       as segment ,
                 string_agg( distinct split_part(filename,'/',-1), ' ' ) as files   ,
@@ -146,7 +168,7 @@ DST_EVENT:
    job:
      executable            : "{payload}/run.sh"
      user_job_wrapper      : "init.sh"
-     arguments             : "$(nevents) {outbase} {logbase} {outdir} $(run) $(ClusterId) $(ProcId) $(build) $(tag)"
+     arguments             : "$(nevents) {outbase} {logbase} {outdir} $(run) $(ClusterId) $(ProcId) $(build) $(tag) $(inputs)"
      output_destination    : 'file://{condor}'
      transfer_input_files  : "{payload},cups.py,init.sh,pull.py,{file_lists}"
      output                : '{logbase}.condor.stdout'

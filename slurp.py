@@ -388,13 +388,23 @@ def submit( rule, **kwargs ):
         
         schedd = htcondor.Schedd()    
 
+        # Strip out unused $(...) condor macros
         mymatching = []
+        if rule.runlist:
+            INFO("Detected filelist inputs... massage the matches...")
+
         for m in iter(matching):
             d = {}
+            # massage the inputs from space to comma separated
+            if m.get('inputs',None): m['inputs']= ','.join( m['inputs'].split() )
             for k,v in m.items():
                 if k in str(submit_job):
                     d[k] = v
             mymatching.append(d)        
+        
+        if rule.runlist:
+            pprint.pprint( mymatching )
+
         
         run_submit_loop=30
         schedd_query = None
@@ -600,12 +610,15 @@ def matches( rule, kwargs={} ):
 
         #
         # Runlist query from the daq was specified.  This requires that all files transferred to SDCC
-        # show up in the datasets catalog (a separate filelist build to be done...)
+        # show up in the datasets catalog.
+        #
+        # A filelist is built from the resulting physical file locations and provided to condor via the
+        # $(inputs) variable, which may be passed into the payload script.
         #
         inputs_ = None
         if fc_map and rl_map:
             (fdum, frun, fseg, ffiles, *frest) = fc_map[run]
-            (rdum, rrun, rseg, rfiles, *rrest) = rl_map[run]
+            (rdum, rrun, rseg, rfiles, rhosts, *rrest) = rl_map[run]
             ffiles=ffiles.split()
             rfiles=rfiles.split()
             test =  set(ffiles) ^ set(rfiles)
@@ -618,9 +631,22 @@ def matches( rule, kwargs={} ):
                 if f in ffiles: 
                     INFO (f"{f} in filecatalog missing in the daq filelist.") # accepting for now but will reject in production
                     #$$$ skip = True 
-            if skip: continue
+            if skip: 
+                continue
 
+            lfns = ffiles # list of LFNs from the filecatalog            
+            lfnpar = ','.join( '?' * len(lfns) )
 
+            # tranfform inputs_ into physical filenames
+            query=f"""
+            select full_file_path 
+                   from files
+            where
+                   lfn in ( {lfnpar} )            
+            """
+            inputs_ = []
+            for f in fcc.execute ( query, lfns ).fetchall():
+                inputs_.append(f[0])            
 
         if test and resubmit:
             WARN("%s exists and will be overwritten"%dst)
@@ -641,7 +667,7 @@ def matches( rule, kwargs={} ):
                 "4096MB",
                 "10GB",
                 payload,
-                inputs=inputs_
+                inputs=' '.join(inputs_)    # dataclass stores flat strings
                 )
 
             match = match.dict()
