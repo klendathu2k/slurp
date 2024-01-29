@@ -655,6 +655,10 @@ def matches( rule, kwargs={} ):
             if verbose>10:
                 INFO (lfn, run, seg, dst, "\n");
 
+            myinputs = None
+            if inputs_:
+                myinputs = ' '.join(inputs_)
+
             match = SPhnxMatch(
                 name,
                 script,
@@ -667,7 +671,7 @@ def matches( rule, kwargs={} ):
                 "4096MB",
                 "10GB",
                 payload,
-                inputs=' '.join(inputs_)    # dataclass stores flat strings
+                inputs=myinputs    # dataclass stores flat strings
                 )
 
             match = match.dict()
