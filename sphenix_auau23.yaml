@@ -77,20 +77,6 @@ DST_EVENT:
      script  :   run.sh
      payload :   /sphenix/u/sphnxpro/slurp/eventcombine/
      mem     :   4096MB   
-     file_lists:
-        - eventcombine/lists/hcaleast_$(run).list
-        - eventcombine/lists/hcalwest_$(run).list
-        - eventcombine/lists/ll1_$(run).list
-        - eventcombine/lists/mbd_$(run).list
-        - eventcombine/lists/seb00_$(run).list
-        - eventcombine/lists/seb01_$(run).list
-        - eventcombine/lists/seb02_$(run).list
-        - eventcombine/lists/seb03_$(run).list
-        - eventcombine/lists/seb04_$(run).list
-        - eventcombine/lists/seb05_$(run).list
-        - eventcombine/lists/seb06_$(run).list
-        - eventcombine/lists/seb07_$(run).list
-        - eventcombine/lists/zdc_$(run).list
 
    #
    # input_query:
