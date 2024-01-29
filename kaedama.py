@@ -69,8 +69,8 @@ def main():
 
     if runlist_query=='': runlist_query = None
     
-    if isinstance( params.get( 'file_lists', False ), list ):
-        params['file_lists'] = ','.join( params['file_lists'] )
+    #if isinstance( params.get( 'file_lists', False ), list ):
+    #    params['file_lists'] = ','.join( params['file_lists'] )
 
     jobkw = {}
     for k,v in job_.items():
