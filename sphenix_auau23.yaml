@@ -125,6 +125,8 @@ DST_EVENT:
    # 4. A space-separated list of logical filenames 
    # 5. A space-separated list of daq hosts.
    # 
+   # grep -v intt | grep -v LL1 | grep -v GL1 | grep -v TPC | grep -v TPOT | grep -v mvtx
+
    runlist_query: |-
         select 'daq/filelist'                                           as source  ,
                 runnumber                                                          ,
@@ -132,15 +134,22 @@ DST_EVENT:
                 string_agg( distinct split_part(filename,'/',-1), ' ' ) as files   ,
                 string_agg( distinct hostname,' ')                      as hosts   
         from filelist
-        where transferred_to_sdcc
-              and filename like '/bbox%'
-              and hostname in ( 'seb00','seb01','seb02','seb03','seb04','seb05','seb06','seb07','seb14','seb15','seb16','seb17','seb18' )
+        where filename     like '/bbox%' and
+              filename not like '%intt%' and
+              filename not like '%LL1%'  and
+              filename not like '%GL1%'  and
+              filename not like '%TPC%'  and 
+              filename not like '%TPOT%' and
+              filename not like '%mvtx%' 
               {run_condition}
               group by runnumber
               order by runnumber
               {limit_condition}
               ;
 
+
+#             and hostname in ( 'seb00','seb01','seb02','seb03','seb04','seb05','seb06','seb07','seb14','seb15','seb16','seb17','seb18' )
+#             and transferred_to_sdcc
 
    filesystem:
      outdir : "/sphenix/lustre01/sphnxpro/slurp/$$([$(run)/100])00"
