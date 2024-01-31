@@ -11,7 +11,18 @@ from slurp import submit
 
 from slurp import arg_parser
 
-from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
+#from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("kaedama.log"),
+        logging.StreamHandler()
+    ]
+)
+
+
 
 import pprint
 
