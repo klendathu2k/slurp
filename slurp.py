@@ -330,7 +330,7 @@ def submit( rule, **kwargs ):
         kwargs['resubmit'] = args.resubmit
 
     # Build list of LFNs which match the input
-    matching, setup = matches( rule, kwargs )
+    matching, setup = matches( rule, kwargs )    
 
     if len(matching)==0:
         WARN("No input files match the specifed rule.")
@@ -402,9 +402,6 @@ def submit( rule, **kwargs ):
                     d[k] = v
             mymatching.append(d)        
         
-        if rule.runlist:
-            pprint.pprint( mymatching )
-
         
         run_submit_loop=30
         schedd_query = None
@@ -575,7 +572,6 @@ def matches( rule, kwargs={} ):
     exists = {}
     for check in fc_check:
         exists[ check[0] ] = ( check[1], check[2] )  # key=filename, value=(run,seg)
-    
 
     # Get the production setup for this submission
     repo_dir  = payload #'/'.join(payload.split('/')[1:]) 
@@ -630,7 +626,6 @@ def matches( rule, kwargs={} ):
                     skip = True
                 if f in ffiles: 
                     INFO (f"{f} in filecatalog missing in the daq filelist.") # accepting for now but will reject in production
-                    #$$$ skip = True 
             if skip: 
                 continue
 
@@ -693,7 +688,7 @@ def matches( rule, kwargs={} ):
 #__________________________________________________________________________________________________
 #
 arg_parser = argparse.ArgumentParser()    
-arg_parser.add_argument( "--batch", default="False", action="store_true",help="Batch mode...")
+arg_parser.add_argument( "--batch", default=False, action="store_true",help="Batch mode...")
 arg_parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=["submitting","submitted","started","running","evicted","failed","finished"] )
 arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, action='store_true', 
                          help='Existing filecatalog entry does not block a job')
