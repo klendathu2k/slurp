@@ -72,11 +72,15 @@ def main():
     config = config[ args.rule ]
 
     # Input query specifies the source of the input files
-    input_query   = config['input_query'].format(**locals())
+    input_query   = config.get('input_query','').format(**locals())
     runlist_query = config.get('runlist_query','').format(**locals())
-    params     = config['params']
-    filesystem = config['filesystem']
-    job_       = config['job']
+    params        = config.get('params',None)
+    filesystem    = config.get('filesystem',None)
+    job_          = config.get('job',None) #config['job']
+
+
+
+
 
     if runlist_query=='': runlist_query = None
     
