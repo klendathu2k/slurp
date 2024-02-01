@@ -25,7 +25,8 @@ from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
 # List of states which block the job
 blocking = ["submitting","submitted","started","running","evicted","failed","finished"]
 #blocking = []
-args = None
+args     = None
+userargs = None
 
 __frozen__ = True
 __rules__  = []
@@ -696,14 +697,15 @@ arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, act
 def parse_command_line():
     global blocking
     global args
+    global userargs
 
-    args = arg_parser.parse_args()
+    args, userargs = arg_parser.parse_known_args()
     #blocking_ = ["submitting","submitted","started","running","evicted","failed","finished"]
 
     if args.unblock:
         blocking = [ b for b in blocking if b not in args.unblock ]
 
-    return args
+    return args, userargs
 
         
 

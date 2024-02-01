@@ -39,7 +39,7 @@ arg_parser.add_argument( '--config',help="Specifies the yaml configuration file"
 def main():
 
     # parse command line options
-    args = slurp.parse_command_line()
+    args, userargs = slurp.parse_command_line()
 
     config={}
     with open(args.config,"r") as stream:
@@ -77,24 +77,44 @@ def main():
     params        = config.get('params',None)
     filesystem    = config.get('filesystem',None)
     job_          = config.get('job',None) #config['job']
+    presubmit     = config.get('presubmit',None)
+
+    if runlist_query =='': runlist_query = None
+    if input_query   =='': input_query   = None
 
 
+    #__________________________________________________________________________________
+    #
+    # Pre Submission Phase
+    #__________________________________________________________________________________
+    if presubmit:
+        pre_query  = presubmit.get('query', '').format(**locals())
+        pre_action = presubmit.get('action','').format(**locals())
 
 
+    #__________________________________________________________________________________
+    #
+    # Job Submission Phase
+    #__________________________________________________________________________________
 
-    if runlist_query=='': runlist_query = None
     
-    #if isinstance( params.get( 'file_lists', False ), list ):
-    #    params['file_lists'] = ','.join( params['file_lists'] )
-
     jobkw = {}
-    for k,v in job_.items():
-        jobkw[k] = v.format( **locals(), **filesystem, **params )
+    job   = None
+    if job_:
+        assert( filesystem is not None )
+        assert( params     is not None )
+        for k,v in job_.items():
+            jobkw[k] = v.format( **locals(), **filesystem, **params )
 
-    # And now we can create the job definition thusly
-    job = Job( **jobkw )
+        # And now we can create the job definition thusly
+        job = Job( **jobkw )
 
-    if args.submit:
+
+    #
+    # Perform job submission IFF we have the params, input_query, filesystem
+    # and job blocks
+    #
+    if args.submit and params and input_query and filesystem and job:
         dst_rule = Rule( name              = params['name'],
                          files             = input_query,
                          runlist           = runlist_query,            # may be None
@@ -110,9 +130,6 @@ def main():
         submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump"] }
 
         submit (dst_rule, nevents=args.nevents, **submitkw, **filesystem ) 
-
-    else:            
-        pprint.pprint(job)
 
 
 if __name__ == '__main__': main()
