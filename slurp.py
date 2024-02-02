@@ -37,7 +37,10 @@ __rules__  = []
 fc = pyodbc.connect("DSN=FileCatalog")
 fcc = fc.cursor()
 
-daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;SERVER=sphnxdaqdbreplica.sdcc.bnl.gov");
+fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
+fccro = fc.cursor()
+
+daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;SERVER=sphnxdaqdbreplica.sdcc.bnl.gov;READONLY=True");
 daqc = daqdb.cursor()
 
 verbose=0
@@ -54,7 +57,7 @@ class SPhnxCondorJob:
     output:                str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).stdout"
     error:                 str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).stderr"
     log:                   str = "$(condor)/$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).condor"
-    periodichold: 	       str = "(NumJobStarts>=1 && JobStatus == 1)"
+    periodichold: 	   str = "(NumJobStarts>=1 && JobStatus == 1)"
     priority:              str = "1958"
     job_lease_duration:    str = "3600"
     requirements:          str = '(CPU_Type == "mdc2")';    
