@@ -567,42 +567,73 @@ def matches( rule, kwargs={} ):
     if rule.runlist:
         rl_result = list( daqc.execute( rule.runlist ).fetchall() )
         rl_map = { r[1] : r for r in rl_result }
-    
+
+    #
+    # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
+    #
     outputs = [ "%s_%s_%s-%08i-%04i.root"%(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
 
-    # Build dictionary of existing dsts
+    #
+    # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
+    # we know that we do not have to produce it if it appears w/in the outputs list.
+    #
     dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
     fc_check = list( fcc.execute("select filename,runnumber,segment from datasets where dsttype like '"+dsttype+"';").fetchall() )
     exists = {}
     for check in fc_check:
         exists[ check[0] ] = ( check[1], check[2] )  # key=filename, value=(run,seg)
 
-    # Get the production setup for this submission
+    # 
+    # The production setup will be unique based on (1) the specified analysis build, (2) the specified DB tag,
+    # and (3) the hash of the local github repository where the payload scripts/macros are found.
+    #
     repo_dir  = payload #'/'.join(payload.split('/')[1:]) 
     repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
     repo_url  = sh.git('config','--get','remote.origin.url',_cwd="MDC2/submit/rawdata/caloreco/rundir/").rstrip()
 
     setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
     
+    #
+    # Returns the production status table from the database
+    #
     prod_status = fetch_production_status ( setup, 0, -1, update )  # between run min and run max inclusive
 
+    #
+    # Map the production status table onto the output filename.  We use this map later on to determine whether
+    # the proposed candidate output DST in the outputs list is currently being produced by a condor job, or
+    # has failed and needs expert attention.
+    #
     prod_status_map = {}
     for stat in prod_status:
         # replace with sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
         file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        
         prod_status_map[file_basename] = stat.status
 
-    # Build the list of matches    
-    
+    #
+    # Build the list of matches.  We iterate over the fc_result zipped with the set of proposed outputs
+    # which derives from it.
+    #
     for ((lfn,run,seg,*fc_rest),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
         
-        x = dst.replace(".root","").strip()
+        #
+        # Get the production status from the proposed output name
+        #
+        x    = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
 
+        #
+        # There is a master list of states which result in a DST producion job being blocked.  By default
+        # this is (or ought to be) the total list of job states.  Jobs can end up failed, so there exist
+        # options to ignore the a blocking state... which will remove it from the blocking list.
+        #
         if stat in blocking:
             if args.batch==False:           WARN("%s is blocked by production status=%s, skipping."%( dst, stat ))
             continue
         
+        #
+        # Next we check to see if the job has alread been produced (i.e. it is registered w/in the file catalog).
+        # If it exists, we will not reproduce the DST.  Unless the resubmit option overrides.
+        #
         test=exists.get( dst, None )
         if test and not resubmit:
             if args.batch==False:           WARN("%s has already been produced, skipping."%dst)
@@ -610,7 +641,12 @@ def matches( rule, kwargs={} ):
 
         #
         # Runlist query from the daq was specified.  This requires that all files transferred to SDCC
-        # show up in the datasets catalog.
+        # show up in the datasets catalog.  
+        #
+        # Consistecy between the input query (filecatalog) and the runlist query ( daqdb ) is required.
+        # If the daqdb indicates that the set of files have been transferred, but one or more files 
+        # is missing in the filecatalog, we skip submission of this DST production.  If the filecatalog
+        # has a file in it that the daqdb is not aware of... we issue a warning.  
         #
         # A filelist is built from the resulting physical file locations and provided to condor via the
         # $(inputs) variable, which may be passed into the payload script.
@@ -636,7 +672,10 @@ def matches( rule, kwargs={} ):
             lfns = ffiles # list of LFNs from the filecatalog            
             lfnpar = ','.join( '?' * len(lfns) )
 
-            # tranfform inputs_ into physical filenames
+            #
+            # We have a list of input LFNs that we now transform into their corresponding physical file locations.
+            # The resulting inputs_ list is passed down to the job as the last argument of the user script.
+            #
             query=f"""
             select full_file_path 
                    from files
@@ -647,9 +686,16 @@ def matches( rule, kwargs={} ):
             for f in fcc.execute ( query, lfns ).fetchall():
                 inputs_.append(f[0])            
 
+        #
+        # If the DST has been produced (and we make it to this point) we issue a warning that
+        # it will be overwritten.
+        #
         if test and resubmit:
             WARN("%s exists and will be overwritten"%dst)
 
+        #
+        #
+        #
         if True:
             if verbose>10:
                 INFO (lfn, run, seg, dst, "\n");
@@ -657,37 +703,43 @@ def matches( rule, kwargs={} ):
             myinputs = None
             if inputs_:
                 myinputs = ' '.join(inputs_)
-
+            
+            # 
+            # Build the rule-match data structure and immediately convert it to a dictionary.
+            #
             match = SPhnxMatch(
-                name,
-                script,
-                lfn,        # lfn of the input file
-                dst,
-                str(run),
-                str(seg),
-                buildarg,   # preserve the "." when building the match
-                tag,
-                "4096MB",
-                "10GB",
-                payload,
-                inputs=myinputs    # dataclass stores flat strings
+                name,                   # name of the DST, e.g. DST_CALO
+                script,                 # script which will be run on the worker node
+                lfn,                    # lfn of the input file
+                dst,                    # name of the DST output file
+                str(run),               # run number
+                str(seg),               # segment number
+                buildarg,               # sPHENIX software build (preserve the "." when building the match)
+                tag,                    # database tag.
+                "4096MB",               # default memory requirement
+                "10GB",                 # default disk space requirement
+                payload,                # payload directory
+                inputs=myinputs         # comma-separated list of input files
                 )
 
             match = match.dict()
 
-            # Add / override with kwargs
+            #
+            # Add / override with kwargs.  This is where (for instance) the memory and disk requirements
+            # can be adjusted.
+            #
             for k,v in kwargs.items():
                 match[k]=str(v)              # coerce any ints to string
             
             result.append(match)
 
+            #
             # Terminate the loop if we exceed the maximum number of matches
+            #
             if rule.limit and len(result)>= rule.limit:
                 break                                
 
     return result, setup
-
-
 
 #__________________________________________________________________________________________________
 #
