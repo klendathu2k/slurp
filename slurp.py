@@ -569,13 +569,15 @@ def matches( rule, kwargs={} ):
     rl_map    = None
 
     if rule.files:
-        curs = cursors[ rule.filesdb ]
+        curs      = cursors[ rule.filesdb ]
         fc_result = list( curs.execute( rule.files ).fetchall() )
-        fc_map = { f[1] : f for f in fc_result }
+        fc_map = { f.runnumber : f for f in fc_result }
+        for fc in fc_result:
+            print( fc )
 
     if rule.runlist:
         rl_result = list( daqc.execute( rule.runlist ).fetchall() )
-        rl_map = { r[1] : r for r in rl_result }
+        rl_map = { r.runnumber : r for r in rl_result }
 
     #
     # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
@@ -586,6 +588,8 @@ def matches( rule, kwargs={} ):
     # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
     # we know that we do not have to produce it if it appears w/in the outputs list.
     #
+    # TODO: This is potentially a big, long query.  Limit query to the existing set of proposed output files or the 
+    # list of runs...
     dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
     exists = {}
     for check in fcc.execute("select filename,runnumber,segment from datasets where filename like '"+dsttype+"%';"):
