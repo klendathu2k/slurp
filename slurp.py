@@ -178,21 +178,6 @@ class SPhnxMatch:
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
 
-def Xtable_exists( tablename ):
-    """
-    Returns true if the named table exists
-    """    
-    query = """
-    select exists ( 
-         select 1 from information_schema.tables where table_name='%s'
-    );
-    """%tablename
-
-    result = bool( fccro.execute( query ).fetchone()[0] )
-    fccro.execute( "select exists ( select 1 from information_schema.tables where table_name='production_setup' )" ).fetchone()
-
-    return result
-
 def table_exists( tablename ):
     """
     """ 
@@ -578,6 +563,16 @@ def matches( rule, kwargs={} ):
     if rule.runlist:
         rl_result = list( daqc.execute( rule.runlist ).fetchall() )
         rl_map = { r.runnumber : r for r in rl_result }
+
+    runlistfromfc = """
+    select 
+            'filecatalog/files' as source,
+            runnumber,
+            segment,
+            string_agg( distinct lfn ) as files
+    from files
+    where ...
+    """
 
     #
     # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
