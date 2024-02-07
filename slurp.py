@@ -667,7 +667,7 @@ def matches( rule, kwargs={} ):
         inputs_ = None
         if fc_map and rl_map:
             (fdum, frun, fseg, ffiles, *frest) = fc_map[run]
-            (rdum, rrun, rseg, rfiles, rhosts, *rrest) = rl_map[run]
+            (rdum, rrun, rseg, rfiles, *rrest) = rl_map[run]
             ffiles=ffiles.split()
             rfiles=rfiles.split()
             test =  set(ffiles) ^ set(rfiles)
