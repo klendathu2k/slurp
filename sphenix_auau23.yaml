@@ -21,17 +21,11 @@ DST_CALOR:
      mem     :   2048MB                                                                  # memory requirement
      disk    :   2GB                                                                     # disk requirement
 
+   #
    # Database query to find input files.  Note that the {run_condition}, {seg_condition} and
    # {limit_condition} are defined in kaedama from command line arguments.  These should be 
    # left in the query.
-   #input_query: |-
-   #     select filename,runnumber,segment from datasets
-   #         where filename like 'DST_EVENT_auau23_ana393_2023p009-%'
-   ##     {run_condition} 
-   #     {seg_condition}
-   #     order by runnumber,segment
-   #     {limit_condition}
-
+   #
    input: 
      db: filecatalog
      query: |-
@@ -89,7 +83,7 @@ DST_EVENT:
      mem     :   4096MB   
 
    #
-   # input_query:
+   # input query:
    #
    # This builds a list of all runs known to the file catalog "datasets" table.
    # The query should return:
@@ -104,26 +98,6 @@ DST_EVENT:
    # The {*_condition} parameters (run, seg, limit) are substituted by kaedama
    # based on (optional) command line options.
    #   
-   #input_query: |-
-   #      select 
-   ##             'filecatalog/datasets'                                  as source  ,
-   #             runnumber                                                          ,
-   #             0                                                       as segment ,        
-   #             string_agg( distinct split_part(filename,'/',-1), ' ' ) as files
-   #      from 
-   ##             datasets
-   #      where
-   #             dsttype='beam' and dataset='rawdata1008'
-   #      {run_condition} 
-   #      {seg_condition}
-   #      group by 
-   #             runnumber
-   #      order by 
-   #             runnumber
-   #      {limit_condition}
-   #      ;
-
-
    input:
       db: filecatalog
       query: |-
