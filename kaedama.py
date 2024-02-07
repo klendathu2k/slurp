@@ -83,7 +83,7 @@ def main():
     input_         = config.get('input')
     input_query    = input_.get('query','').format(**locals())
     input_query_db = input_.get('db',None)
-    #input_query   = config.get('input_query','').format(**locals())
+
     runlist_query = config.get('runlist_query','').format(**locals())
     params        = config.get('params',None)
     filesystem    = config.get('filesystem',None)
@@ -138,6 +138,7 @@ def main():
     if args.submit and params and input_query and filesystem and job:
         dst_rule = Rule( name              = params['name'],
                          files             = input_query,
+                         filesdb           = input_query_db,
                          runlist           = runlist_query,            # may be None
                          script            = params['script'],
                          build             = params['build'],

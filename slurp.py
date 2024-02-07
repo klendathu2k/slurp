@@ -90,7 +90,8 @@ class SPhnxRule:
     script:            str            # Production script
     build:             str            # Build tag
     tag:               str            # Database tag
-    files:             str  = None    # FileCatalog DB query
+    files:             str  = None    # Input files query
+    filesdb:           str  = None    # Input files DB to query
     runlist:           str  = None    # Input run list query from daq
     job:               SPhnxCondorJob = SPhnxCondorJob()
     resubmit:          bool = False   # Set true if job should overwrite existing job
