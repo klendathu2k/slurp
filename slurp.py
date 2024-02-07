@@ -43,6 +43,13 @@ fccro = fc.cursor()
 daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;SERVER=sphnxdaqdbreplica.sdcc.bnl.gov;READONLY=True");
 daqc = daqdb.cursor()
 
+cursors = { 
+    'daq':daqc,
+    'fc':fccro,
+    'daqdb':daqc,
+    'filecatalog': fccro
+}
+
 verbose=0
 
 @dataclass

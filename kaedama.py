@@ -16,8 +16,8 @@ from slurp import daqc
 import sh
 import sys
 
-cursors = { 'daq':daqc,
-            'fc':fcc }
+from slurp import cursors
+
 
 #from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
 import logging
