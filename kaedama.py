@@ -80,7 +80,10 @@ def main():
     config = config[ args.rule ]
 
     # Input query specifies the source of the input files
-    input_query   = config.get('input_query','').format(**locals())
+    input_         = config.get('input')
+    input_query    = input_.get('query','').format(**locals())
+    input_query_db = input_.get('db',None)
+    #input_query   = config.get('input_query','').format(**locals())
     runlist_query = config.get('runlist_query','').format(**locals())
     params        = config.get('params',None)
     filesystem    = config.get('filesystem',None)
