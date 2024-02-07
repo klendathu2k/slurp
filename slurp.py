@@ -587,10 +587,10 @@ def matches( rule, kwargs={} ):
     # we know that we do not have to produce it if it appears w/in the outputs list.
     #
     dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
-    fc_check = list( fccro.execute("select filename,runnumber,segment from datasets where dsttype like '"+dsttype+"';").fetchall() )
     exists = {}
-    for check in fc_check:
-        exists[ check[0] ] = ( check[1], check[2] )  # key=filename, value=(run,seg)
+    for check in fcc.execute("select filename,runnumber,segment from datasets where filename like '"+dsttype+"%';"):
+        exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
+
 
     # 
     # The production setup will be unique based on (1) the specified analysis build, (2) the specified DB tag,
@@ -598,7 +598,7 @@ def matches( rule, kwargs={} ):
     #
     repo_dir  = payload #'/'.join(payload.split('/')[1:]) 
     repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
-    repo_url  = sh.git('config','--get','remote.origin.url',_cwd="MDC2/submit/rawdata/caloreco/rundir/").rstrip()
+    repo_url  = sh.git('config','--get','remote.origin.url',_cwd="MDC2/submit/rawdata/caloreco/rundir/").rstrip()  # TODO: fix hardcoded directory
 
     setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
     
