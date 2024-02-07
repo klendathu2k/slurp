@@ -188,8 +188,8 @@ def Xtable_exists( tablename ):
     );
     """%tablename
 
-    result = bool( fcc.execute( query ).fetchone()[0] )
-    fcc.execute( "select exists ( select 1 from information_schema.tables where table_name='production_setup' )" ).fetchone()
+    result = bool( fccro.execute( query ).fetchone()[0] )
+    fccro.execute( "select exists ( select 1 from information_schema.tables where table_name='production_setup' )" ).fetchone()
 
     return result
 
@@ -197,7 +197,7 @@ def table_exists( tablename ):
     """
     """ 
     result = False
-    if fcc.tables( table=tablename.lower(), tableType='TABLE' ).fetchone():
+    if fccro.tables( table=tablename.lower(), tableType='TABLE' ).fetchone():
         result = True
     return result
 
@@ -217,7 +217,7 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
         if ( runmn>runmx ): query = query + f" and run>={runmn};"
         else              : query = query + f" and run>={runmn} and run<={runmx};"
 
-        dbresult = fcc.execute( query ).fetchall();
+        dbresult = fccro.execute( query ).fetchall();
 
         # Transform the list of tuples from the db query to a list of prouction status dataclass objects
         result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
@@ -226,8 +226,8 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
 
         create = sphnx_production_status_table_def( setup.name, setup.build, setup.dbtag )
 
-        fcc.execute(create) # 
-        fcc.commit()
+        fccro.execute(create) # 
+        fccro.commit()
         
 
     return result
@@ -236,7 +236,7 @@ def getLatestId( tablename, dstname, run, seg ):
     query=f"""
     select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
     """
-    result = fcc.execute(query).fetchone()[0]
+    result = fccro.execute(query).fetchone()[0]
     return result
 
 def update_production_status( matching, setup, condor, state ):
@@ -487,7 +487,7 @@ def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
                  limit 1;
     """%( name, build, dbtag, hash_ )
     
-    array = list( fcc.execute( query ).fetchall() )
+    array = list( fccro.execute( query ).fetchall() )
     assert( len(array)<2 )
 
     if   len(array)==0:
@@ -569,7 +569,8 @@ def matches( rule, kwargs={} ):
     rl_map    = None
 
     if rule.files:
-        fc_result = list( fcc.execute( rule.files ).fetchall() )
+        curs = cursors[ rule.filesdb ]
+        fc_result = list( curs.execute( rule.files ).fetchall() )
         fc_map = { f[1] : f for f in fc_result }
 
     if rule.runlist:
@@ -586,7 +587,7 @@ def matches( rule, kwargs={} ):
     # we know that we do not have to produce it if it appears w/in the outputs list.
     #
     dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
-    fc_check = list( fcc.execute("select filename,runnumber,segment from datasets where dsttype like '"+dsttype+"';").fetchall() )
+    fc_check = list( fccro.execute("select filename,runnumber,segment from datasets where dsttype like '"+dsttype+"';").fetchall() )
     exists = {}
     for check in fc_check:
         exists[ check[0] ] = ( check[1], check[2] )  # key=filename, value=(run,seg)
@@ -691,7 +692,7 @@ def matches( rule, kwargs={} ):
                    lfn in ( {lfnpar} )            
             """
             inputs_ = []
-            for f in fcc.execute ( query, lfns ).fetchall():
+            for f in fccro.execute ( query, lfns ).fetchall():
                 inputs_.append(f[0])            
 
         #
