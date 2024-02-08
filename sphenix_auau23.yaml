@@ -98,15 +98,17 @@ DST_EVENT:
    # 1000 events per job
    # number of segments calculated in flight
    # first event in each segment will be 1000*segment
-   # 
+   # 		string_agg( distinct split_part(filename,'/',-1) || ':(' || firstevent || ',' || lastevent || ')', ' ' ) as fileranges 		
    input:
       db: daqdb
       query: |-
          select 
-                'daqdb/filelist'                                        as source  , 
-                runnumber                                                          , 
-                generate_series( 0, max(lastevent)/1000 )               as segment , 
-                string_agg( distinct split_part(filename,'/',-1), ' ' ) as files
+                'daqdb/filelist'                                                 as source  , 
+                runnumber                                                                   , 
+                generate_series( 0, max(lastevent)/1000 )                       as segment , 
+                string_agg( distinct split_part(filename,'/',-1), ' ' )    as files,   
+                string_agg( distinct split_part(filename,'/',-1) || ':' || firstevent || ':' || lastevent              , ' ' )    as fileranges
+
          from  
                 filelist
          where 
@@ -192,7 +194,7 @@ DST_EVENT:
    job:
      executable            : "{payload}/run.sh"
      user_job_wrapper      : "init.sh"
-     arguments             : "$(nevents) {outbase} {logbase} {outdir} $(run) $(ClusterId) $(ProcId) $(build) $(tag) $(inputs)"
+     arguments             : "$(nevents) {outbase} {logbase} {outdir} $(run) $(ClusterId) $(ProcId) $(build) $(tag) $(inputs) $(ranges)"
      output_destination    : 'file://{condor}'
      transfer_input_files  : "{payload},cups.py,init.sh,pull.py"
      output                : '{logbase}.condor.stdout'

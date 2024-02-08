@@ -149,6 +149,7 @@ class SPhnxMatch:
     condor:   str = None;
     buildarg: str = None;
     inputs:   str = None;
+    ranges:   str = None;
 
     
 
@@ -390,7 +391,10 @@ def submit( rule, **kwargs ):
         for m in iter(matching):
             d = {}
             # massage the inputs from space to comma separated
-            if m.get('inputs',None): m['inputs']= ','.join( m['inputs'].split() )
+            if m.get('inputs',None): 
+                m['inputs']= ','.join( m['inputs'].split() )
+            if m.get('ranges',None):
+                m['ranges']= ','.join( m['ranges'].split() )
             for k,v in m.items():
                 if k in str(submit_job):
                     d[k] = v
@@ -553,6 +557,7 @@ def matches( rule, kwargs={} ):
 
     lfn_lists  = {}  # LFN lists per run requested in the input query
     pfn_lists  = {}  # PFN lists per run existing on disk
+    rng_lists  = {}  # LFN:firstevent:lastevent
 
     if rule.files:
         curs      = cursors[ rule.filesdb ]
@@ -562,12 +567,15 @@ def matches( rule, kwargs={} ):
             segment = f.segment
             if lfn_lists.get(run,None) == None:
                 lfn_lists[ f"'{run}-{segment}'" ] = f.files.split()
+                rng_lists[ f"'{run}-{segment}'" ] = getattr( f, 'fileranges', [] )
             else:
                 # If we hit this result, then the db query has resulted in two rows with identical
                 # run numbers.  Violating the implicit submission schema.
                 ERROR(f"Run number {run}-{segment} reached twice in this query...")
                 ERROR(rule.files)
                 exit(1)
+
+            
 
         fc_map = { f.runnumber : f for f in fc_result }
 
@@ -682,6 +690,7 @@ def matches( rule, kwargs={} ):
             continue
 
         inputs_ = lfn_lists[f"'{run}-{seg}'"]
+        ranges_ = rng_lists[f"'{run}-{seg}'"]
 
         #
         # If the DST has been produced (and we make it to this point) we issue a warning that
@@ -698,8 +707,13 @@ def matches( rule, kwargs={} ):
                 INFO (lfn, run, seg, dst, "\n");
 
             myinputs = None
+            myranges = None
             if inputs_:
-                myinputs = ' '.join(inputs_)
+                myinputs = ' '.join(inputs_) ### ??????
+
+            if ranges_:
+                myranges = ' '.join(ranges_)
+            
             
             # 
             # Build the rule-match data structure and immediately convert it to a dictionary.
@@ -716,7 +730,8 @@ def matches( rule, kwargs={} ):
                 "4096MB",               # default memory requirement
                 "10GB",                 # default disk space requirement
                 payload,                # payload directory
-                inputs=myinputs         # comma-separated list of input files
+                inputs=myinputs,        # space-separated list of input files
+                ranges=myranges,        # space-separated list of input files with first and last event separated by :
                 )
 
             match = match.dict()
