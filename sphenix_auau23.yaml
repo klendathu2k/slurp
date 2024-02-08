@@ -95,14 +95,18 @@ DST_EVENT:
    # The {*_condition} parameters (run, seg, limit) are substituted by kaedama
    # based on (optional) command line options.
    #
+   # 1000 events per job
+   # number of segments calculated in flight
+   # first event in each segment will be 1000*segment
+   # 
    input:
       db: daqdb
       query: |-
          select 
-                'daqdb/filelist' as source, 
-                runnumber, 
-                0 as segment, 
-                string_agg( distinct split_part(filename,'/',-1), ' ' ) as files 
+                'daqdb/filelist'                                        as source  , 
+                runnumber                                                          , 
+                generate_series( 0, max(lastevent)/1000 )               as segment , 
+                string_agg( distinct split_part(filename,'/',-1), ' ' ) as files
          from  
                 filelist
          where 
