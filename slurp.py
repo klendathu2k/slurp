@@ -558,38 +558,30 @@ def matches( rule, kwargs={} ):
         curs      = cursors[ rule.filesdb ]
         fc_result = list( curs.execute( rule.files ).fetchall() )
         for f in fc_result:
-            run = f.runnumber
+            run     = f.runnumber
+            segment = f.segment
             if lfn_lists.get(run,None) == None:
-                lfn_lists[run]=f.files.split()
+                lfn_lists[ f"'{run}-{segment}'" ] = f.files.split()
             else:
                 # If we hit this result, then the db query has resulted in two rows with identical
                 # run numbers.  Violating the implicit submission schema.
-                ERROR(f"Run number {run} reached twice in this query...")
+                ERROR(f"Run number {run}-{segment} reached twice in this query...")
                 ERROR(rule.files)
                 exit(1)
 
         fc_map = { f.runnumber : f for f in fc_result }
 
-    pprint.pprint( fc_map )
-    pprint.pprint( lfn_lists )
-
     # Build lists of PFNs available for each run
-    for run,lfns in lfn_lists.items():
+    for runseg,lfns in lfn_lists.items():
         lfns_ = [ f"'{x}'" for x in lfns ]
         list_of_lfns = ','.join(lfns_)
-        if pfn_lists.get(run,None)==None:
-            pfn_lists[run]=[]
+        if pfn_lists.get(runseg,None)==None:
+            pfn_lists[runseg]=[]
         pfnquery=f"""
         select full_file_path,md5 from files where lfn in ( {list_of_lfns} );
         """        
         for pfnresult in fccro.execute( pfnquery ):
-            #print(pfnresult)
-            pfn_lists[run].append( pfnresult.full_file_path )
-
-
-    if rule.runlist:
-        rl_result = list( daqc.execute( rule.runlist ).fetchall() )
-        rl_map = { r.runnumber : r for r in rl_result }
+            pfn_lists[ runseg ].append( pfnresult.full_file_path )
 
     #
     # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
@@ -668,12 +660,12 @@ def matches( rule, kwargs={} ):
         # Check consistentcy between the LFN list (from input query) and PFN list (from file catalog query) 
         # for the current run.  Verify that the two lists are consistent.
         #
-        num_lfn = len( lfn_lists[run] )
-        num_pfn = len( pfn_lists[run] )
+        num_lfn = len( lfn_lists[f"'{run}-{seg}'"] )
+        num_pfn = len( pfn_lists[f"'{run}-{seg}'"] )
         sanity = True
-        pfn_check = [ x.split('/')[-1] for x in pfn_lists[run] ]
+        pfn_check = [ x.split('/')[-1] for x in pfn_lists[f"'{run}-{seg}'"] ]
         for x in pfn_check:
-            if x not in lfn_lists[run]:
+            if x not in lfn_lists[f"'{run}-{seg}'"]:
                 sanity = False
                 break
 
@@ -684,12 +676,12 @@ def matches( rule, kwargs={} ):
         # not match the pfn list, then reject.
         #
         if num_lfn > num_pfn or sanity==False:
-            WARNING(f"LFN list and PFN list are different.  Skipping this run {run}")
+            WARNING(f"LFN list and PFN list are different.  Skipping this run {run} {seg}")
             WARNING( lfn_lists )
             WARNING( pfn_lists )
             continue
 
-        inputs_ = lfn_lists[run]
+        inputs_ = lfn_lists[f"'{run}-{seg}'"]
 
         #
         # If the DST has been produced (and we make it to this point) we issue a warning that
