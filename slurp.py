@@ -387,9 +387,6 @@ def submit( rule, **kwargs ):
 
         # Strip out unused $(...) condor macros
         mymatching = []
-        if rule.runlist:
-            INFO("Detected filelist inputs... massage the matches...")
-
         for m in iter(matching):
             d = {}
             # massage the inputs from space to comma separated
