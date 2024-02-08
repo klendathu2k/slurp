@@ -547,29 +547,49 @@ def matches( rule, kwargs={} ):
     fc_result = []
     fc_map    = None
 
+
     rl_result = None
     rl_map    = None
+
+    lfn_lists  = {}  # LFN lists per run requested in the input query
+    pfn_lists  = {}  # PFN lists per run existing on disk
 
     if rule.files:
         curs      = cursors[ rule.filesdb ]
         fc_result = list( curs.execute( rule.files ).fetchall() )
+        for f in fc_result:
+            run = f.runnumber
+            if lfn_lists.get(run,None) == None:
+                lfn_lists[run]=f.files.split()
+            else:
+                # If we hit this result, then the db query has resulted in two rows with identical
+                # run numbers.  Violating the implicit submission schema.
+                ERROR(f"Run number {run} reached twice in this query...")
+                ERROR(rule.files)
+                exit(1)
+
         fc_map = { f.runnumber : f for f in fc_result }
-        for fc in fc_result:
-            print( fc )
+
+    pprint.pprint( fc_map )
+    pprint.pprint( lfn_lists )
+
+    # Build lists of PFNs available for each run
+    for run,lfns in lfn_lists.items():
+        lfns_ = [ f"'{x}'" for x in lfns ]
+        list_of_lfns = ','.join(lfns_)
+        if pfn_lists.get(run,None)==None:
+            pfn_lists[run]=[]
+        pfnquery=f"""
+        select full_file_path,md5 from files where lfn in ( {list_of_lfns} );
+        """        
+        for pfnresult in fccro.execute( pfnquery ):
+            #print(pfnresult)
+            pfn_lists[run].append( pfnresult.full_file_path )
+
 
     if rule.runlist:
         rl_result = list( daqc.execute( rule.runlist ).fetchall() )
         rl_map = { r.runnumber : r for r in rl_result }
-
-    runlistfromfc = """
-    select 
-            'filecatalog/files' as source,
-            runnumber,
-            segment,
-            string_agg( distinct lfn ) as files
-    from files
-    where ...
-    """
 
     #
     # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
@@ -645,51 +665,31 @@ def matches( rule, kwargs={} ):
             continue
 
         #
-        # Runlist query from the daq was specified.  This requires that all files transferred to SDCC
-        # show up in the datasets catalog.  
+        # Check consistentcy between the LFN list (from input query) and PFN list (from file catalog query) 
+        # for the current run.  Verify that the two lists are consistent.
         #
-        # Consistecy between the input query (filecatalog) and the runlist query ( daqdb ) is required.
-        # If the daqdb indicates that the set of files have been transferred, but one or more files 
-        # is missing in the filecatalog, we skip submission of this DST production.  If the filecatalog
-        # has a file in it that the daqdb is not aware of... we issue a warning.  
-        #
-        # A filelist is built from the resulting physical file locations and provided to condor via the
-        # $(inputs) variable, which may be passed into the payload script.
-        #
-        inputs_ = None
-        if fc_map and rl_map:
-            (fdum, frun, fseg, ffiles, *frest) = fc_map[run]
-            (rdum, rrun, rseg, rfiles, *rrest) = rl_map[run]
-            ffiles=ffiles.split()
-            rfiles=rfiles.split()
-            test =  set(ffiles) ^ set(rfiles)
-            skip = False
-            # Loop over the difference between the sets of files
-            for f in test:
-                if f in rfiles: 
-                    if args.batch==False: INFO (f"{f} has been transferred to SDCC but is not in the filecatalog, skipping")
-                    skip = True
-                if f in ffiles: 
-                    INFO (f"{f} in filecatalog missing in the daq filelist.") # accepting for now but will reject in production
-            if skip: 
-                continue
+        num_lfn = len( lfn_lists[run] )
+        num_pfn = len( pfn_lists[run] )
+        sanity = True
+        pfn_check = [ x.split('/')[-1] for x in pfn_lists[run] ]
+        for x in pfn_check:
+            if x not in lfn_lists[run]:
+                sanity = False
+                break
 
-            lfns = ffiles # list of LFNs from the filecatalog            
-            lfnpar = ','.join( '?' * len(lfns) )
+        # TODO: Add MD5 check
 
-            #
-            # We have a list of input LFNs that we now transform into their corresponding physical file locations.
-            # The resulting inputs_ list is passed down to the job as the last argument of the user script.
-            #
-            query=f"""
-            select full_file_path 
-                   from files
-            where
-                   lfn in ( {lfnpar} )            
-            """
-            inputs_ = []
-            for f in fccro.execute ( query, lfns ).fetchall():
-                inputs_.append(f[0])            
+        #
+        # If there are more LFNs requested than exist on disk, OR if the lfn list does
+        # not match the pfn list, then reject.
+        #
+        if num_lfn > num_pfn or sanity==False:
+            WARNING(f"LFN list and PFN list are different.  Skipping this run {run}")
+            WARNING( lfn_lists )
+            WARNING( pfn_lists )
+            continue
+
+        inputs_ = lfn_lists[run]
 
         #
         # If the DST has been produced (and we make it to this point) we issue a warning that
