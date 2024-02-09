@@ -15,10 +15,6 @@ import sys
 import signal
 import json
 
-# File catalog
-fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
-fcc = fc.cursor()
-
 # Production status ... TODO: refactor production_status table to use "ps" and "psc"... to support different DB's...
 statusdb = pyodbc.connect("DSN=FileCatalog")
 statusdbc = statusdb.cursor()
@@ -313,6 +309,10 @@ def catalog(args):
 
     filename = f"{dstname}-{run:08}-{seg:04}.{ext}"
 
+    # File catalog
+    fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
+    fcc = fc.cursor()
+
     checkfile = fcc.execute( f"select size,full_file_path from files where lfn='{filename}';" ).fetchall()
     if checkfile and replace:
         fcc.execute(f"delete from files where lfn='{filename}';")
@@ -408,7 +408,10 @@ def quality(args):
     INSERT INTO production_quality (stat_id,dstname,run,segment,qual) values
       ( {id_},'{dstname}',{run},{segment},'{qastring}' );   
     """
-    print(qaentry)
+
+    # File catalog
+    fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
+    fcc = fc.cursor()
 
     fcc.execute(qaentry)
     fcc.commit()    
