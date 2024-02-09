@@ -567,7 +567,7 @@ def matches( rule, kwargs={} ):
             segment = f.segment
             if lfn_lists.get(run,None) == None:
                 lfn_lists[ f"'{run}-{segment}'" ] = f.files.split()
-                rng_lists[ f"'{run}-{segment}'" ] = getattr( f, 'fileranges', [] )
+                rng_lists[ f"'{run}-{segment}'" ] = getattr( f, 'fileranges', '' ).split()
             else:
                 # If we hit this result, then the db query has resulted in two rows with identical
                 # run numbers.  Violating the implicit submission schema.
@@ -691,6 +691,7 @@ def matches( rule, kwargs={} ):
 
         inputs_ = lfn_lists[f"'{run}-{seg}'"]
         ranges_ = rng_lists[f"'{run}-{seg}'"]
+        
 
         #
         # If the DST has been produced (and we make it to this point) we issue a warning that
@@ -713,7 +714,7 @@ def matches( rule, kwargs={} ):
 
             if ranges_:
                 myranges = ' '.join(ranges_)
-            
+
             
             # 
             # Build the rule-match data structure and immediately convert it to a dictionary.
