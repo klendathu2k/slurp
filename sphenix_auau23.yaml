@@ -39,7 +39,7 @@ DST_CALOR:
    # Declares the directory where input files are found, output files are stored, and
    # log/condor files should be placed.
    filesystem:
-     outdir : "/sphenix/lustre01/sphnxpro/slurp/$$([$(run)/100])00"
+     outdir : "/sphenix/lustre01/sphnxpro/slurptest/$$([$(run)/100])00"
      logdir : "file:///sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
      condor :        "/sphenix/data/data02/sphnxpro/condorlogs/$$([$(run)/100])00"
 
@@ -197,13 +197,10 @@ DST_EVENT:
      arguments             : "$(nevents) {outbase} {logbase} {outdir} $(run) $(ClusterId) $(ProcId) $(build) $(tag) $(inputs) $(ranges)"
      output_destination    : 'file://{condor}'
      transfer_input_files  : "{payload},cups.py,init.sh,pull.py"
-     transfer_output_files  : '$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).out,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).err'
      output                : '{logbase}.condor.stdout'
      error                 : '{logbase}.condor.stderr'
      log                   : '{condor}/{logbase}.condor'
      accounting_group      : "group_sphenix.mdc2"
      accounting_group_user : "sphnxpro"
-
-
-
-  
+     transfer_output_files : '$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).out,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).err'  
+     priority : '3800'
