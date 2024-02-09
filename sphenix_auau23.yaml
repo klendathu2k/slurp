@@ -194,7 +194,7 @@ DST_EVENT:
    job:
      executable            : "{payload}/run.sh"
      user_job_wrapper      : "init.sh"
-     arguments             : "$(nevents) {outbase} {logbase} {outdir} $(run) $(ClusterId) $(ProcId) $(build) $(tag) $(inputs) $(ranges)"
+     arguments             : "$(nevents) {outbase} {logbase} {outdir} $(run) $(seg) $(ClusterId) $(ProcId) $(build) $(tag) $(inputs) $(ranges)"
      output_destination    : 'file://{condor}'
      transfer_input_files  : "{payload},cups.py,init.sh,pull.py"
      output                : '{logbase}.condor.stdout'
