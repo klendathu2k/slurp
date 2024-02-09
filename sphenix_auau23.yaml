@@ -105,7 +105,7 @@ DST_EVENT:
          select 
                 'daqdb/filelist'                                                 as source  , 
                 runnumber                                                                   , 
-                generate_series( 0, max(lastevent)/1000 )                       as segment , 
+                generate_series( 0, max(lastevent)/{args.nevents} )                       as segment , 
                 string_agg( distinct split_part(filename,'/',-1), ' ' )    as files,   
                 string_agg( distinct split_part(filename,'/',-1) || ':' || firstevent || ':' || lastevent              , ' ' )    as fileranges
 
@@ -197,6 +197,7 @@ DST_EVENT:
      arguments             : "$(nevents) {outbase} {logbase} {outdir} $(run) $(ClusterId) $(ProcId) $(build) $(tag) $(inputs) $(ranges)"
      output_destination    : 'file://{condor}'
      transfer_input_files  : "{payload},cups.py,init.sh,pull.py"
+     transfer_output_files  : '$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).out,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).err'
      output                : '{logbase}.condor.stdout'
      error                 : '{logbase}.condor.stderr'
      log                   : '{condor}/{logbase}.condor'
