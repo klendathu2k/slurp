@@ -37,8 +37,8 @@ __rules__  = []
 fc = pyodbc.connect("DSN=FileCatalog")
 fcc = fc.cursor()
 
-fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
-fccro = fc.cursor()
+#fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
+fccro = fcc # fcro.cursor()
 
 daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;SERVER=sphnxdaqdbreplica.sdcc.bnl.gov;READONLY=True");
 daqc = daqdb.cursor()
