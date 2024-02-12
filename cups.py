@@ -15,10 +15,6 @@ import sys
 import signal
 import json
 
-# File catalog
-fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
-fcc = fc.cursor()
-
 # Production status ... TODO: refactor production_status table to use "ps" and "psc"... to support different DB's...
 statusdb = pyodbc.connect("DSN=FileCatalog")
 statusdbc = statusdb.cursor()
@@ -275,6 +271,32 @@ def nevents(args):
         statusdbc.execute( update )
         statusdbc.commit()
 
+#_______________________________________________________________________________________________________
+@subcommand([
+    argument(     "--files",  help="List of input files (and/or ranges)",dest="files",nargs="+"),
+])
+def inputs(args):
+    """
+    Updates the number of events processed
+    """
+    tablename=args.table
+    dstname=args.dstname
+    run=int(args.run)
+    seg=int(args.segment)
+    id_ = getLatestId( tablename, dstname, run, seg )
+    inputs = ' '.join(args.files)
+    update = f"""
+    update {tablename}
+    set inputs='{inputs}'
+    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+    """
+    if args.noupdate:
+        print(update)
+    else:
+        print(update)
+        statusdbc.execute( update )
+        statusdbc.commit()
+
 
 # files
 # lfn | full_host_name | full_file_path | time | size | md5 
@@ -312,6 +334,10 @@ def catalog(args):
     dsttype='_'.join( dstname.split('_')[-2:] )
 
     filename = f"{dstname}-{run:08}-{seg:04}.{ext}"
+
+    # File catalog
+    fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
+    fcc = fc.cursor()
 
     checkfile = fcc.execute( f"select size,full_file_path from files where lfn='{filename}';" ).fetchall()
     if checkfile and replace:
@@ -408,7 +434,10 @@ def quality(args):
     INSERT INTO production_quality (stat_id,dstname,run,segment,qual) values
       ( {id_},'{dstname}',{run},{segment},'{qastring}' );   
     """
-    print(qaentry)
+
+    # File catalog
+    fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
+    fcc = fc.cursor()
 
     fcc.execute(qaentry)
     fcc.commit()    

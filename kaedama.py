@@ -16,8 +16,8 @@ from slurp import daqc
 import sh
 import sys
 
-cursors = { 'daq':daqc,
-            'fc':fcc }
+from slurp import cursors
+
 
 #from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
 import logging
@@ -80,7 +80,10 @@ def main():
     config = config[ args.rule ]
 
     # Input query specifies the source of the input files
-    input_query   = config.get('input_query','').format(**locals())
+    input_         = config.get('input')
+    input_query    = input_.get('query','').format(**locals())
+    input_query_db = input_.get('db',None)
+
     runlist_query = config.get('runlist_query','').format(**locals())
     params        = config.get('params',None)
     filesystem    = config.get('filesystem',None)
@@ -135,6 +138,7 @@ def main():
     if args.submit and params and input_query and filesystem and job:
         dst_rule = Rule( name              = params['name'],
                          files             = input_query,
+                         filesdb           = input_query_db,
                          runlist           = runlist_query,            # may be None
                          script            = params['script'],
                          build             = params['build'],
