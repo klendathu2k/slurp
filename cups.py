@@ -271,6 +271,32 @@ def nevents(args):
         statusdbc.execute( update )
         statusdbc.commit()
 
+#_______________________________________________________________________________________________________
+@subcommand([
+    argument(     "--files",  help="List of input files (and/or ranges)",dest="files",nargs="+"),
+])
+def inputs(args):
+    """
+    Updates the number of events processed
+    """
+    tablename=args.table
+    dstname=args.dstname
+    run=int(args.run)
+    seg=int(args.segment)
+    id_ = getLatestId( tablename, dstname, run, seg )
+    inputs = ' '.join(args.files)
+    update = f"""
+    update {tablename}
+    set inputs='{inputs}'
+    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+    """
+    if args.noupdate:
+        print(update)
+    else:
+        print(update)
+        statusdbc.execute( update )
+        statusdbc.commit()
+
 
 # files
 # lfn | full_host_name | full_file_path | time | size | md5 
