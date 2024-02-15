@@ -328,21 +328,11 @@ def submit( rule, **kwargs ):
         kwargs['resubmit'] = args.resubmit
 
     # Build list of LFNs which match the input
-    matching, setup = matches( rule, kwargs )    
+    matching, setup, runlist = matches( rule, kwargs )
 
     if len(matching)==0:
         WARN("No input files match the specifed rule.")
         return result
-
-    # Build "list" of paths which need to be created before submitting
-    #$$$mkpaths = {}
-    #$$$for m in matching:        
-    #$$$    mkpaths[ m["condor"] ] = 1;
-    #$$$    mkpaths[ m["stdout"] ] = 2;
-    #$$$    mkpaths[ m["stderr"] ] = 3;
-
-    #$$$for (p,v) in mkpaths.items():
-    #$$$    if not os.path.exists(p): os.makedirs( p )
 
     #
     # Resubmit is only a manual operation.  Existing files must be removed or the DB query adjusted to avoid
@@ -371,8 +361,26 @@ def submit( rule, **kwargs ):
         if reply in ['n','N','No','no','NO']:
             return result        
 
+
     jobd = rule.job.dict()
 
+    # f"{math.floor(v/n)*n}"
+    rundirs = []
+    for r in runlist:
+        d = f"{math.floor(r/100)*100}"
+        if d not in rundirs:
+            rundirs.append(d)
+
+    # Make sure that directories referenced in the filesystem are available
+    for k in [ 'outdir', 'logdir', 'condor']:
+        v = kwargs.get(k,None)
+        if v==None: continue
+        v = v.replace('file:/','')
+        v = v.replace('//','/')
+        v = v.split('$$')[0]
+        paths = [ v + '/' + d for d in rundirs ]
+        for p in paths: pathlib.Path( p, parents=True, exist_ok=True )        
+    
     submit_job = htcondor.Submit( jobd )
 
     if verbose>0:
@@ -636,10 +644,11 @@ def matches( rule, kwargs={} ):
 
     #
     # Build the list of matches.  We iterate over the fc_result zipped with the set of proposed outputs
-    # which derives from it.
+    # which derives from it.  Keep a list of all runs we are about to submit.
     #
-    for ((lfn,run,seg,*fc_rest),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():
-        
+    list_of_runs = []
+    for ((lfn,run,seg,*fc_rest),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
+
         #
         # Get the production status from the proposed output name
         #
@@ -684,9 +693,9 @@ def matches( rule, kwargs={} ):
         # not match the pfn list, then reject.
         #
         if num_lfn > num_pfn or sanity==False:
-            WARNING(f"LFN list and PFN list are different.  Skipping this run {run} {seg}")
-            WARNING( lfn_lists )
-            WARNING( pfn_lists )
+            WARN(f"LFN list and PFN list are different.  Skipping this run {run} {seg}")
+            WARN( lfn_lists )
+            WARN( pfn_lists )
             continue
 
         inputs_ = lfn_lists[f"'{run}-{seg}'"]
@@ -704,6 +713,7 @@ def matches( rule, kwargs={} ):
         #
         #
         if True:
+
             if verbose>10:
                 INFO (lfn, run, seg, dst, "\n");
 
@@ -746,13 +756,15 @@ def matches( rule, kwargs={} ):
             
             result.append(match)
 
+            if int(run) not in list_of_runs: list_of_runs.append(run)
+
             #
             # Terminate the loop if we exceed the maximum number of matches
             #
             if rule.limit and len(result)>= rule.limit:
-                break                                
+                break    
 
-    return result, setup
+    return result, setup, list_of_runs
 
 #__________________________________________________________________________________________________
 #
