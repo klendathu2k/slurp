@@ -379,7 +379,8 @@ def submit( rule, **kwargs ):
         v = v.replace('//','/')
         v = v.split('$$')[0]
         paths = [ v + '/' + d for d in rundirs ]
-        for p in paths: pathlib.Path( p, parents=True, exist_ok=True )        
+        for p in paths: 
+            pathlib.Path( p ).mkdir( parents=True, exist_ok=True )        
     
     submit_job = htcondor.Submit( jobd )
 
@@ -622,7 +623,8 @@ def matches( rule, kwargs={} ):
     #
     repo_dir  = payload #'/'.join(payload.split('/')[1:]) 
     repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
-    repo_url  = sh.git('config','--get','remote.origin.url',_cwd="MDC2/submit/rawdata/caloreco/rundir/").rstrip()  # TODO: fix hardcoded directory
+    #repo_url  = sh.git('config','--get','remote.origin.url',_cwd="MDC2/submit/rawdata/caloreco/rundir/").rstrip()  # TODO: fix hardcoded directory
+    repo_url  = sh.git('config','--get','remote.origin.url',_cwd=payload ).rstrip()  # TODO: fix hardcoded directory
 
     setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
     
