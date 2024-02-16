@@ -37,6 +37,9 @@ __rules__  = []
 fc = pyodbc.connect("DSN=FileCatalog")
 fcc = fc.cursor()
 
+statusdb = pyodbc.connect("DSN=ProductionStatus")
+statusdbc = statusdb.cursor()
+
 #fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
 fccro = fcc # fcro.cursor()
 
@@ -47,7 +50,8 @@ cursors = {
     'daq':daqc,
     'fc':fccro,
     'daqdb':daqc,
-    'filecatalog': fccro
+    'filecatalog': fccro,
+    'status' : statusdbc
 }
 
 verbose=0
@@ -183,7 +187,7 @@ def table_exists( tablename ):
     """
     """ 
     result = False
-    if fccro.tables( table=tablename.lower(), tableType='TABLE' ).fetchone():
+    if statusdbc.tables( table=tablename.lower(), tableType='TABLE' ).fetchone():
         result = True
     return result
 
@@ -203,7 +207,7 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
         if ( runmn>runmx ): query = query + f" and run>={runmn};"
         else              : query = query + f" and run>={runmn} and run<={runmx};"
 
-        dbresult = fccro.execute( query ).fetchall();
+        dbresult = statusdbc.execute( query ).fetchall();
 
         # Transform the list of tuples from the db query to a list of prouction status dataclass objects
         result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
@@ -212,17 +216,17 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
 
         create = sphnx_production_status_table_def( setup.name, setup.build, setup.dbtag )
 
-        fccro.execute(create) # 
-        fccro.commit()
+        statusdbc.execute(create) # 
+        statusdbc.commit()
         
 
     return result
 
-def getLatestId( tablename, dstname, run, seg ):
+def getLatestId( tablename, dstname, run, seg ):  # limited to status db
     query=f"""
     select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
     """
-    result = fccro.execute(query).fetchone()[0]
+    result = statusdbc.execute(query).fetchone()[0]
     return result
 
 def update_production_status( matching, setup, condor, state ):
@@ -249,8 +253,8 @@ def update_production_status( matching, setup, condor, state ):
         set     status='{state}',{state}='{timestamp}'
         where   dstname='{dstname}' and run={run} and segment={segment} and id={id_}
         """
-        fcc.execute(update)
-        fcc.commit()
+        statusdbc.execute(update)
+        statusdbc.commit()
 
 def insert_production_status( matching, setup, condor, state ):
 
@@ -307,8 +311,8 @@ def insert_production_status( matching, setup, condor, state ):
         values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0 )
         """
 
-        fcc.execute(insert)
-        fcc.commit()
+        statusdbc.execute(insert)
+        statusdbc.commit()
 
         
 
@@ -482,7 +486,7 @@ def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
                  limit 1;
     """%( name, build, dbtag, hash_ )
     
-    array = list( fccro.execute( query ).fetchall() )
+    array = list( statusdbc.execute( query ).fetchall() )
     assert( len(array)<2 )
 
     if   len(array)==0:
@@ -491,8 +495,8 @@ def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
                values('%s','%s','%s','%s','%s','%s');
         """%(name,build,dbtag,repo,dir_,hash_)
 
-        fcc.execute( insert )
-        fcc.commit()
+        statusdbc.execute( insert )
+        statusdbc.commit()
 
         result = fetch_production_setup(name, build, dbtag, repo, dir_, hash_)
 

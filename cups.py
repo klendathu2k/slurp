@@ -16,7 +16,7 @@ import signal
 import json
 
 # Production status ... TODO: refactor production_status table to use "ps" and "psc"... to support different DB's...
-statusdb = pyodbc.connect("DSN=FileCatalog")
+statusdb = pyodbc.connect("DSN=ProductionStatus")
 statusdbc = statusdb.cursor()
 
 """
