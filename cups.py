@@ -15,8 +15,8 @@ import sys
 import signal
 import json
 
-# Production status ... TODO: refactor production_status table to use "ps" and "psc"... to support different DB's...
-statusdb = pyodbc.connect("DSN=ProductionStatus")
+# Production status ... 
+statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
 statusdbc = statusdb.cursor()
 
 """
@@ -79,55 +79,57 @@ def getLatestId( tablename, dstname, run, seg ):
     query=f"""
     select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
     """
-    print(query)
     result = statusdbc.execute(query).fetchone()[0]
     return result
 
-@subcommand()
-def submitting(args):
-    """
-    Executed by slurp when the jobs are being submitted to condor.
-    """
-    tablename=args.table
-    dstname=args.dstname
-    timestamp=args.timestamp
-    run=int(args.run)
-    seg=int(args.segment)
-    id_ = getLatestId( tablename, dstname, run, seg )
-    update = f"""
-    update {tablename}
-    set status='submitting',submitting='{timestamp}'
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    """
-    if args.noupdate:
-        print(update)
-    else:
-        print(update)
-        statusdbc.execute( update )
-        statusdbc.commit()
+# The submitting and submitted states are handled internally by slurp, and should not be 
+# set by the running job.
 
-@subcommand()
-def submitted(args):
-    """
-    Executed by slurp when the jobs have been submitted to condor.
-    """
-    tablename=args.table
-    dstname=args.dstname
-    timestamp=args.timestamp
-    run=int(args.run)
-    seg=int(args.segment)
-    id_ = getLatestId( tablename, dstname, run, seg )
-    update = f"""
-    update {tablename}
-    set status='submitted',submitted='{timestamp}'
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    """
-    if args.noupdate:
-        print(update)
-    else:
-        print(update)
-        statusdbc.execute( update )
-        statusdbc.commit()
+#@subcommand()
+#def submitting(args):
+#    """
+#    Executed by slurp when the jobs are being submitted to condor.
+#    """
+#    tablename=args.table
+#    dstname=args.dstname
+#    timestamp=args.timestamp
+#    run=int(args.run)
+#    seg=int(args.segment)
+#    id_ = getLatestId( tablename, dstname, run, seg )
+#    update = f"""
+#    update {tablename}
+#    set status='submitting',submitting='{timestamp}'
+#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+#    """
+#    if args.noupdate:
+#        print(update)
+#    else:
+#        print(update)
+#        statusdbc.execute( update )
+#        statusdbc.commit()
+
+#@subcommand()
+#def submitted(args):
+#    """
+#    Executed by slurp when the jobs have been submitted to condor.
+#    """
+#    tablename=args.table
+#    dstname=args.dstname
+#    timestamp=args.timestamp
+#    run=int(args.run)
+#    seg=int(args.segment)
+#    id_ = getLatestId( tablename, dstname, run, seg )
+#    update = f"""
+#    update {tablename}
+#    set status='submitted',submitted='{timestamp}'
+#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+#    """
+#    if args.noupdate:
+#        print(update)
+#    else:
+#        print(update)
+#        statusdbc.execute( update )
+#        statusdbc.commit()
 
 @subcommand()
 def started(args):
@@ -148,7 +150,6 @@ def started(args):
     if args.noupdate:
         print(update)
     else:
-        print(update)
         statusdbc.execute( update )
         statusdbc.commit()
 
@@ -318,8 +319,9 @@ def inputs(args):
 ])
 def catalog(args):
     """
-    Add the file to the file catalog
+    Add the file to the file catalog.  
     """
+    # TODO: switch to an update mode rather than a delete / replace mode.
     replace  = args.replace
     tablename= args.table
     dstname  = args.dstname
@@ -339,15 +341,17 @@ def catalog(args):
     fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
     fcc = fc.cursor()
 
+    dataset = args.dataset
+
     checkfile = fcc.execute( f"select size,full_file_path from files where lfn='{filename}';" ).fetchall()
     if checkfile and replace:
         fcc.execute(f"delete from files where lfn='{filename}';")
         fcc.commit()
         
 
-    checkdataset = fcc.execute( f"select size from datasets where filename='{filename}' and dataset='mdc2';" ).fetchall()
+    checkdataset = fcc.execute( f"select size from datasets where filename='{filename}' and dataset='{dataset}';" ).fetchall()
     if checkdataset and replace:
-        fcc.execute(f"delete from datasets where  filename='{filename}' and dataset='mdc2';" )
+        fcc.execute(f"delete from datasets where  filename='{filename}' and dataset='{dataset}';" )
         fcc.commit()
 
     # Calculate md5 checksum
@@ -365,7 +369,7 @@ def catalog(args):
     # Insert into datasets
     insert=f"""
     insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
-    values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
+    values ('{filename}',{run},{seg},{sz},'{dataset}','{dsttype}',{args.nevents})
     """
     fcc.execute(insert)
     fcc.commit()
@@ -436,11 +440,8 @@ def quality(args):
     """
 
     # File catalog
-    fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
-    fcc = fc.cursor()
-
-    fcc.execute(qaentry)
-    fcc.commit()    
+    statusdbc.execute(qaentry)
+    statusdbc.commit()    
 
 
 def main():
