@@ -34,16 +34,19 @@ __rules__  = []
 # File Catalog (and file catalog cursor)
 # TODO: exception handling... if we can't connect, retry at some randomized point in the future.
 # ... and set a limit on the number of retries before we bomb out ...
-fc = pyodbc.connect("DSN=FileCatalog")
-fcc = fc.cursor()
+#fc = pyodbc.connect("DSN=FileCatalog")
+#fcc = fc.cursor()
 
-statusdb = pyodbc.connect("DSN=ProductionStatus")
-statusdbc = statusdb.cursor()
+statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
+statusdbr = statusdbr_.cursor()
 
-#fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
-fccro = fcc # fcro.cursor()
+statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
+statusdbw = statusdbw_.cursor()
 
-daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;SERVER=sphnxdaqdbreplica.sdcc.bnl.gov;READONLY=True");
+fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
+fccro = fcro.cursor()
+
+daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;READONLY=True");
 daqc = daqdb.cursor()
 
 cursors = { 
@@ -51,7 +54,7 @@ cursors = {
     'fc':fccro,
     'daqdb':daqc,
     'filecatalog': fccro,
-    'status' : statusdbc
+    'status' : statusdbr
 }
 
 verbose=0
@@ -187,7 +190,7 @@ def table_exists( tablename ):
     """
     """ 
     result = False
-    if statusdbc.tables( table=tablename.lower(), tableType='TABLE' ).fetchone():
+    if statusdbr.tables( table=tablename.lower(), tableType='TABLE' ).fetchone():
         result = True
     return result
 
@@ -207,17 +210,17 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
         if ( runmn>runmx ): query = query + f" and run>={runmn};"
         else              : query = query + f" and run>={runmn} and run<={runmx};"
 
-        dbresult = statusdbc.execute( query ).fetchall();
+        dbresult = statusdbr.execute( query ).fetchall();
 
         # Transform the list of tuples from the db query to a list of prouction status dataclass objects
         result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
 
-    elif update==True:
+    elif update==True: # note: we should never reach this state ...  tables ought to exist already
 
         create = sphnx_production_status_table_def( setup.name, setup.build, setup.dbtag )
 
-        statusdbc.execute(create) # 
-        statusdbc.commit()
+        statusdbw.execute(create) # 
+        statusdbw.commit()
         
 
     return result
@@ -226,7 +229,7 @@ def getLatestId( tablename, dstname, run, seg ):  # limited to status db
     query=f"""
     select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
     """
-    result = statusdbc.execute(query).fetchone()[0]
+    result = statusdbw.execute(query).fetchone()[0]
     return result
 
 def update_production_status( matching, setup, condor, state ):
@@ -253,8 +256,8 @@ def update_production_status( matching, setup, condor, state ):
         set     status='{state}',{state}='{timestamp}'
         where   dstname='{dstname}' and run={run} and segment={segment} and id={id_}
         """
-        statusdbc.execute(update)
-        statusdbc.commit()
+        statusdbw.execute(update)
+        statusdbw.commit()
 
 def insert_production_status( matching, setup, condor, state ):
 
@@ -303,7 +306,7 @@ def insert_production_status( matching, setup, condor, state ):
 
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
 
-        # Consider deleting the entry here...
+        # TODO: Handle conflict
 
         insert=f"""
         insert into production_status
@@ -311,8 +314,8 @@ def insert_production_status( matching, setup, condor, state ):
         values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0 )
         """
 
-        statusdbc.execute(insert)
-        statusdbc.commit()
+        statusdbw.execute(insert)
+        statusdbw.commit()
 
         
 
@@ -486,7 +489,7 @@ def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
                  limit 1;
     """%( name, build, dbtag, hash_ )
     
-    array = list( statusdbc.execute( query ).fetchall() )
+    array = list( statusdbr.execute( query ).fetchall() )
     assert( len(array)<2 )
 
     if   len(array)==0:
@@ -495,8 +498,8 @@ def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
                values('%s','%s','%s','%s','%s','%s');
         """%(name,build,dbtag,repo,dir_,hash_)
 
-        statusdbc.execute( insert )
-        statusdbc.commit()
+        statusdbw.execute( insert )
+        statusdbw.commit()
 
         result = fetch_production_setup(name, build, dbtag, repo, dir_, hash_)
 
@@ -617,7 +620,7 @@ def matches( rule, kwargs={} ):
     # list of runs...
     dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
     exists = {}
-    for check in fcc.execute("select filename,runnumber,segment from datasets where filename like '"+dsttype+"%';"):
+    for check in fccro.execute("select filename,runnumber,segment from datasets where filename like '"+dsttype+"%';"):
         exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
 
 
