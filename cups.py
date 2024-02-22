@@ -274,7 +274,7 @@ def nevents(args):
 
 #_______________________________________________________________________________________________________
 @subcommand([
-    argument(     "--files",  help="List of input files (and/or ranges)",dest="files",nargs="+"),
+    argument(     "--files",  help="List of input files (and/or ranges)",dest="files",nargs="*"),
 ])
 def inputs(args):
     """
@@ -285,7 +285,9 @@ def inputs(args):
     run=int(args.run)
     seg=int(args.segment)
     id_ = getLatestId( tablename, dstname, run, seg )
-    inputs = ' '.join(args.files)
+    inputs = 'unset'
+    if len(args.files)>0:
+        inputs=' '.join(args.files)
     update = f"""
     update {tablename}
     set inputs='{inputs}'
