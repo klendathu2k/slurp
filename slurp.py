@@ -489,7 +489,7 @@ def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
                  limit 1;
     """%( name, build, dbtag, hash_ )
     
-    array = list( statusdbr.execute( query ).fetchall() )
+    array = list( statusdbw.execute( query ).fetchall() )
     assert( len(array)<2 )
 
     if   len(array)==0:
