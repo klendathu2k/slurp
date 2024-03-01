@@ -619,7 +619,6 @@ def matches( rule, kwargs={} ):
             for pfnresult in fccro.execute( pfnquery ):
                 pfn_lists[ runseg ].append( pfnresult.full_file_path )
 
-
     #
     # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
     #
@@ -721,7 +720,8 @@ def matches( rule, kwargs={} ):
             #WARN( pfn_lists )
             continue
 
-        inputs_ = lfn_lists[f"'{run}-{seg}'"]
+        #inputs_ = lfn_lists[f"'{run}-{seg}'"]
+        inputs_ = pfn_lists[f"'{run}-{seg}'"]
         ranges_ = rng_lists[f"'{run}-{seg}'"]
         
 
