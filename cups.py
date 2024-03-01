@@ -337,6 +337,7 @@ def catalog(args):
     # n.b. not the slurp convention for dsttype
     dsttype='_'.join( dstname.split('_')[-2:] )
 
+    # TODO: allow to specify the filename
     filename = f"{dstname}-{run:08}-{seg:04}.{ext}"
 
     # File catalog
@@ -376,6 +377,104 @@ def catalog(args):
     fcc.execute(insert)
     fcc.commit()
 
+#_______________________________________________________________________________________________________
+@subcommand([
+    argument( "filename", help="Name of the file to be staged out"),
+    argument( "outdir",   help="Output directory" ),
+    argument( "--retries", help="Number of retries before silent failure", type=int, default=1 ),
+    argument( "--hostname", help="host name of the filesystem", default="lustre", choices=["lustre","gpfs"] ),
+    argument( "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
+    argument( "--dataset", help="sets the name of the dataset", default="test" ),
+    #argument( "--add-to-files",    dest="add_to_files", help="Adds to the file catalog", default=True, action="store_true"),
+    #argument( "--no-add-to-files", dest="add_to_files", help="Do not add to the file catalog", action="store_false"),
+    #argument( "--add-to-datasets",    dest="add_to_datasets", help="Adds to the file catalog", default=True, action="store_true"),
+    #argument( "--no-add-to-datasets", dest="add_to_datasets", help="Do not add to the file catalog", action="store_false"),    
+])
+def stageout(args):
+    """
+    Stages the given file out to the specified 
+    """
+
+    # MD5 checksum of the file to be staged out
+    md5true  = sh.md5sum( f"{args.filename}").split()[0]    
+    md5check = None
+
+    ntry=0
+
+
+    # Stage the file out to the target directory
+    sh.cp(f"{args.filename}", f"{args.outdir}")
+    md5check = sh.md5sum( f"{args.outdir}/{args.filename}").split()[0]
+    
+    if md5true==md5check:
+        # Copy succeeded.  Connect to file catalog and add to it
+        fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
+        fcc = fc.cursor()
+        
+        # TODO: switch to an update mode rather than a delete / replace mode.
+        timestamp= args.timestamp
+        run      = int(args.run)
+        seg      = int(args.segment)
+        host     = args.hostname
+        nevents  = args.nevents
+
+        # n.b. not the slurp convention for dsttype
+        dstname  = args.dstname
+        dsttype='_'.join( dstname.split('_')[-2:] )
+        
+        sz  = int( sh.stat( '--printf=%s', f"{args.filename}" ) )
+        md5=md5check
+
+        # Insert into files primary key: (lfn,full_host_name,full_file_path)
+        insert=f"""
+        insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
+               values ('{args.filename}','{host}','{args.outdir}/{args.filename}','now',{sz},'{md5}')
+        on conflict
+        on constraint files_pkey
+        do update set 
+               time=EXCLUDED.time,
+               size=EXCLUDED.size,
+               md5=EXCLUDED.md5
+        ;
+        """
+        print(insert)
+        fcc.execute(insert)
+        fcc.commit()
+
+
+
+        # Insert into datasets primary key: (filename,dataset)
+        insert=f"""
+        insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
+               values ('{args.filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
+        on conflict
+        on constraint datasets_pkey
+        do update set
+           runnumber=EXCLUDED.runnumber,
+           segment=EXCLUDED.segment,
+           size=EXCLUDED.size,
+           dsttype=EXCLUDED.dsttype,
+           events=EXCLUDED.events
+        ;
+        """
+        print(insert)
+        fcc.execute(insert)
+        fcc.commit()
+
+
+
+        
+        
+        
+
+
+
+@subcommand([
+])
+def stagein(args):
+    """
+    """
+    pass
 
 
 #_______________________________________________________________________________________________________
@@ -390,8 +489,6 @@ def execute(args):
     Execute user script.  Exit code will be set to the exit status of the payload
     script, rather than the payload macro.
     """
-
-#   time.sleep( random.randint(1,10) )
 
 
     # We have to go through the parser to run these subcommands, and we don't want
