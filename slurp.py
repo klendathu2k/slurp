@@ -107,6 +107,7 @@ class SPhnxRule:
     files:             str  = None    # Input files query
     filesdb:           str  = None    # Input files DB to query
     runlist:           str  = None    # Input run list query from daq
+    direct:            str  = None    # Direct path to input files (supercedes filecatalog)
     job:               SPhnxCondorJob = SPhnxCondorJob()
     resubmit:          bool = False   # Set true if job should overwrite existing job
     buildarg:          str  = ""      # The build tag passed as an argument (leaves the "." in place).
@@ -265,7 +266,7 @@ def insert_production_status( matching, setup, condor, state ):
     for ad in condor:
         clusterId = ad['ClusterId']
         procId    = ad['ProcId']
-        out       = ad['Out']
+        out       = ad['Out'].split('/')[-1]   # discard anything that looks like a filepath
         args      = ad['Args']
         key       = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
 
@@ -599,13 +600,24 @@ def matches( rule, kwargs={} ):
     for runseg,lfns in lfn_lists.items():
         lfns_ = [ f"'{x}'" for x in lfns ]
         list_of_lfns = ','.join(lfns_)
+
+        # Add a new entry in the pfn_lists lookup table
         if pfn_lists.get(runseg,None)==None:
             pfn_lists[runseg]=[]
-        pfnquery=f"""
-        select full_file_path,md5 from files where lfn in ( {list_of_lfns} );
-        """        
-        for pfnresult in fccro.execute( pfnquery ):
-            pfn_lists[ runseg ].append( pfnresult.full_file_path )
+
+        # Build list of PFNs via direct lookup and append the results
+        if rule.direct:
+            for p in [ rule.direct+'/'+f for f in lfns if os.path.isfile(os.path.join(rule.direct, f)) ]:
+                pfn_lists[ runseg ].append( p )
+            
+
+        # Build list of PFNs via filecatalog lookup if direct path has not been specified
+        if rule.direct==None:
+            pfnquery=f"""
+            select full_file_path,md5 from files where lfn in ( {list_of_lfns} );
+            """        
+            for pfnresult in fccro.execute( pfnquery ):
+                pfn_lists[ runseg ].append( pfnresult.full_file_path )
 
     #
     # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
@@ -703,11 +715,13 @@ def matches( rule, kwargs={} ):
         #
         if num_lfn > num_pfn or sanity==False:
             WARN(f"LFN list and PFN list are different.  Skipping this run {run} {seg}")
-            WARN( lfn_lists )
-            WARN( pfn_lists )
+            WARN( f"{num_lfn} {num_pfn} {sanity}" )
+            #WARN( lfn_lists )
+            #WARN( pfn_lists )
             continue
 
-        inputs_ = lfn_lists[f"'{run}-{seg}'"]
+        #inputs_ = lfn_lists[f"'{run}-{seg}'"]
+        inputs_ = pfn_lists[f"'{run}-{seg}'"]
         ranges_ = rng_lists[f"'{run}-{seg}'"]
         
 

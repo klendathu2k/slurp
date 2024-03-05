@@ -14,10 +14,24 @@ import sh
 import sys
 import signal
 import json
+import hashlib
+import os
+import shutil
 
 # Production status ... 
 statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
 statusdbc = statusdb.cursor()
+
+def md5sum( filename ):
+    file_hash=None
+    with open( filename, "rb") as f:
+        file_hash = hashlib.md5()
+        chunk = f.read(8192)
+        while chunk:
+            file_hash.update(chunk)
+            chunk = f.read(8192)
+    return file_hash.hexdigest()
+    
 
 """
 cups.py -t tablename state  dstname run segment [-e exitcode -n nsegments]
@@ -337,6 +351,7 @@ def catalog(args):
     # n.b. not the slurp convention for dsttype
     dsttype='_'.join( dstname.split('_')[-2:] )
 
+    # TODO: allow to specify the filename
     filename = f"{dstname}-{run:08}-{seg:04}.{ext}"
 
     # File catalog
@@ -357,8 +372,9 @@ def catalog(args):
         fcc.commit()
 
     # Calculate md5 checksum
-    md5 = sh.md5sum( f"{args.path}/{filename}").split()[0]
-    sz  = int( sh.stat( '--printf=%s', f"{args.path}/{filename}" ) )
+    md5 = md5sum( f"{filename}")#  #sh.md5sum( f"{args.path}/{filename}").split()[0]
+    #sz  = int( sh.stat( '--printf=%s', f"{args.path}/{filename}" ) )
+    sz  = int( os.path.getsize(f"{filename}") ) 
 
     # Insert into files
     insert=f"""
@@ -376,6 +392,99 @@ def catalog(args):
     fcc.execute(insert)
     fcc.commit()
 
+#_______________________________________________________________________________________________________
+@subcommand([
+    argument( "filename", help="Name of the file to be staged out"),
+    argument( "outdir",   help="Output directory" ),
+    argument( "--retries", help="Number of retries before silent failure", type=int, default=1 ),
+    argument( "--hostname", help="host name of the filesystem", default="lustre", choices=["lustre","gpfs"] ),
+    argument( "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
+    argument( "--dataset", help="sets the name of the dataset", default="test" ),
+    #argument( "--add-to-files",    dest="add_to_files", help="Adds to the file catalog", default=True, action="store_true"),
+    #argument( "--no-add-to-files", dest="add_to_files", help="Do not add to the file catalog", action="store_false"),
+    #argument( "--add-to-datasets",    dest="add_to_datasets", help="Adds to the file catalog", default=True, action="store_true"),
+    #argument( "--no-add-to-datasets", dest="add_to_datasets", help="Do not add to the file catalog", action="store_false"),    
+])
+def stageout(args):
+    """
+    Stages the given file out to the specified 
+    """
+    md5true  = md5sum( args.filename ) # md5 of the file we are staging out
+    md5check = md5sum( "cups.py" )     # md5 of the file once we have copied it
+
+    # Stage the file out to the target directory.
+    print("Copy back file")
+    shutil.copy2( f"{args.filename}", f"{args.outdir}" )
+    md5check = md5sum( f"{args.outdir}/{args.filename}" )
+
+    # Unlikely to have failed w/out shutil throwing an error
+    if md5true==md5check:
+
+        # Copy succeeded.  Connect to file catalog and add to it
+        fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
+        fcc = fc.cursor()
+        
+        # TODO: switch to an update mode rather than a delete / replace mode.
+        timestamp= args.timestamp
+        run      = int(args.run)
+        seg      = int(args.segment)
+        host     = args.hostname
+        nevents  = args.nevents
+
+        # n.b. not the slurp convention for dsttype
+        dstname  = args.dstname
+        dsttype='_'.join( dstname.split('_')[-2:] )
+        
+        sz  = int( os.path.getsize(f"{args.filename}") ) #int( sh.stat( '--printf=%s', f"{args.filename}" ) )
+        md5=md5check
+
+        # Insert into files primary key: (lfn,full_host_name,full_file_path)
+        print("Insert into files")
+        insert=f"""
+        insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
+               values ('{args.filename}','{host}','{args.outdir}/{args.filename}','now',{sz},'{md5}')
+        on conflict
+        on constraint files_pkey
+        do update set 
+               time=EXCLUDED.time,
+               size=EXCLUDED.size,
+               md5=EXCLUDED.md5
+        ;
+        """
+        fcc.execute(insert)
+        fcc.commit()
+
+
+
+        # Insert into datasets primary key: (filename,dataset)
+        print("Insert into datasets")
+        insert=f"""
+        insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
+               values ('{args.filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
+        on conflict
+        on constraint datasets_pkey
+        do update set
+           runnumber=EXCLUDED.runnumber,
+           segment=EXCLUDED.segment,
+           size=EXCLUDED.size,
+           dsttype=EXCLUDED.dsttype,
+           events=EXCLUDED.events
+        ;
+        """
+        fcc.execute(insert)
+        fcc.commit()
+
+        # and remove the file
+        print("Cleanup file")        
+        os.remove( f"{args.filename}")
+
+
+@subcommand([
+])
+def stagein(args):
+    """
+    """
+    print("Not implemented")
 
 
 #_______________________________________________________________________________________________________
@@ -390,8 +499,6 @@ def execute(args):
     Execute user script.  Exit code will be set to the exit status of the payload
     script, rather than the payload macro.
     """
-
-#   time.sleep( random.randint(1,10) )
 
 
     # We have to go through the parser to run these subcommands, and we don't want
