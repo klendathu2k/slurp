@@ -266,7 +266,7 @@ def insert_production_status( matching, setup, condor, state ):
     for ad in condor:
         clusterId = ad['ClusterId']
         procId    = ad['ProcId']
-        out       = ad['Out']
+        out       = ad['Out'].split('/')[-1]   # discard anything that looks like a filepath
         args      = ad['Args']
         key       = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
 
