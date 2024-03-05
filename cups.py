@@ -412,7 +412,8 @@ def stageout(args):
     md5true  = md5sum( args.filename ) # md5 of the file we are staging out
     md5check = md5sum( "cups.py" )     # md5 of the file once we have copied it
 
-    # Stage the file out to the target directory. 
+    # Stage the file out to the target directory.
+    print("Copy back file")
     shutil.copy2( f"{args.filename}", f"{args.outdir}" )
     md5check = md5sum( f"{args.outdir}/{args.filename}" )
 
@@ -438,6 +439,7 @@ def stageout(args):
         md5=md5check
 
         # Insert into files primary key: (lfn,full_host_name,full_file_path)
+        print("Insert into files")
         insert=f"""
         insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
                values ('{args.filename}','{host}','{args.outdir}/{args.filename}','now',{sz},'{md5}')
@@ -455,6 +457,7 @@ def stageout(args):
 
 
         # Insert into datasets primary key: (filename,dataset)
+        print("Insert into datasets")
         insert=f"""
         insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
                values ('{args.filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
@@ -470,6 +473,10 @@ def stageout(args):
         """
         fcc.execute(insert)
         fcc.commit()
+
+        # and remove the file
+        print("Cleanup file")        
+        os.remove( f"{args.filename}")
 
 
 @subcommand([
