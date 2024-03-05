@@ -16,6 +16,7 @@ import signal
 import json
 import hashlib
 import os
+import shutil
 
 # Production status ... 
 statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
@@ -416,7 +417,8 @@ def stageout(args):
     ntry=0
 
     # Stage the file out to the target directory
-    sh.cp(f"{args.filename}", f"{args.outdir}")
+    #sh.cp(f"{args.filename}", f"{args.outdir}")
+    shutil.copy2( f"{args.filename}", f"{args.outdir}" )
     md5check = md5sum( f"{args.outdir}/{args.filename}" )#sh.md5sum( f"{args.outdir}/{args.filename}").split()[0]
     
     if md5true==md5check:
