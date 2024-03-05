@@ -409,19 +409,16 @@ def stageout(args):
     """
     Stages the given file out to the specified 
     """
+    md5true  = md5sum( args.filename ) # md5 of the file we are staging out
+    md5check = md5sum( "cups.py" )     # md5 of the file once we have copied it
 
-    # MD5 checksum of the file to be staged out
-    md5true  = md5sum( args.filename ) #sh.md5sum( f"{args.filename}").split()[0]    
-    md5check = None
-
-    ntry=0
-
-    # Stage the file out to the target directory
-    #sh.cp(f"{args.filename}", f"{args.outdir}")
+    # Stage the file out to the target directory. 
     shutil.copy2( f"{args.filename}", f"{args.outdir}" )
-    md5check = md5sum( f"{args.outdir}/{args.filename}" )#sh.md5sum( f"{args.outdir}/{args.filename}").split()[0]
-    
+    md5check = md5sum( f"{args.outdir}/{args.filename}" )
+
+    # Unlikely to have failed w/out shutil throwing an error
     if md5true==md5check:
+
         # Copy succeeded.  Connect to file catalog and add to it
         fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
         fcc = fc.cursor()
@@ -452,7 +449,6 @@ def stageout(args):
                md5=EXCLUDED.md5
         ;
         """
-        print(insert)
         fcc.execute(insert)
         fcc.commit()
 
@@ -472,16 +468,8 @@ def stageout(args):
            events=EXCLUDED.events
         ;
         """
-        print(insert)
         fcc.execute(insert)
         fcc.commit()
-
-
-
-        
-        
-        
-
 
 
 @subcommand([
@@ -489,7 +477,7 @@ def stageout(args):
 def stagein(args):
     """
     """
-    pass
+    print("Not implemented")
 
 
 #_______________________________________________________________________________________________________
