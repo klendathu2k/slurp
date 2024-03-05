@@ -14,10 +14,23 @@ import sh
 import sys
 import signal
 import json
+import hashlib
+import os
 
 # Production status ... 
 statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
 statusdbc = statusdb.cursor()
+
+def md5sum( filename ):
+    file_hash=None
+    with open( filename, "rb") as f:
+        file_hash = hashlib.md5()
+        chunk = f.read(8192)
+        while chunk:
+            file_hash.update(chunk)
+            chunk = f.read(8192)
+    return file_hash.hexdigest()
+    
 
 """
 cups.py -t tablename state  dstname run segment [-e exitcode -n nsegments]
@@ -358,8 +371,9 @@ def catalog(args):
         fcc.commit()
 
     # Calculate md5 checksum
-    md5 = sh.md5sum( f"{args.path}/{filename}").split()[0]
-    sz  = int( sh.stat( '--printf=%s', f"{args.path}/{filename}" ) )
+    md5 = md5sum( f"{filename}")#  #sh.md5sum( f"{args.path}/{filename}").split()[0]
+    #sz  = int( sh.stat( '--printf=%s', f"{args.path}/{filename}" ) )
+    sz  = int( os.path.getsize(f"{filename}") ) 
 
     # Insert into files
     insert=f"""
@@ -396,15 +410,14 @@ def stageout(args):
     """
 
     # MD5 checksum of the file to be staged out
-    md5true  = sh.md5sum( f"{args.filename}").split()[0]    
+    md5true  = md5sum( args.filename ) #sh.md5sum( f"{args.filename}").split()[0]    
     md5check = None
 
     ntry=0
 
-
     # Stage the file out to the target directory
     sh.cp(f"{args.filename}", f"{args.outdir}")
-    md5check = sh.md5sum( f"{args.outdir}/{args.filename}").split()[0]
+    md5check = md5sum( f"{args.outdir}/{args.filename}" )#sh.md5sum( f"{args.outdir}/{args.filename}").split()[0]
     
     if md5true==md5check:
         # Copy succeeded.  Connect to file catalog and add to it
@@ -422,7 +435,7 @@ def stageout(args):
         dstname  = args.dstname
         dsttype='_'.join( dstname.split('_')[-2:] )
         
-        sz  = int( sh.stat( '--printf=%s', f"{args.filename}" ) )
+        sz  = int( os.path.getsize(f"{args.filename}") ) #int( sh.stat( '--printf=%s', f"{args.filename}" ) )
         md5=md5check
 
         # Insert into files primary key: (lfn,full_host_name,full_file_path)
