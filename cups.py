@@ -410,18 +410,21 @@ def stageout(args):
     Stages the given file out to the specified 
     """
     md5true  = md5sum( args.filename ) # md5 of the file we are staging out
-    md5check = md5sum( "cups.py" )     # md5 of the file once we have copied it
 
     # Stage the file out to the target directory.
     print("Copy back file")
     shutil.copy2( f"{args.filename}", f"{args.outdir}" )
     md5check = md5sum( f"{args.outdir}/{args.filename}" )
 
+    print("Checksum before and after")
+    print(md5true)
+    print(md5check)
+
     # Unlikely to have failed w/out shutil throwing an error
     if md5true==md5check:
 
         # Copy succeeded.  Connect to file catalog and add to it
-        fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
+        fc = pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc")
         fcc = fc.cursor()
         
         # TODO: switch to an update mode rather than a delete / replace mode.
@@ -438,11 +441,16 @@ def stageout(args):
         sz  = int( os.path.getsize(f"{args.filename}") ) #int( sh.stat( '--printf=%s', f"{args.filename}" ) )
         md5=md5check
 
+        # Strip off any leading path 
+        filename=args.filename.split('/')[-1]
+
+        
+
         # Insert into files primary key: (lfn,full_host_name,full_file_path)
         print("Insert into files")
         insert=f"""
         insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
-               values ('{args.filename}','{host}','{args.outdir}/{args.filename}','now',{sz},'{md5}')
+               values ('{filename}','{host}','{args.outdir}/{filename}','now',{sz},'{md5}')
         on conflict
         on constraint files_pkey
         do update set 
@@ -451,6 +459,7 @@ def stageout(args):
                md5=EXCLUDED.md5
         ;
         """
+        print(insert)
         fcc.execute(insert)
         fcc.commit()
 
@@ -460,7 +469,7 @@ def stageout(args):
         print("Insert into datasets")
         insert=f"""
         insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
-               values ('{args.filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
+               values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
         on conflict
         on constraint datasets_pkey
         do update set
@@ -471,12 +480,13 @@ def stageout(args):
            events=EXCLUDED.events
         ;
         """
+        print(insert)
         fcc.execute(insert)
         fcc.commit()
 
         # and remove the file
         print("Cleanup file")        
-        os.remove( f"{args.filename}")
+        os.remove( f"{filename}")
 
 
 @subcommand([
