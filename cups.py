@@ -14,14 +14,24 @@ import sh
 import sys
 import signal
 import json
+import hashlib
+import os
+import shutil
 
-# File catalog
-fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
-fcc = fc.cursor()
-
-# Production status ... TODO: refactor production_status table to use "ps" and "psc"... to support different DB's...
-statusdb = pyodbc.connect("DSN=FileCatalog")
+# Production status ... 
+statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
 statusdbc = statusdb.cursor()
+
+def md5sum( filename ):
+    file_hash=None
+    with open( filename, "rb") as f:
+        file_hash = hashlib.md5()
+        chunk = f.read(8192)
+        while chunk:
+            file_hash.update(chunk)
+            chunk = f.read(8192)
+    return file_hash.hexdigest()
+    
 
 """
 cups.py -t tablename state  dstname run segment [-e exitcode -n nsegments]
@@ -36,6 +46,7 @@ def eprint(*args, **kwargs):
 parser     = argparse.ArgumentParser(prog='cups')
 subparsers = parser.add_subparsers(dest="subcommand")
 
+parser.add_argument( "-v", "--verbose",dest="verbose"   , default=False, action="store_true", help="Sets verbose output")
 parser.add_argument( "--no-update",    dest="noupdate"  , default=False, action="store_true", help="Does not update the DB table")
 parser.add_argument( "-t","--table"  , dest="table"     , default="production_status",help="Sets the name of the production status table table")
 parser.add_argument( "-d","--dstname", dest="dstname"   ,                                                   help="Set the DST name eg DST_CALO_auau1", required=True)
@@ -83,55 +94,57 @@ def getLatestId( tablename, dstname, run, seg ):
     query=f"""
     select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
     """
-    print(query)
     result = statusdbc.execute(query).fetchone()[0]
     return result
 
-@subcommand()
-def submitting(args):
-    """
-    Executed by slurp when the jobs are being submitted to condor.
-    """
-    tablename=args.table
-    dstname=args.dstname
-    timestamp=args.timestamp
-    run=int(args.run)
-    seg=int(args.segment)
-    id_ = getLatestId( tablename, dstname, run, seg )
-    update = f"""
-    update {tablename}
-    set status='submitting',submitting='{timestamp}'
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    """
-    if args.noupdate:
-        print(update)
-    else:
-        print(update)
-        statusdbc.execute( update )
-        statusdbc.commit()
+# The submitting and submitted states are handled internally by slurp, and should not be 
+# set by the running job.
 
-@subcommand()
-def submitted(args):
-    """
-    Executed by slurp when the jobs have been submitted to condor.
-    """
-    tablename=args.table
-    dstname=args.dstname
-    timestamp=args.timestamp
-    run=int(args.run)
-    seg=int(args.segment)
-    id_ = getLatestId( tablename, dstname, run, seg )
-    update = f"""
-    update {tablename}
-    set status='submitted',submitted='{timestamp}'
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    """
-    if args.noupdate:
-        print(update)
-    else:
-        print(update)
-        statusdbc.execute( update )
-        statusdbc.commit()
+#@subcommand()
+#def submitting(args):
+#    """
+#    Executed by slurp when the jobs are being submitted to condor.
+#    """
+#    tablename=args.table
+#    dstname=args.dstname
+#    timestamp=args.timestamp
+#    run=int(args.run)
+#    seg=int(args.segment)
+#    id_ = getLatestId( tablename, dstname, run, seg )
+#    update = f"""
+#    update {tablename}
+#    set status='submitting',submitting='{timestamp}'
+#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+#    """
+#    if args.noupdate:
+#        print(update)
+#    else:
+#        print(update)
+#        statusdbc.execute( update )
+#        statusdbc.commit()
+
+#@subcommand()
+#def submitted(args):
+#    """
+#    Executed by slurp when the jobs have been submitted to condor.
+#    """
+#    tablename=args.table
+#    dstname=args.dstname
+#    timestamp=args.timestamp
+#    run=int(args.run)
+#    seg=int(args.segment)
+#    id_ = getLatestId( tablename, dstname, run, seg )
+#    update = f"""
+#    update {tablename}
+#    set status='submitted',submitted='{timestamp}'
+#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+#    """
+#    if args.noupdate:
+#        print(update)
+#    else:
+#        print(update)
+#        statusdbc.execute( update )
+#        statusdbc.commit()
 
 @subcommand()
 def started(args):
@@ -149,10 +162,13 @@ def started(args):
     set status='started',started='{timestamp}'
     where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
+    if args.verbose:
+        print(update)
+
     if args.noupdate:
-        print(update)
+        pass
+        #print(update)
     else:
-        print(update)
         statusdbc.execute( update )
         statusdbc.commit()
 
@@ -176,10 +192,12 @@ def running(args):
     set status='running',running='{timestamp}',nsegments={nsegments}
     where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
+    if args.verbose:
+        print(update)
+
     if args.noupdate:
-        print(update)
+        pass
     else:
-        print(update)
         statusdbc.execute( update )
         statusdbc.commit()
 
@@ -211,10 +229,12 @@ def finished(args):
     set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
     where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
+    if args.verbose:
+        print(update)
+
     if args.noupdate:
-        print(update)
+        pass
     else:
-        print(update)
         statusdbc.execute( update )
         statusdbc.commit()
 
@@ -241,10 +261,12 @@ def exitcode(args):
     set status='{state}',exit_code={ec}
     where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
+    if args.verbose:
+        print(update)
+
     if args.noupdate:
-        print(update)
+        pass
     else:
-        print(update)
         statusdbc.execute( update )
         statusdbc.commit()
 
@@ -268,10 +290,41 @@ def nevents(args):
     set nevents={ne}
     where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
+    if args.verbose:
+        print(update)
+
     if args.noupdate:
-        print(update)
+        pass
     else:
+        statusdbc.execute( update )
+        statusdbc.commit()
+
+#_______________________________________________________________________________________________________
+@subcommand([
+    argument(     "--files",  help="List of input files (and/or ranges)",dest="files",nargs="*"),
+])
+def inputs(args):
+    """
+    Updates the number of events processed
+    """
+    tablename=args.table
+    dstname=args.dstname
+    run=int(args.run)
+    seg=int(args.segment)
+    id_ = getLatestId( tablename, dstname, run, seg )
+    inputs = 'unset'
+    if len(args.files)>0:
+        inputs=' '.join(args.files)
+    update = f"""
+    update {tablename}
+    set inputs='{inputs}'
+    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+    """
+    if args.verbose:
         print(update)
+    if args.noupdate:
+        pass
+    else:
         statusdbc.execute( update )
         statusdbc.commit()
 
@@ -296,8 +349,9 @@ def nevents(args):
 ])
 def catalog(args):
     """
-    Add the file to the file catalog
+    Add the file to the file catalog.  
     """
+    # TODO: switch to an update mode rather than a delete / replace mode.
     replace  = args.replace
     tablename= args.table
     dstname  = args.dstname
@@ -311,7 +365,14 @@ def catalog(args):
     # n.b. not the slurp convention for dsttype
     dsttype='_'.join( dstname.split('_')[-2:] )
 
+    # TODO: allow to specify the filename
     filename = f"{dstname}-{run:08}-{seg:04}.{ext}"
+
+    # File catalog
+    fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
+    fcc = fc.cursor()
+
+    dataset = args.dataset
 
     checkfile = fcc.execute( f"select size,full_file_path from files where lfn='{filename}';" ).fetchall()
     if checkfile and replace:
@@ -319,14 +380,15 @@ def catalog(args):
         fcc.commit()
         
 
-    checkdataset = fcc.execute( f"select size from datasets where filename='{filename}' and dataset='mdc2';" ).fetchall()
+    checkdataset = fcc.execute( f"select size from datasets where filename='{filename}' and dataset='{dataset}';" ).fetchall()
     if checkdataset and replace:
-        fcc.execute(f"delete from datasets where  filename='{filename}' and dataset='mdc2';" )
+        fcc.execute(f"delete from datasets where  filename='{filename}' and dataset='{dataset}';" )
         fcc.commit()
 
     # Calculate md5 checksum
-    md5 = sh.md5sum( f"{args.path}/{filename}").split()[0]
-    sz  = int( sh.stat( '--printf=%s', f"{args.path}/{filename}" ) )
+    md5 = md5sum( f"{filename}")#  #sh.md5sum( f"{args.path}/{filename}").split()[0]
+    #sz  = int( sh.stat( '--printf=%s', f"{args.path}/{filename}" ) )
+    sz  = int( os.path.getsize(f"{filename}") ) 
 
     # Insert into files
     insert=f"""
@@ -339,11 +401,124 @@ def catalog(args):
     # Insert into datasets
     insert=f"""
     insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
-    values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
+    values ('{filename}',{run},{seg},{sz},'{dataset}','{dsttype}',{args.nevents})
     """
     fcc.execute(insert)
     fcc.commit()
 
+#_______________________________________________________________________________________________________
+@subcommand([
+    argument( "filename", help="Name of the file to be staged out"),
+    argument( "outdir",   help="Output directory" ),
+    argument( "--retries", help="Number of retries before silent failure", type=int, default=1 ),
+    argument( "--hostname", help="host name of the filesystem", default="lustre", choices=["lustre","gpfs"] ),
+    argument( "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
+    argument( "--dataset", help="sets the name of the dataset", default="test" ),
+    #argument( "--add-to-files",    dest="add_to_files", help="Adds to the file catalog", default=True, action="store_true"),
+    #argument( "--no-add-to-files", dest="add_to_files", help="Do not add to the file catalog", action="store_false"),
+    #argument( "--add-to-datasets",    dest="add_to_datasets", help="Adds to the file catalog", default=True, action="store_true"),
+    #argument( "--no-add-to-datasets", dest="add_to_datasets", help="Do not add to the file catalog", action="store_false"),    
+])
+def stageout(args):
+    """
+    Stages the given file out to the specified 
+    """
+    md5true  = md5sum( args.filename ) # md5 of the file we are staging out
+
+    # Stage the file out to the target directory.
+    if args.verbose:
+        print("Copy back file")
+
+    shutil.copy2( f"{args.filename}", f"{args.outdir}" )
+    md5check = md5sum( f"{args.outdir}/{args.filename}" )
+
+    if args.verbose:
+        print("Checksum before and after")
+        print(md5true)
+        print(md5check)
+
+    # Unlikely to have failed w/out shutil throwing an error
+    if md5true==md5check:
+
+        # Copy succeeded.  Connect to file catalog and add to it
+        fc = pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc")
+        fcc = fc.cursor()
+        
+        # TODO: switch to an update mode rather than a delete / replace mode.
+        timestamp= args.timestamp
+        run      = int(args.run)
+        seg      = int(args.segment)
+        host     = args.hostname
+        nevents  = args.nevents
+
+        # n.b. not the slurp convention for dsttype
+        dstname  = args.dstname
+        dsttype='_'.join( dstname.split('_')[-2:] )
+        
+        sz  = int( os.path.getsize(f"{args.filename}") ) #int( sh.stat( '--printf=%s', f"{args.filename}" ) )
+        md5=md5check
+
+        # Strip off any leading path 
+        filename=args.filename.split('/')[-1]
+
+        
+
+        # Insert into files primary key: (lfn,full_host_name,full_file_path)
+        if args.verbose:
+            print("Insert into files")
+        insert=f"""
+        insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
+               values ('{filename}','{host}','{args.outdir}/{filename}','now',{sz},'{md5}')
+        on conflict
+        on constraint files_pkey
+        do update set 
+               time=EXCLUDED.time,
+               size=EXCLUDED.size,
+               md5=EXCLUDED.md5
+        ;
+        """
+        if args.verbose:
+            print(insert)
+
+        fcc.execute(insert)
+        fcc.commit()
+
+
+
+        # Insert into datasets primary key: (filename,dataset)
+        if args.verbose:
+            print("Insert into datasets")
+        insert=f"""
+        insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
+               values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
+        on conflict
+        on constraint datasets_pkey
+        do update set
+           runnumber=EXCLUDED.runnumber,
+           segment=EXCLUDED.segment,
+           size=EXCLUDED.size,
+           dsttype=EXCLUDED.dsttype,
+           events=EXCLUDED.events
+        ;
+        """
+        if args.verbose:
+            print(insert)
+
+        fcc.execute(insert)
+        fcc.commit()
+
+        # and remove the file
+        if args.verbose:
+            print("Cleanup file")        
+        os.remove( f"{filename}")
+
+
+@subcommand([
+])
+def stagein(args):
+    """
+    """
+    print("Not implemented")
 
 
 #_______________________________________________________________________________________________________
@@ -358,8 +533,6 @@ def execute(args):
     Execute user script.  Exit code will be set to the exit status of the payload
     script, rather than the payload macro.
     """
-
-#   time.sleep( random.randint(1,10) )
 
 
     # We have to go through the parser to run these subcommands, and we don't want
@@ -408,10 +581,10 @@ def quality(args):
     INSERT INTO production_quality (stat_id,dstname,run,segment,qual) values
       ( {id_},'{dstname}',{run},{segment},'{qastring}' );   
     """
-    print(qaentry)
 
-    fcc.execute(qaentry)
-    fcc.commit()    
+    # File catalog
+    statusdbc.execute(qaentry)
+    statusdbc.commit()    
 
 
 def main():

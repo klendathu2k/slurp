@@ -72,7 +72,7 @@ def main():
             print("Summary of jobs which have not reached staus='started'")
             print("------------------------------------------------------")
             psqlquery=f"""
-            select dsttype,
+            select dsttype,prod_id,
                count(run)                        as num_jobs           ,
                avg(age(submitted,submitting))    as avg_time_to_submit ,
                min(age(submitted,submitting))    as min_time_to_submit ,
@@ -80,7 +80,7 @@ def main():
        
             from   production_status 
             where  status<='started'  {conditions}
-            group by dsttype
+            group by dsttype,prod_id
             order by dsttype desc
             ;
             """
@@ -90,8 +90,7 @@ def main():
             print("Summary of jobs which have reached staus='started'")
             print("--------------------------------------------------")
             psqlquery=f"""
-            select dsttype,
-               run,
+            select dsttype,prod_id,
                count(run)                      as num_jobs,
                avg(age(started,submitting))    as avg_time_to_start,
                count( case status when 'submitted' then 1 else null end )
@@ -109,8 +108,8 @@ def main():
        
             from   production_status 
             where  status>='started' {conditions}
-            group by dsttype,run
-            order by dsttype,run desc
+            group by dsttype,prod_id
+            order by dsttype desc
                ;
             """
             psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)

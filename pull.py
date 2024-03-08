@@ -107,7 +107,7 @@ for line in sys.stdin:
 
         # Fall through to the aggregate below...
 
-if runnumber>0: 
+if int(runnumber)>0: 
     cups([
         '--run',      f'{runnumber}', 
         '--segment',  f'{segment}',

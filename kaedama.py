@@ -10,6 +10,27 @@ from slurp import matches
 from slurp import submit
 
 from slurp import arg_parser
+from slurp import fccro as fcc  # production status DB cursor
+from slurp import daqc 
+
+import sh
+import sys
+
+from slurp import cursors
+
+
+#from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("kaedama.log"),
+        logging.StreamHandler()
+    ]
+)
+
+
 
 import pprint
 
@@ -26,7 +47,7 @@ arg_parser.add_argument( '--config',help="Specifies the yaml configuration file"
 def main():
 
     # parse command line options
-    args = slurp.parse_command_line()
+    args, userargs = slurp.parse_command_line()
 
     config={}
     with open(args.config,"r") as stream:
@@ -59,24 +80,68 @@ def main():
     config = config[ args.rule ]
 
     # Input query specifies the source of the input files
-    input_query= config['input_query'].format(**locals())
-    params     = config['params']
-    filesystem = config['filesystem']
-    job_       = config['job']
+    input_         = config.get('input')
+    input_query    = input_.get('query','').format(**locals())
+    input_query_db = input_.get('db',None)
+    input_query_direct = input_.get('direct_path',None)
+
+    runlist_query = config.get('runlist_query','').format(**locals())
+    params        = config.get('params',None)
+    filesystem    = config.get('filesystem',None)
+    job_          = config.get('job',None) #config['job']
+    presubmit     = config.get('presubmit',None)
+
+    if runlist_query =='': runlist_query = None
+    if input_query   =='': input_query   = None
+
+
+    #__________________________________________________________________________________
+    #
+    # Pre Submission Phase... execute the action script on the results of the 
+    # specified query to the specified database.
+    #__________________________________________________________________________________
+    if presubmit:
+        cursor=cursors[ presubmit.get('db','fcc') ]
+        pre_query  = presubmit.get('query', '').format(**locals())
+        result_ = [ list(x) 
+            for x in  cursor.execute(pre_query).fetchall() 
+        ]
+        for result in result_:
+            query      = ' '.join([ str(x) for x in result ])
+            pre_action = presubmit.get('action','').format( **locals())
+            pre_action = pre_action.split()
+            actor=sh.Command( pre_action[0] )
+            actor( *pre_action[1:], _out=sys.stdout )
+
+
+    #__________________________________________________________________________________
+    #
+    # Job Submission Phase
+    #__________________________________________________________________________________
+
     
-    if isinstance( params.get( 'file_lists', False ), list ):
-        params['file_lists'] = ','.join( params['file_lists'] )
-
     jobkw = {}
-    for k,v in job_.items():
-        jobkw[k] = v.format( **locals(), **filesystem, **params )
+    job   = None
+    if job_:
+        assert( filesystem is not None )
+        assert( params     is not None )
+        for k,v in job_.items():
+            jobkw[k] = v.format( **locals(), **filesystem, **params )
 
-    # And now we can create the job definition thusly
-    job = Job( **jobkw )
+        # And now we can create the job definition thusly
+        job = Job( **jobkw )
 
-    if args.submit:
+
+    #
+    # Perform job submission IFF we have the params, input_query, filesystem
+    # and job blocks
+    #
+    if args.submit and params and input_query and filesystem and job:
         dst_rule = Rule( name              = params['name'],
                          files             = input_query,
+                         filesdb           = input_query_db,
+                         direct            = input_query_direct,         
+                         runlist           = runlist_query,            # deprecated TODO
                          script            = params['script'],
                          build             = params['build'],
                          tag               = params['dbtag'],
@@ -89,9 +154,6 @@ def main():
         submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump"] }
 
         submit (dst_rule, nevents=args.nevents, **submitkw, **filesystem ) 
-
-    else:            
-        pprint.pprint(job)
 
 
 if __name__ == '__main__': main()
