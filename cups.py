@@ -46,6 +46,7 @@ def eprint(*args, **kwargs):
 parser     = argparse.ArgumentParser(prog='cups')
 subparsers = parser.add_subparsers(dest="subcommand")
 
+parser.add_argument( "-v", "--verbose",dest="verbose"   , default=False, action="store_true", help="Sets verbose output")
 parser.add_argument( "--no-update",    dest="noupdate"  , default=False, action="store_true", help="Does not update the DB table")
 parser.add_argument( "-t","--table"  , dest="table"     , default="production_status",help="Sets the name of the production status table table")
 parser.add_argument( "-d","--dstname", dest="dstname"   ,                                                   help="Set the DST name eg DST_CALO_auau1", required=True)
@@ -161,8 +162,12 @@ def started(args):
     set status='started',started='{timestamp}'
     where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
-    if args.noupdate:
+    if args.verbose:
         print(update)
+
+    if args.noupdate:
+        pass
+        #print(update)
     else:
         statusdbc.execute( update )
         statusdbc.commit()
@@ -187,10 +192,12 @@ def running(args):
     set status='running',running='{timestamp}',nsegments={nsegments}
     where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
+    if args.verbose:
+        print(update)
+
     if args.noupdate:
-        print(update)
+        pass
     else:
-        print(update)
         statusdbc.execute( update )
         statusdbc.commit()
 
@@ -222,10 +229,12 @@ def finished(args):
     set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
     where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
+    if args.verbose:
+        print(update)
+
     if args.noupdate:
-        print(update)
+        pass
     else:
-        print(update)
         statusdbc.execute( update )
         statusdbc.commit()
 
@@ -252,10 +261,12 @@ def exitcode(args):
     set status='{state}',exit_code={ec}
     where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
+    if args.verbose:
+        print(update)
+
     if args.noupdate:
-        print(update)
+        pass
     else:
-        print(update)
         statusdbc.execute( update )
         statusdbc.commit()
 
@@ -279,10 +290,12 @@ def nevents(args):
     set nevents={ne}
     where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
+    if args.verbose:
+        print(update)
+
     if args.noupdate:
-        print(update)
+        pass
     else:
-        print(update)
         statusdbc.execute( update )
         statusdbc.commit()
 
@@ -307,10 +320,11 @@ def inputs(args):
     set inputs='{inputs}'
     where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
+    if args.verbose:
+        print(update)
     if args.noupdate:
-        print(update)
+        pass
     else:
-        print(update)
         statusdbc.execute( update )
         statusdbc.commit()
 
@@ -412,13 +426,16 @@ def stageout(args):
     md5true  = md5sum( args.filename ) # md5 of the file we are staging out
 
     # Stage the file out to the target directory.
-    print("Copy back file")
+    if args.verbose:
+        print("Copy back file")
+
     shutil.copy2( f"{args.filename}", f"{args.outdir}" )
     md5check = md5sum( f"{args.outdir}/{args.filename}" )
 
-    print("Checksum before and after")
-    print(md5true)
-    print(md5check)
+    if args.verbose:
+        print("Checksum before and after")
+        print(md5true)
+        print(md5check)
 
     # Unlikely to have failed w/out shutil throwing an error
     if md5true==md5check:
@@ -447,7 +464,8 @@ def stageout(args):
         
 
         # Insert into files primary key: (lfn,full_host_name,full_file_path)
-        print("Insert into files")
+        if args.verbose:
+            print("Insert into files")
         insert=f"""
         insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
                values ('{filename}','{host}','{args.outdir}/{filename}','now',{sz},'{md5}')
@@ -459,14 +477,17 @@ def stageout(args):
                md5=EXCLUDED.md5
         ;
         """
-        print(insert)
+        if args.verbose:
+            print(insert)
+
         fcc.execute(insert)
         fcc.commit()
 
 
 
         # Insert into datasets primary key: (filename,dataset)
-        print("Insert into datasets")
+        if args.verbose:
+            print("Insert into datasets")
         insert=f"""
         insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
                values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
@@ -480,12 +501,15 @@ def stageout(args):
            events=EXCLUDED.events
         ;
         """
-        print(insert)
+        if args.verbose:
+            print(insert)
+
         fcc.execute(insert)
         fcc.commit()
 
         # and remove the file
-        print("Cleanup file")        
+        if args.verbose:
+            print("Cleanup file")        
         os.remove( f"{filename}")
 
 
