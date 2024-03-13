@@ -9,9 +9,14 @@ from tabulate import tabulate
 import signal
 import pprint
 import os
+import datetime
+import time
 
 statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
 statusdbr = statusdbr_.cursor()
+
+timestart=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
+time.sleep(1)
 
 # https://mike.depalatis.net/blog/simplifying-argparse
 
@@ -59,7 +64,9 @@ parser.add_argument( "-v", "--verbose",dest="verbose"   , default=False, action=
 #signal.signal(signal.SIGSTOP, handler)
 #signal.signal(signal.SIGKILL, handler)
 
-def clear(): print("\033c\033[3J", end='')
+def clear(): 
+    sleep(10)
+    print("\033c\033[3J", end='')
 
 def subcommand(args=[], parent=subparsers):
     def decorator(func):
@@ -83,7 +90,8 @@ def query_pending_jobs( conditions="" ):
     max(age(submitted,submitting))    as max_time_to_submit
        
     from   production_status 
-    where  status<='started'  {conditions}
+    where  status<='started' and submitted>'{timestart}'
+       {conditions}
     group by dsttype,prod_id
     order by dsttype desc
     ;
@@ -113,7 +121,8 @@ def query_started_jobs(conditions=""):
     sum(nevents)                    as sum_events
        
     from   production_status 
-    where  status>='started' {conditions}
+    where  status>='started' and submitted>'{timestart}'
+     {conditions}
     group by dsttype,prod_id
     order by dsttype desc
     ;
@@ -134,23 +143,21 @@ def submit(args):
     """
     Submit a single set of jobs matching the specified rules in the specified definition files.
     """
-
-    kaedama  = sh.Command("kaedama.py")    
-
     go = True
 
+    kaedama  = sh.Command("kaedama.py" )    
     kaedama = kaedama.bake( "submit", "--config", args.SLURPFILE )
 
-    if   len(args.runs)==1: kaedama = kaedama.bake( runs=args.runs[0] )
-    elif len(args.runs)==2: kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1] )
-    elif len(args.runs)==3: kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1], args.runs[2] )
-    else:                   kaedama = kaedama.bake( "--runs", "0", "999999" )
-    
     while ( go ):
+
+        if   len(args.runs)==1: kaedama = kaedama.bake( runs=args.runs[0] )
+        elif len(args.runs)==2: kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1] )
+        elif len(args.runs)==3: kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1], args.runs[2] )
+        else:                   kaedama = kaedama.bake( "--runs", "0", "999999" )
 
         # Execute the specified rules
         for r in args.rules:
-            kaedama( batch=True, rule=r )
+            kaedama( batch=True, rule=r, _out=sys.stdout )
 
         clear()
         query_pending_jobs(" and prod_id>=31 ")
