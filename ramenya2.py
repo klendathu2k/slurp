@@ -16,6 +16,22 @@ from colorama import Fore, Back, Style, init
 
 init()
 
+# Colorize tables
+def colorize(row,fail_color=(Back.RED,Fore.WHITE)):
+    color=f"{Fore.GREEN}{Style.BRIGHT}"
+    reset=f"{Style.RESET_ALL}{Fore.RESET}"
+    if row.num_failed>0:  
+        color=f"{fail_color[0]}{fail_color[1]}{Style.BRIGHT}"
+        reset=f"{Fore.RESET}{Back.RESET}{Style.RESET_ALL}"
+    myrow = [ 
+        f"{color}{element}{reset}"   if (element!=None) else ""
+        for element in list(row) 
+    ]
+    return myrow
+
+
+
+
 statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
 statusdbr = statusdbr_.cursor()
 
@@ -101,8 +117,10 @@ def query_pending_jobs( conditions="" ):
     ;
     """    
     results = statusdbr.execute(psqlquery);
-    labels  = [ c[0] for c in statusdbr.description ]
-    print( tabulate( results, labels, tablefmt="psql" ) )
+    labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+    table = [colorize(r) for r in results]
+    print( tabulate( table, labels, tablefmt="psql" ) )
+
 
 def query_started_jobs(conditions=""):
     print("Summary of jobs which have reached staus='started'")
@@ -132,8 +150,9 @@ def query_started_jobs(conditions=""):
     ;
     """
     results = statusdbr.execute(psqlquery);
-    labels  = [ c[0] for c in statusdbr.description ]
-    print( tabulate( results, labels, tablefmt="psql" ) )
+    labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+    table = [colorize(r,fail_color=(Back.YELLOW,Fore.BLACK)) for r in results]
+    print( tabulate( table, labels, tablefmt="psql" ) )
 
 def query_jobs_by_cluster(conditions=""):
     print("Summary of jobs by condor cluster")
@@ -162,8 +181,11 @@ def query_jobs_by_cluster(conditions=""):
                ;
     """
     results = statusdbr.execute(psqlquery);
-    labels  = [ c[0] for c in statusdbr.description ]
-    print( tabulate( results, labels, tablefmt="psql" ) )
+    labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+    table = [colorize(r) for r in results]
+    print( tabulate( table, labels, tablefmt="psql" ) )
+
+
 
 def query_jobs_by_run(conditions=""):
     print("Summary of jobs by condor cluster")
@@ -193,21 +215,6 @@ def query_jobs_by_run(conditions=""):
     """
     results = statusdbr.execute(psqlquery);
     labels  = [ c[0] for c in statusdbr.description ]
-
-    def colorize(row):
-
-        color=Fore.GREEN
-        reset=Fore.RESET
-        if row.num_failed>0:  
-            color=f"{Back.RED}{Fore.WHITE}"
-            reset=f"{Fore.RESET}{Back.RESET}"
-
-        myrow = [ 
-            f"{color}{element}{reset}"   if (element!=None) else ""
-            for element in list(row) 
-        ]
-
-        return myrow
 
     table = [colorize(r) for r in results]
 
@@ -260,7 +267,7 @@ query_choices=[
 @subcommand([
     argument( '--runs',  nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[0,999999] ),
     argument( "--loop", default=False, action="store_true", help="Run query in loop with default 5min delay"),
-    argument( "--delay", default=300, help="Set the loop delay"),
+    argument( "--delay", default=300, help="Set the loop delay",type=int),
     argument( "--dstname", default=["all"], nargs="+", help="Specifies one or more dstnames to select on the display query" ),
     argument( "--timestart",default=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),help="Specifies UTC timestamp (in ISO format, e.g. YYYY-MM-DD) for query.", type=dateutil.parser.parse)
 
@@ -274,10 +281,10 @@ def query(args):
     go = True
     while ( go ):
         clear()
-        #query_pending_jobs()
-        #query_started_jobs()
-        #query_jobs_by_cluster()
-        query_jobs_by_run()
+        query_pending_jobs()
+        query_started_jobs()
+        query_jobs_by_cluster()
+        #query_jobs_by_run()
         if args.loop==False: break
         time.sleep( args.delay )
 
