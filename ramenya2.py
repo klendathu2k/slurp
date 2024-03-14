@@ -11,6 +11,10 @@ import pprint
 import os
 import datetime
 import time
+import dateutil.parser
+from colorama import Fore, Back, Style, init
+
+init()
 
 statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
 statusdbr = statusdbr_.cursor()
@@ -131,6 +135,84 @@ def query_started_jobs(conditions=""):
     labels  = [ c[0] for c in statusdbr.description ]
     print( tabulate( results, labels, tablefmt="psql" ) )
 
+def query_jobs_by_cluster(conditions=""):
+    print("Summary of jobs by condor cluster")
+    psqlquery=f"""
+            select dsttype,cluster,
+               count(run)                      as num_jobs,
+               avg(age(started,submitting))    as avg_time_to_start,
+               count( case status when 'submitted' then 1 else null end )
+                                               as num_submitted,
+               count( case status when 'running' then 1 else null end )
+                                               as num_running,
+               count( case status when 'finished' then 1 else null end )
+                                               as num_finished,
+               count( case status when 'failed' then 1 else null end )
+                                               as num_failed,
+               avg(age(ended,started))         as avg_job_duration,
+               min(age(ended,started))         as min_job_duration,
+               max(age(ended,started))         as max_job_duration,
+               sum(nevents)                    as sum_events
+       
+            from   production_status 
+            where  status>='started'   and submitted>'{timestart}'
+            {conditions}
+            group by dsttype,cluster
+            order by dsttype desc
+               ;
+    """
+    results = statusdbr.execute(psqlquery);
+    labels  = [ c[0] for c in statusdbr.description ]
+    print( tabulate( results, labels, tablefmt="psql" ) )
+
+def query_jobs_by_run(conditions=""):
+    print("Summary of jobs by condor cluster")
+#              count(run)                      as num_jobs,
+    psqlquery=f"""
+            select dsttype,run,
+               avg(age(started,submitting))    as avg_time_to_start,
+               count( case status when 'submitted' then 1 else null end )
+                                               as num_submitted,
+               count( case status when 'running' then 1 else null end )
+                                               as num_running,
+               count( case status when 'finished' then 1 else null end )
+                                               as num_finished,
+               count( case status when 'failed' then 1 else null end )
+                                               as num_failed,
+               avg(age(ended,started))         as avg_job_duration,
+               min(age(ended,started))         as min_job_duration,
+               max(age(ended,started))         as max_job_duration,
+               sum(nevents)                    as sum_events
+       
+            from   production_status 
+            where  status>='started'   and submitted>'{timestart}'
+            {conditions}
+            group by dsttype,run
+            order by run
+               ;
+    """
+    results = statusdbr.execute(psqlquery);
+    labels  = [ c[0] for c in statusdbr.description ]
+
+    def colorize(row):
+
+        color=Fore.GREEN
+        reset=Fore.RESET
+        if row.num_failed>0:  
+            color=f"{Back.RED}{Fore.WHITE}"
+            reset=f"{Fore.RESET}{Back.RESET}"
+
+        myrow = [ 
+            f"{color}{element}{reset}"   if (element!=None) else ""
+            for element in list(row) 
+        ]
+
+        return myrow
+
+    table = [colorize(r) for r in results]
+
+    print( tabulate( table, labels, tablefmt="psql" ) )
+
 
 @subcommand([
     argument( '--runs',  nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list.", default=[] ),
@@ -160,13 +242,12 @@ def submit(args):
             kaedama( batch=True, rule=r, _out=sys.stdout )
 
         clear()
-        query_pending_jobs(" and prod_id>=31 ")
-        query_started_jobs(" and prod_id>=31 ")
+        query_pending_jobs()
+        query_started_jobs()
+        query_jobs_by_cluster()
 
         if args.loop==False: break
-        sleep( args.delay )
-
-
+        time.sleep( args.delay )
 
 query_choices=[
     "submitted",
@@ -181,12 +262,25 @@ query_choices=[
     argument( "--loop", default=False, action="store_true", help="Run query in loop with default 5min delay"),
     argument( "--delay", default=300, help="Set the loop delay"),
     argument( "--dstname", default=["all"], nargs="+", help="Specifies one or more dstnames to select on the display query" ),
+    argument( "--timestart",default=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),help="Specifies UTC timestamp (in ISO format, e.g. YYYY-MM-DD) for query.", type=dateutil.parser.parse)
+
 ])
 def query(args):
     """
     Shows jobs which have reached a given state
     """
-    pass
+    global timestart
+    timestart=str(args.timestart)
+    go = True
+    while ( go ):
+        clear()
+        #query_pending_jobs()
+        #query_started_jobs()
+        #query_jobs_by_cluster()
+        query_jobs_by_run()
+        if args.loop==False: break
+        time.sleep( args.delay )
+
 
 
 
