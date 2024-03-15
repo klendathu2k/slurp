@@ -13,14 +13,16 @@ import datetime
 import time
 import dateutil.parser
 from colorama import Fore, Back, Style, init
+from tqdm import tqdm
+import pydoc
 
 init()
 
 # Colorize tables
-def colorize(row,fail_color=(Back.RED,Fore.WHITE)):
-    color=f"{Fore.GREEN}{Style.BRIGHT}"
-    reset=f"{Style.RESET_ALL}{Fore.RESET}"
-    if row.num_failed>0:  
+def colorize(row,default_color=(Back.RESET,Fore.GREEN),fail_color=(Back.RED,Fore.WHITE)):
+    color=f"{default_color[0]}{default_color[1]}{Style.BRIGHT}"
+    reset=f"{Fore.RESET}{Back.RESET}{Style.RESET_ALL}"
+    if getattr( row, 'num_failed', 0)>0:
         color=f"{fail_color[0]}{fail_color[1]}{Style.BRIGHT}"
         reset=f"{Fore.RESET}{Back.RESET}{Style.RESET_ALL}"
     myrow = [ 
@@ -28,9 +30,6 @@ def colorize(row,fail_color=(Back.RED,Fore.WHITE)):
         for element in list(row) 
     ]
     return myrow
-
-
-
 
 statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
 statusdbr = statusdbr_.cursor()
@@ -152,13 +151,20 @@ def query_started_jobs(conditions=""):
     results = statusdbr.execute(psqlquery);
     labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
     table = [colorize(r,fail_color=(Back.YELLOW,Fore.BLACK)) for r in results]
-    print( tabulate( table, labels, tablefmt="psql" ) )
+    vistable = tabulate( table, labels, tablefmt="psql" ) 
+    print( vistable )
+    return vistable
 
 def query_jobs_by_cluster(conditions=""):
     print("Summary of jobs by condor cluster")
+#               min(age(ended,started))         as min_job_duration,
+#               max(age(ended,started))         as max_job_duration,
     psqlquery=f"""
             select dsttype,cluster,
+               min(run) as min_run,
+               max(run) as max_run,
                count(run)                      as num_jobs,
+               min(started)                    as earliest_start,
                avg(age(started,submitting))    as avg_time_to_start,
                count( case status when 'submitted' then 1 else null end )
                                                as num_submitted,
@@ -169,8 +175,6 @@ def query_jobs_by_cluster(conditions=""):
                count( case status when 'failed' then 1 else null end )
                                                as num_failed,
                avg(age(ended,started))         as avg_job_duration,
-               min(age(ended,started))         as min_job_duration,
-               max(age(ended,started))         as max_job_duration,
                sum(nevents)                    as sum_events
        
             from   production_status 
@@ -185,31 +189,30 @@ def query_jobs_by_cluster(conditions=""):
     table = [colorize(r) for r in results]
     print( tabulate( table, labels, tablefmt="psql" ) )
 
+def query_failed_jobs(conditions="", title="Summary of failed jobs by run"):
+    print(title)
+    psqlquery=f"""
+            select dstname,run,segment,cluster,process,prod_id
+            from   production_status 
+            where  status='failed'   and submitted>'{timestart}'
+            {conditions}
+            order by run
+               ;
+    """
+    results = statusdbr.execute(psqlquery);
+    labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+    table = [colorize(r,default_color=(Back.RED,Fore.WHITE)) for r in results]
+    print( tabulate( table, labels, tablefmt="psql" ) )
 
 
-def query_jobs_by_run(conditions=""):
-    print("Summary of jobs by condor cluster")
+def query_jobs_by_run(conditions="", title="Summary of jobs by run" ):
+    print(title)
 #              count(run)                      as num_jobs,
     psqlquery=f"""
-            select dsttype,run,
-               avg(age(started,submitting))    as avg_time_to_start,
-               count( case status when 'submitted' then 1 else null end )
-                                               as num_submitted,
-               count( case status when 'running' then 1 else null end )
-                                               as num_running,
-               count( case status when 'finished' then 1 else null end )
-                                               as num_finished,
-               count( case status when 'failed' then 1 else null end )
-                                               as num_failed,
-               avg(age(ended,started))         as avg_job_duration,
-               min(age(ended,started))         as min_job_duration,
-               max(age(ended,started))         as max_job_duration,
-               sum(nevents)                    as sum_events
-       
+            select dsttype,run,segment,status
             from   production_status 
-            where  status>='started'   and submitted>'{timestart}'
+            where  status>='started'   and submitted>'{timestart}' and status!='finished'
             {conditions}
-            group by dsttype,run
             order by run
                ;
     """
@@ -226,6 +229,7 @@ def query_jobs_by_run(conditions=""):
     argument( "--loop",  default=False, action="store_true", help="Run submission in loop with default 5min delay"), 
     argument( "--delay", default=300, help="Set the loop delay",type=int),
     argument( "--rules", default=[], nargs="+", help="Sets the name of the rule to be used"),
+    argument( "--timestart",default=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),help="Specifies UTC timestamp (in ISO format, e.g. YYYY-MM-DD) for query.", type=dateutil.parser.parse),
     argument( "SLURPFILE",   help="Specifies the slurpfile(s) containing the job definitions" )
 ])
 def submit(args):
@@ -233,6 +237,8 @@ def submit(args):
     Submit a single set of jobs matching the specified rules in the specified definition files.
     """
     go = True
+    global timestart
+    timestart=str(args.timestart)
 
     kaedama  = sh.Command("kaedama.py" )    
     kaedama = kaedama.bake( "submit", "--config", args.SLURPFILE )
@@ -249,12 +255,17 @@ def submit(args):
             kaedama( batch=True, rule=r, _out=sys.stdout )
 
         clear()
+
+        tabulate ( args.rules, ["rules"] )
+
         query_pending_jobs()
         query_started_jobs()
         query_jobs_by_cluster()
+        query_failed_jobs()
 
         if args.loop==False: break
-        time.sleep( args.delay )
+        for i in tqdm( range( args.delay * 10), desc="Next submit" ):
+            time.sleep(0.1)
 
 query_choices=[
     "submitted",
@@ -269,6 +280,7 @@ query_choices=[
     argument( "--loop", default=False, action="store_true", help="Run query in loop with default 5min delay"),
     argument( "--delay", default=300, help="Set the loop delay",type=int),
     argument( "--dstname", default=["all"], nargs="+", help="Specifies one or more dstnames to select on the display query" ),
+    argument( "--reports", default=["started"], nargs="+", help="Queries the status DB and produces summary reports"),
     argument( "--timestart",default=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),help="Specifies UTC timestamp (in ISO format, e.g. YYYY-MM-DD) for query.", type=dateutil.parser.parse)
 
 ])
@@ -278,17 +290,73 @@ def query(args):
     """
     global timestart
     timestart=str(args.timestart)
+
+
+    fmap = {
+        "pending" : query_pending_jobs,
+        "started" : query_started_jobs,
+        "clusters" : query_jobs_by_cluster,
+        "runs" : query_jobs_by_run,
+        "failed": query_failed_jobs,
+    }
+
+
     go = True
     while ( go ):
         clear()
-        query_pending_jobs()
-        query_started_jobs()
-        query_jobs_by_cluster()
-        #query_jobs_by_run()
+        for fname in args.reports:
+            fmap[fname]()
         if args.loop==False: break
-        time.sleep( args.delay )
+        for i in tqdm( range( args.delay * 10), desc="Next poll" ):
+            time.sleep(0.1)
 
 
+@subcommand([
+    argument( "dstname", help="Specifies the failed dst name to be removed" ),
+    argument( "run",     help="Specifies the failed run number to be removed", type=int ),
+    argument( "--segment", help="Specifies the failed segment number to be removed.  If not specified, all segments will be removed.", default=None, type=int ),    
+    argument( "--ext", help="File extention to be removed", default="root" )
+])
+def remove(args):
+    """
+    """
+    statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
+    statusdbw  = statusdbw_.cursor()
+
+    filecatw_  = pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc")
+    filecatw   = filecatw_.cursor()
+
+    segment_condition = ""
+    if args.segment!=None:
+        segment_condition = f" and segment={args.segment}"
+
+    file_segment='%'
+    if args.segment!=None:
+        file_segment = f'-{args.segment:04}'
+
+    # Remove matching files
+    files_query=f"""
+    delete from files where lfn like '{args.dstname}_{args.run:08}{file_segment}.{args.ext}';
+    """
+    print(files_query)
+    filecatw.execute(files_query);
+    filecatw.commit()
+
+    # Remove matching datasets
+    datasets_query=f"""
+    delete from datasets where filename like '{args.dstname}_{args.run:08}{file_segment}.{args.ext}';
+    """
+    print(datasets_query)
+    filecatw.execute(datasets_query);
+    filecatw.commit()
+
+    # Remove matching production status
+    status_query=f"""
+    delete from production_status where dstname='{args.dstname}' and run={args.run} {segment_condition};
+    """
+    print(status_query)
+    statusdbw.execute(status_query);
+    statusdbw.commit()
 
 
 
