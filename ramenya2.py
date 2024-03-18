@@ -15,11 +15,33 @@ import dateutil.parser
 from colorama import Fore, Back, Style, init
 from tqdm import tqdm
 import pydoc
+import htcondor
 
 init()
 
+args  = None
+
+def no_colorization(row,default_color=("",""),fail_color=("","")):
+    return [str(r) for r in row]
+
+# Colorize html tables
+def html_colorization(row,default_color=(),fail_color=()):
+    color='<font color="green">'
+    reset='</font>'
+    if getattr( row, 'num_failed', 0)>0:
+        color='<font color="red">'
+        reset='</font>'
+    myrow = [ 
+        f"{color}{element}{reset}"   if (element!=None) else ""
+        for element in list(row) 
+    ]
+    return myrow
+    
+
+
 # Colorize tables
-def colorize(row,default_color=(Back.RESET,Fore.GREEN),fail_color=(Back.RED,Fore.WHITE)):
+def apply_colorization(row,default_color=(Back.RESET,Fore.GREEN),fail_color=(Back.RED,Fore.WHITE)):
+
     color=f"{default_color[0]}{default_color[1]}{Style.BRIGHT}"
     reset=f"{Fore.RESET}{Back.RESET}{Style.RESET_ALL}"
     if getattr( row, 'num_failed', 0)>0:
@@ -30,6 +52,9 @@ def colorize(row,default_color=(Back.RESET,Fore.GREEN),fail_color=(Back.RED,Fore
         for element in list(row) 
     ]
     return myrow
+
+colorize=apply_colorization
+tablefmt="psql"
 
 statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
 statusdbr = statusdbr_.cursor()
@@ -43,6 +68,7 @@ parser     = argparse.ArgumentParser(prog='ramenya2')
 subparsers = parser.add_subparsers(dest="subcommand")
 
 parser.add_argument( "-v", "--verbose",dest="verbose"   , default=False, action="store_true", help="Sets verbose output")
+parser.add_argument(       "--html",dest="html"   , default=False, action="store_true", help="Sets html output")
 #parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[0,999999] )
 #parser.add_argument( '--config',help="Specifies the configuration file used by kaedama to specify workflows", default='sphenix_auau23.yaml')
 #parser.add_argument( '--rules', nargs='+', default="['all']" )
@@ -116,9 +142,10 @@ def query_pending_jobs( conditions="" ):
     ;
     """    
     results = statusdbr.execute(psqlquery);
-    labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+    #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
     table = [colorize(r) for r in results]
-    print( tabulate( table, labels, tablefmt="psql" ) )
+    print( tabulate( table, labels, tablefmt=tablefmt ) )
 
 
 def query_started_jobs(conditions=""):
@@ -149,9 +176,10 @@ def query_started_jobs(conditions=""):
     ;
     """
     results = statusdbr.execute(psqlquery);
-    labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+    #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
     table = [colorize(r,fail_color=(Back.YELLOW,Fore.BLACK)) for r in results]
-    vistable = tabulate( table, labels, tablefmt="psql" ) 
+    vistable = tabulate( table, labels, tablefmt=tablefmt ) 
     print( vistable )
     return vistable
 
@@ -185,9 +213,10 @@ def query_jobs_by_cluster(conditions=""):
                ;
     """
     results = statusdbr.execute(psqlquery);
-    labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+
+    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
     table = [colorize(r) for r in results]
-    print( tabulate( table, labels, tablefmt="psql" ) )
+    print( tabulate( table, labels, tablefmt=tablefmt ) )
 
 def query_failed_jobs(conditions="", title="Summary of failed jobs by run"):
     print(title)
@@ -200,28 +229,33 @@ def query_failed_jobs(conditions="", title="Summary of failed jobs by run"):
                ;
     """
     results = statusdbr.execute(psqlquery);
-    labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+    #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
     table = [colorize(r,default_color=(Back.RED,Fore.WHITE)) for r in results]
-    print( tabulate( table, labels, tablefmt="psql" ) )
+    print( tabulate( table, labels, tablefmt=tablefmt ) )
 
 
 def query_jobs_by_run(conditions="", title="Summary of jobs by run" ):
     print(title)
 #              count(run)                      as num_jobs,
     psqlquery=f"""
-            select dsttype,run,segment,status
+            select dsttype,run,segment,status,cluster,process
             from   production_status 
             where  status>='started'   and submitted>'{timestart}' and status!='finished'
             {conditions}
             order by run
                ;
     """
+    print(psqlquery)
     results = statusdbr.execute(psqlquery);
-    labels  = [ c[0] for c in statusdbr.description ]
+    #for r in results:
+    #    print(f"{r.cluster} {r.process}")
 
+    #labels  = [ c[0] for c in statusdbr.description ]
+    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
     table = [colorize(r) for r in results]
 
-    print( tabulate( table, labels, tablefmt="psql" ) )
+    print( tabulate( table, labels, tablefmt=tablefmt ) )
 
 
 @subcommand([
@@ -336,6 +370,18 @@ def remove(args):
 
     # Remove matching files
     files_query=f"""
+    select * from files where lfn like '{args.dstname}_{args.run:08}{file_segment}.{args.ext}';
+    """
+    files=filecatw.execute(files_query).fetchall()
+    for f in files:
+        try: 
+            os.remove(f.full_file_path) 
+            print(f"{f.lfn}: {f.full_file_path} removed")
+        except OSError as error: 
+            print(error) 
+            print(f"{f.lfn}: {f.full_file_path} already gone")
+
+    files_query=f"""
     delete from files where lfn like '{args.dstname}_{args.run:08}{file_segment}.{args.ext}';
     """
     print(files_query)
@@ -350,6 +396,16 @@ def remove(args):
     filecatw.execute(datasets_query);
     filecatw.commit()
 
+# TODO: cleanup the condor queue
+#    status_query=f"""
+#    select cluster,process from production_status where dstname='{args.dstname}' and run={args.run} {segment_condition};
+#    """    
+#    print(status_query)
+#    results=filecatw.execute(status_query).fetchall()
+#    print(results)
+#    for r in results:
+#        print( r.cluster + " " + r.process )
+
     # Remove matching production status
     status_query=f"""
     delete from production_status where dstname='{args.dstname}' and run={args.run} {segment_condition};
@@ -360,14 +416,25 @@ def remove(args):
 
 
 
-def main():
+def noodles( args_=None ):
 
-    args=parser.parse_args()
+    global colorize
+    global tablefmt
+    global args
 
+    if args_ == None:
+        args=parser.parse_args()
+    else:
+        args=parser.parse_args( args_ )
+
+    if args.html:
+        colorize = no_colorization
+        tablefmt = "html"
     if args.subcommand is None:
         parser.print_help()
     else:
         args.func(args)        
 
+
 if __name__ == '__main__':
-    main()
+    noodles()
