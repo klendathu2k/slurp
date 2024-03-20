@@ -423,14 +423,16 @@ def stageout(args):
     """
     Stages the given file out to the specified 
     """
-    md5true  = md5sum( args.filename ) # md5 of the file we are staging out
+    md5true  = md5sum( args.filename )                    # md5 of the file we are staging out
+    sztrue   = int( os.path.getsize(f"{args.filename}") ) # size in bytes of the file
 
     # Stage the file out to the target directory.
     if args.verbose:
         print("Copy back file")
 
     shutil.copy2( f"{args.filename}", f"{args.outdir}" )
-    md5check = md5sum( f"{args.outdir}/{args.filename}" )
+    # md5check = md5sum( f"{args.outdir}/{args.filename}" )
+    sz  = int( os.path.getsize(f"{args.outdir}/{args.filename}") ) 
 
     if args.verbose:
         print("Checksum before and after")
@@ -438,7 +440,7 @@ def stageout(args):
         print(md5check)
 
     # Unlikely to have failed w/out shutil throwing an error
-    if md5true==md5check:
+    if sz==sztrue:
 
         # Copy succeeded.  Connect to file catalog and add to it
         fc = pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc")
@@ -454,9 +456,8 @@ def stageout(args):
         # n.b. not the slurp convention for dsttype
         dstname  = args.dstname
         dsttype='_'.join( dstname.split('_')[-2:] )
-        
-        sz  = int( os.path.getsize(f"{args.filename}") ) #int( sh.stat( '--printf=%s', f"{args.filename}" ) )
-        md5=md5check
+                
+        md5=md5true
 
         # Strip off any leading path 
         filename=args.filename.split('/')[-1]
