@@ -16,6 +16,7 @@ from colorama import Fore, Back, Style, init
 from tqdm import tqdm
 import pydoc
 import htcondor
+import classad
 
 init()
 
@@ -44,7 +45,7 @@ def apply_colorization(row,default_color=(Back.RESET,Fore.GREEN),fail_color=(Bac
 
     color=f"{default_color[0]}{default_color[1]}{Style.BRIGHT}"
     reset=f"{Fore.RESET}{Back.RESET}{Style.RESET_ALL}"
-    if getattr( row, 'num_failed', 0)>0:
+    if getattr( row, 'num_failed', 0)>0 or "Held" in row:
         color=f"{fail_color[0]}{fail_color[1]}{Style.BRIGHT}"
         reset=f"{Fore.RESET}{Back.RESET}{Style.RESET_ALL}"
     myrow = [ 
@@ -257,6 +258,110 @@ def query_jobs_by_run(conditions="", title="Summary of jobs by run" ):
 
     print( tabulate( table, labels, tablefmt=tablefmt ) )
 
+def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor state" ):
+    print(title)
+#              count(run)                      as num_jobs,
+    psqlquery=f"""
+            select dsttype,run,segment,status,cluster,process
+            from   production_status 
+            where  status>='started'   and submitted>'{timestart}' and status!='finished'
+            {conditions}
+            order by run
+               ;
+    """
+    print(psqlquery)
+    results = statusdbr.execute(psqlquery);
+
+    schedd = htcondor.Schedd() 
+    condor_job_status_map = {
+        1:"Idle",
+        2:"Running",
+        3:"Removing",
+        4:"Completed",
+        5:"Held",
+        6:"Transferring Output",
+        7:"Suspended",
+    }
+
+    condor_query = schedd.query(
+#       constraint=f"(ClusterId=={r.cluster})&&(ProcId=={r.process})",
+        projection=["ClusterId","ProcId","JobStatus","HoldReasonCode","HoldReasonSubcode","HoldReason","EnteredCurrentStatus","ExecutableSize"]
+    )
+    #print(condor_query)
+
+    condor_results = {}
+
+    for q in condor_query:
+        clusterid = int(q.lookup("ClusterId"))
+        processid = int(q.lookup("ProcId"))
+        jobstatus = int(q.lookup("JobStatus"))
+        execsize  = int(q.lookup("ExecutableSize"))/1024 # MB
+        enteredcurrentstatus=int(q.lookup("EnteredCurrentStatus"))
+        holdreasoncode    = 0
+        holdreasonsubcode = 0
+        holdreason        = ""
+        if jobstatus==5:
+            holdreasoncode    = int(q.lookup("HoldReasonCode"))
+            holdreasonsubcode = int(q.lookup("HoldReasonSubcode"))
+            holdreason        = q.lookup("HoldReason")
+
+        # Add a dictionary for cluster if needed
+        if condor_results.get( clusterid, None )==None:
+            condor_results[ clusterid ] = {}
+
+        # Get the cluster entry
+        cluster_entry = condor_results[ clusterid ]
+
+        # Add in the processid
+        if cluster_entry.get( processid, None )==None:
+            cluster_entry[ processid ] = {}
+
+        # Add dictionary for process
+        process_entry = cluster_entry[ processid ]
+
+        process_entry["jobstatus"]=condor_job_status_map[jobstatus]
+        process_entry["execsize"]=execsize
+        process_entry["enteredcurrentstatus"]=str( datetime.datetime.utcfromtimestamp(enteredcurrentstatus) )
+        process_entry["holdreasoncode"]=holdreasoncode
+        process_entry["holdreasonsubcode"]=holdreasonsubcode
+        
+
+    merged = []
+    for r in results:
+
+        cluster_entry = condor_results.get( int(r.cluster), None )
+        if cluster_entry==None:
+ #           print(f"{r.cluster} has no cluster entry")
+            continue
+
+        process_entry = cluster_entry.get( int(r.process), None )
+        if process_entry==None:
+#            print(f"{r.process} has no cluster entry")
+            continue
+
+        myresults = [ i for i in r ]
+
+        extend = [
+            process_entry["jobstatus"],
+            process_entry["enteredcurrentstatus"],
+            process_entry["holdreasoncode"],
+            process_entry["holdreasonsubcode"],
+            ]
+
+        merged.append( myresults + extend )
+
+ 
+
+    
+
+
+        
+    #labels  = [ c[0] for c in statusdbr.description ]
+    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ] + ["condor status","at","hold code","..."]
+    table = [colorize(r) for r in merged]
+
+    print( tabulate( table, labels, tablefmt=tablefmt ) )
+
 
 @subcommand([
     argument( '--runs',  nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list.", default=[] ),
@@ -332,6 +437,7 @@ def query(args):
         "clusters" : query_jobs_by_cluster,
         "runs" : query_jobs_by_run,
         "failed": query_failed_jobs,
+        "condor": query_jobs_by_condor,
     }
 
 
