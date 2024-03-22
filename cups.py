@@ -414,6 +414,7 @@ def catalog(args):
     argument( "--hostname", help="host name of the filesystem", default="lustre", choices=["lustre","gpfs"] ),
     argument( "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
     argument( "--dataset", help="sets the name of the dataset", default="test" ),
+    argument( "--dsttype", help="sets the sphenix dsttype", default=None )
     #argument( "--add-to-files",    dest="add_to_files", help="Adds to the file catalog", default=True, action="store_true"),
     #argument( "--no-add-to-files", dest="add_to_files", help="Do not add to the file catalog", action="store_false"),
     #argument( "--add-to-datasets",    dest="add_to_datasets", help="Adds to the file catalog", default=True, action="store_true"),
@@ -456,13 +457,14 @@ def stageout(args):
         # n.b. not the slurp convention for dsttype
         dstname  = args.dstname
         dsttype='_'.join( dstname.split('_')[-2:] )
+
+        if args.dsttype != None:
+            dsttype = args.dsttype
                 
         md5=md5true
 
         # Strip off any leading path 
         filename=args.filename.split('/')[-1]
-
-        
 
         # Insert into files primary key: (lfn,full_host_name,full_file_path)
         if args.verbose:
