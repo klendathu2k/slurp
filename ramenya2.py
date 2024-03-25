@@ -367,7 +367,8 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
     argument( '--runs',  nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list.", default=[] ),
     argument( "--loop",  default=False, action="store_true", help="Run submission in loop with default 5min delay"), 
     argument( "--delay", default=300, help="Set the loop delay",type=int),
-    argument( "--rules", default=[], nargs="+", help="Sets the name of the rule to be used"),
+    argument( "--rules", default=[], nargs="?", help="Sets the name of the rule to be used"),
+    argument( "--rules-file", dest="rules_file", default=None, help="If specified, read the list of active rules from the given file on each pass of the loop" ),
     argument( "--timestart",default=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),help="Specifies UTC timestamp (in ISO format, e.g. YYYY-MM-DD) for query.", type=dateutil.parser.parse),
     argument( "SLURPFILE",   help="Specifies the slurpfile(s) containing the job definitions" )
 ])
@@ -389,13 +390,21 @@ def submit(args):
         elif len(args.runs)==3: kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1], args.runs[2] )
         else:                   kaedama = kaedama.bake( "--runs", "0", "999999" )
 
-        # Execute the specified rules
-        for r in args.rules:
-            kaedama( batch=True, rule=r, _out=sys.stdout )
+        list_of_active_rules = args.rules
+        if args.rules_file:
+            with open( args.rules_file, 'r' ) as f:
+                list_of_active_rules = [ 
+                    line.strip() for line in f.readlines() if '#' not in line 
+                ]
 
         clear()
 
-        tabulate ( args.rules, ["rules"] )
+        print( "Active rules: " )
+        print( tabulate( [ list_of_active_rules ], ['active rules'], tablefmt=tablefmt ) )
+
+        # Execute the specified rules
+        for r in list_of_active_rules:
+            kaedama( batch=True, rule=r, _out=sys.stdout )
 
         query_pending_jobs()
         query_started_jobs()
