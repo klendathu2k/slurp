@@ -414,7 +414,7 @@ def catalog(args):
     argument( "--hostname", help="host name of the filesystem", default="lustre", choices=["lustre","gpfs"] ),
     argument( "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
     argument( "--dataset", help="sets the name of the dataset", default="test" ),
-    argument( "--dsttype", help="sets the sphenix dsttype", default=None )
+    argument( "--dsttype", help="sets the sphenix dsttype", default=None ),
     #argument( "--add-to-files",    dest="add_to_files", help="Adds to the file catalog", default=True, action="store_true"),
     #argument( "--no-add-to-files", dest="add_to_files", help="Do not add to the file catalog", action="store_false"),
     #argument( "--add-to-datasets",    dest="add_to_datasets", help="Adds to the file catalog", default=True, action="store_true"),
@@ -439,6 +439,7 @@ def stageout(args):
         print("Checksum before and after")
         print(md5true)
         print(md5check)
+
 
     # Unlikely to have failed w/out shutil throwing an error
     if sz==sztrue:
