@@ -159,6 +159,7 @@ class SPhnxMatch:
     buildarg: str = None;
     inputs:   str = None;
     ranges:   str = None;
+    rungroup: str = None;
 
     
 
@@ -172,6 +173,7 @@ class SPhnxMatch:
         b = b.replace(".","")
         object.__setattr__(self, 'build', b)                
         run = int(self.run)
+        object.__setattr__(self, 'rungroup', f'{100*math.floor(run/100):08d}_{100*math.ceil(run/100):08d}')
 
         #sldir = "/tmp/slurp/%i"%( math.trunc(run/100)*100 )
         #if self.condor == None: object.__setattr__(self, 'condor', sldir )
@@ -381,18 +383,25 @@ def submit( rule, **kwargs ):
         outdir = outdir.replace('file:/','')
         outdir = outdir.replace('//','/')
 
-
-        # This is calling for a regex... 
-        outdir = outdir.replace( "$$([", "{math.floorOPAR" ) # start of condor expr becomes start of python format expression
-        outdir = outdir.replace( "])",   "CPAR:06d}" ) # end of condor expr ...
-        outdir = outdir.replace( "$(", "" )    # condor macro "run" becomes local variable run.... hork.
-        outdir = outdir.replace( ")",  "" )
-        outdir = outdir.replace( "OPAR", "(" )
-        outdir = outdir.replace( "CPAR", ")" )
-
+        outdir = outdir.replace( '$(rungroup)', '{rungroup}')
         outdir = f'f"{outdir}"'
         for run in runlist:
+            rungroup=f'{100*math.floor(run/100):08d}_{100*math.ceil(run/100):08d}'
             pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
+
+    #pprint.pprint(jobd)
+        # This is calling for a regex... 
+#$$        outdir = outdir.replace( "$$([", "{math.floorOPAR" ) # start of condor expr becomes start of python format expression
+#$$$       outdir = outdir.replace( "])",   "CPAR:06d}" ) # end of condor expr ...
+#$$        outdir = outdir.replace( "])",   "CPAR}" ) # end of condor expr ...
+#$$        outdir = outdir.replace( "$(", "" )    # condor macro "run" becomes local variable run.... hork.
+#$$        outdir = outdir.replace( ")",  "" )
+#$$        outdir = outdir.replace( "OPAR", "(" )
+#$$        outdir = outdir.replace( "CPAR", ")" )
+
+#$$        outdir = f'f"{outdir}"'
+#$$        for run in runlist:
+#$$            pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
     
     submit_job = htcondor.Submit( jobd )
 
@@ -420,6 +429,9 @@ def submit( rule, **kwargs ):
                 if k in str(submit_job):
                     d[k] = v
             mymatching.append(d)        
+            #pprint.pprint(m)
+
+
         
         
         run_submit_loop=30
