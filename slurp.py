@@ -8,11 +8,12 @@ import uuid
 import os
 import pathlib
 import pprint
-import math
 import sh
 import argparse
 import datetime
 import time
+
+import math
 
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
@@ -383,7 +384,7 @@ def submit( rule, **kwargs ):
 
         # This is calling for a regex... 
         outdir = outdir.replace( "$$([", "{math.floorOPAR" ) # start of condor expr becomes start of python format expression
-        outdir = outdir.replace( "])",   "CPAR}" ) # end of condor expr ...
+        outdir = outdir.replace( "])",   "CPAR:06d}" ) # end of condor expr ...
         outdir = outdir.replace( "$(", "" )    # condor macro "run" becomes local variable run.... hork.
         outdir = outdir.replace( ")",  "" )
         outdir = outdir.replace( "OPAR", "(" )
@@ -392,7 +393,6 @@ def submit( rule, **kwargs ):
         outdir = f'f"{outdir}"'
         for run in runlist:
             pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
-
     
     submit_job = htcondor.Submit( jobd )
 
