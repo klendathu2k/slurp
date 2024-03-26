@@ -372,23 +372,27 @@ def submit( rule, **kwargs ):
 
     jobd = rule.job.dict()
 
-    # f"{math.floor(v/n)*n}"
-    rundirs = []
-    for r in runlist:
-        d = f"{math.floor(r/100)*100}"
-        if d not in rundirs:
-            rundirs.append(d)
 
-    # Make sure that directories referenced in the filesystem are available
-    for k in [ 'outdir', 'logdir', 'condor']:
-        v = kwargs.get(k,None)
-        if v==None: continue
-        v = v.replace('file:/','')
-        v = v.replace('//','/')
-        v = v.split('$$')[0]
-        paths = [ v + '/' + d for d in rundirs ]
-        for p in paths: 
-            pathlib.Path( p ).mkdir( parents=True, exist_ok=True )        
+    for outname in [ 'outdir', 'logdir', 'condor']:
+
+        outdir=kwargs.get(outname,None)
+        if outdir==None: continue
+        outdir = outdir.replace('file:/','')
+        outdir = outdir.replace('//','/')
+
+
+        # This is calling for a regex... 
+        outdir = outdir.replace( "$$([", "{math.floorOPAR" ) # start of condor expr becomes start of python format expression
+        outdir = outdir.replace( "])",   "CPAR}" ) # end of condor expr ...
+        outdir = outdir.replace( "$(", "" )    # condor macro "run" becomes local variable run.... hork.
+        outdir = outdir.replace( ")",  "" )
+        outdir = outdir.replace( "OPAR", "(" )
+        outdir = outdir.replace( "CPAR", ")" )
+
+        outdir = f'f"{outdir}"'
+        for run in runlist:
+            pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
+
     
     submit_job = htcondor.Submit( jobd )
 
