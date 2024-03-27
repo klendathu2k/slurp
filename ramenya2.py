@@ -364,12 +364,14 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
 
 
 @subcommand([
+    argument( '--nevents', help="Specifies number of events to submit (defaults to all)", default=0 ),
     argument( '--runs',  nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list.", default=[] ),
     argument( "--loop",  default=False, action="store_true", help="Run submission in loop with default 5min delay"), 
     argument( "--delay", default=300, help="Set the loop delay",type=int),
     argument( "--rules", default=[], nargs="?", help="Sets the name of the rule to be used"),
     argument( "--rules-file", dest="rules_file", default=None, help="If specified, read the list of active rules from the given file on each pass of the loop" ),
     argument( "--timestart",default=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),help="Specifies UTC timestamp (in ISO format, e.g. YYYY-MM-DD) for query.", type=dateutil.parser.parse),
+    argument( "--test",default=False,help=argparse.SUPPRESS,action="store_true") # kaedama will be submitted in batch mode
     argument( "SLURPFILE",   help="Specifies the slurpfile(s) containing the job definitions" )
 ])
 def submit(args):
@@ -381,7 +383,9 @@ def submit(args):
     timestart=str(args.timestart)
 
     kaedama  = sh.Command("kaedama.py" )    
-    kaedama = kaedama.bake( "submit", "--config", args.SLURPFILE )
+    kaedama = kaedama.bake( "submit", "--config", args.SLURPFILE, "--nevents", args.nevents )
+    if args.test:
+        kaedama = kaedama.bake( "--batch" )
 
     while ( go ):
 
