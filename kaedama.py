@@ -15,6 +15,7 @@ from slurp import daqc
 
 import sh
 import sys
+import re
 
 from slurp import cursors
 
@@ -43,6 +44,18 @@ arg_parser.add_argument( '--no-submit', help="Job will not be submitted... print
 arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=['26022'] )
 arg_parser.add_argument( '--segments', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[] )
 arg_parser.add_argument( '--config',help="Specifies the yaml configuration file")
+
+
+def sanity_checks( params ):
+    result = True
+
+    # Name should be of the form DST_NAME_runXauau
+    if re.match( "DST_[A-Z]+_[a-z0-9]+", params['name'] ) == None:
+        logging.error( f'params.name {params["name"]} does not respect the sPHENIX convention:  DST_NAME_run<N>species' )
+        result = False
+    
+    return result
+    
 
 def main():
 
@@ -91,9 +104,13 @@ def main():
     job_          = config.get('job',None) #config['job']
     presubmit     = config.get('presubmit',None)
 
+
+    # Do not submit if we fail sanity check on definition file
+    if sanity_checks( params ) == False:        exit(1)
+
+
     if runlist_query =='': runlist_query = None
     if input_query   =='': input_query   = None
-
 
     #__________________________________________________________________________________
     #
@@ -151,7 +168,7 @@ def main():
                      )
 
         # Extract the subset of parameters that we need to pass to submit
-        submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump"] }
+        submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump", "neventsper"] }
 
         submit (dst_rule, nevents=args.nevents, **submitkw, **filesystem ) 
 
