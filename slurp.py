@@ -12,7 +12,8 @@ import sh
 import argparse
 import datetime
 import time
-
+import itertools
+from  glob import glob
 import math
 
 from slurptables import SPhnxProductionSetup
@@ -623,8 +624,9 @@ def matches( rule, kwargs={} ):
 
         # Build list of PFNs via direct lookup and append the results
         if rule.direct:
-            for p in [ rule.direct+'/'+f for f in lfns if os.path.isfile(os.path.join(rule.direct, f)) ]:
-                pfn_lists[ runseg ].append( p )
+            for direct in glob(rule.direct):
+                for p in [ direct+'/'+f for f in lfns if os.path.isfile(os.path.join(direct, f)) ]:
+                    pfn_lists[ runseg ].append( p )
             
 
         # Build list of PFNs via filecatalog lookup if direct path has not been specified
@@ -732,6 +734,8 @@ def matches( rule, kwargs={} ):
         if num_lfn > num_pfn or sanity==False:
             WARN(f"LFN list and PFN list are different.  Skipping this run {run} {seg}")
             WARN( f"{num_lfn} {num_pfn} {sanity}" )
+            for i in itertools.zip_longest( lfn_lists[f"'{run}-{seg}'"], pfn_lists[f"'{run}-{seg}'"] ):
+                print(i)
             #WARN( lfn_lists )
             #WARN( pfn_lists )
             continue
