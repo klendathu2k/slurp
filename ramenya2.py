@@ -371,7 +371,7 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
     argument( "--rules", default=[], nargs="?", help="Sets the name of the rule to be used"),
     argument( "--rules-file", dest="rules_file", default=None, help="If specified, read the list of active rules from the given file on each pass of the loop" ),
     argument( "--timestart",default=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),help="Specifies UTC timestamp (in ISO format, e.g. YYYY-MM-DD) for query.", type=dateutil.parser.parse),
-    argument( "--test",default=False,help=argparse.SUPPRESS,action="store_true") # kaedama will be submitted in batch mode
+    argument( "--test",default=False,help=argparse.SUPPRESS,action="store_true"), # kaedama will be submitted in batch mode
     argument( "SLURPFILE",   help="Specifies the slurpfile(s) containing the job definitions" )
 ])
 def submit(args):
