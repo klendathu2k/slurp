@@ -46,13 +46,39 @@ arg_parser.add_argument( '--segments', nargs='+', help="One argument for a speci
 arg_parser.add_argument( '--config',help="Specifies the yaml configuration file")
 
 
-def sanity_checks( params ):
+def sanity_checks( params, inputq ):
     result = True
+
+    #
+    # The following rules establish the sPHENIX naming convention.  In stageout.sh we
+    # extract the dst type, name, run, etc... based on the positions of fields separated
+    # by the underscores and/or dashes.
+    #
 
     # Name should be of the form DST_NAME_runXauau
     if re.match( "DST_[A-Z]+_[a-z0-9]+", params['name'] ) == None:
         logging.error( f'params.name {params["name"]} does not respect the sPHENIX convention:  DST_NAME_run<N>species' )
         result = False
+
+    # Build and dbtag should not contain a "_"
+    if re.match("_",params['build']):
+        logging.error( f'params.build {params["build"]} cannot contain an underscore' )
+        result = False
+    if re.match("_",params['build_name']):
+        logging.error( f'params.build_name {params["build_name"]} cannot contain an underscore' )
+        result = False
+    if re.match("_",params['dbtag']):
+        logging.error( f'params.dbtag {params["dbtag"]} cannot contain an underscore' )
+        result = False
+
+    
+    # 
+    # The input query should be of the form
+    #
+    # select dummy as source, runnumber, segment (as segment), list of input files as files, list of file ranges as ranges
+    # it must not do any updates, writes, etc...
+    # 
+    
     
     return result
     
@@ -106,7 +132,7 @@ def main():
 
 
     # Do not submit if we fail sanity check on definition file
-    if sanity_checks( params ) == False:        exit(1)
+    if sanity_checks( params, input_ ) == False:        exit(1)
 
 
     if runlist_query =='': runlist_query = None
