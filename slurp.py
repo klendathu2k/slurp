@@ -174,7 +174,7 @@ class SPhnxMatch:
         b = b.replace(".","")
         object.__setattr__(self, 'build', b)                
         run = int(self.run)
-        object.__setattr__(self, 'rungroup', f'{100*math.floor(run/100):08d}_{100*math.ceil(run/100):08d}')
+        object.__setattr__(self, 'rungroup', f'{100*math.floor(run/100):08d}_{100*math.ceil((run+1)/100):08d}')
 
         #sldir = "/tmp/slurp/%i"%( math.trunc(run/100)*100 )
         #if self.condor == None: object.__setattr__(self, 'condor', sldir )
