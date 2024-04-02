@@ -431,8 +431,9 @@ def stageout(args):
     if args.verbose:
         print("Copy back file")
 
+    # Copy the file
     shutil.copy2( f"{args.filename}", f"{args.outdir}" )
-    # md5check = md5sum( f"{args.outdir}/{args.filename}" )
+
     sz  = int( os.path.getsize(f"{args.outdir}/{args.filename}") ) 
 
     if args.verbose:
@@ -488,7 +489,6 @@ def stageout(args):
         fcc.commit()
 
 
-
         # Insert into datasets primary key: (filename,dataset)
         if args.verbose:
             print("Insert into datasets")
@@ -510,6 +510,24 @@ def stageout(args):
 
         fcc.execute(insert)
         fcc.commit()
+
+
+        # Add to nevents in the production status
+        if args.verbose:
+            print("Update nevents")
+        tablename=args.table
+        dstname=args.dstname
+        run=int(args.run)
+        seg=int(args.segment)
+        id_ = getLatestId( tablename, dstname, run, seg )
+        update = f"""
+        update {tablename}
+            set nevents=nevents+{args.nevents}
+            where dstname='{dstname}' and run={run} and segment={seg} and id={id_};
+        """
+        statusdbc.execute( update )
+        statusdbc.commit()
+
 
         # and remove the file
         if args.verbose:
