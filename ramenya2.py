@@ -15,6 +15,7 @@ import dateutil.parser
 from colorama import Fore, Back, Style, init
 from tqdm import tqdm
 import pydoc
+
 import htcondor
 import classad
 
@@ -258,18 +259,17 @@ def query_jobs_by_run(conditions="", title="Summary of jobs by run" ):
 
     print( tabulate( table, labels, tablefmt=tablefmt ) )
 
-def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor state" ):
+def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor state",  ):
     print(title)
 #              count(run)                      as num_jobs,
     psqlquery=f"""
-            select dsttype,run,segment,status,cluster,process
+            select dsttype,run,segment,status,cluster,process,prod_id
             from   production_status 
-            where  status>='started'   and submitted>'{timestart}' and status!='finished'
+            where  status>='started' and submitted>'{timestart}' and status!='finished'
             {conditions}
             order by run
                ;
     """
-    print(psqlquery)
     results = statusdbr.execute(psqlquery);
 
     schedd = htcondor.Schedd() 
@@ -287,7 +287,7 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
 #       constraint=f"(ClusterId=={r.cluster})&&(ProcId=={r.process})",
         projection=["ClusterId","ProcId","JobStatus","HoldReasonCode","HoldReasonSubcode","HoldReason","EnteredCurrentStatus","ExecutableSize"]
     )
-    #print(condor_query)
+
 
     condor_results = {}
 
@@ -323,8 +323,7 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
         process_entry["execsize"]=execsize
         process_entry["enteredcurrentstatus"]=str( datetime.datetime.utcfromtimestamp(enteredcurrentstatus) )
         process_entry["holdreasoncode"]=holdreasoncode
-        process_entry["holdreasonsubcode"]=holdreasonsubcode
-        
+        process_entry["holdreasonsubcode"]=holdreasonsubcode        
 
     merged = []
     for r in results:
@@ -336,7 +335,6 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
 
         process_entry = cluster_entry.get( int(r.process), None )
         if process_entry==None:
-#            print(f"{r.process} has no cluster entry")
             continue
 
         myresults = [ i for i in r ]
@@ -348,16 +346,9 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
             process_entry["holdreasonsubcode"],
             ]
 
-        merged.append( myresults + extend )
+        merged.append( myresults + extend )    
 
- 
-
-    
-
-
-        
-    #labels  = [ c[0] for c in statusdbr.description ]
-    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ] + ["condor status","at","hold code","..."]
+    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ] + ["condor status","at","hold code","sub code"]
     table = [colorize(r) for r in merged]
 
     print( tabulate( table, labels, tablefmt=tablefmt ) )
@@ -427,12 +418,22 @@ query_choices=[
     "failed",
 ]
 
+
+fmap = {
+    "pending" : query_pending_jobs,
+    "started" : query_started_jobs,
+    "clusters" : query_jobs_by_cluster,
+    "runs" : query_jobs_by_run,
+    "failed": query_failed_jobs,
+    "condor": query_jobs_by_condor,
+}
+
 @subcommand([
     argument( '--runs',  nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[0,999999] ),
     argument( "--loop", default=False, action="store_true", help="Run query in loop with default 5min delay"),
     argument( "--delay", default=300, help="Set the loop delay",type=int),
     argument( "--dstname", default=["all"], nargs="+", help="Specifies one or more dstnames to select on the display query" ),
-    argument( "--reports", default=["started"], nargs="+", help="Queries the status DB and produces summary reports"),
+    argument( "--reports", default=["started"], nargs="+", help="Queries the status DB and produces summary reports",choices=fmap.keys()),
     argument( "--timestart",default=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),help="Specifies UTC timestamp (in ISO format, e.g. YYYY-MM-DD) for query.", type=dateutil.parser.parse)
 
 ])
@@ -442,17 +443,6 @@ def query(args):
     """
     global timestart
     timestart=str(args.timestart)
-
-
-    fmap = {
-        "pending" : query_pending_jobs,
-        "started" : query_started_jobs,
-        "clusters" : query_jobs_by_cluster,
-        "runs" : query_jobs_by_run,
-        "failed": query_failed_jobs,
-        "condor": query_jobs_by_condor,
-    }
-
 
     go = True
     while ( go ):
