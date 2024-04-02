@@ -205,7 +205,8 @@ def running(args):
 @subcommand([
     argument("-e","--exit",help="Exit code of the payload macro",dest="exit",default=-1),
     argument(     "--nsegments",help="Number of segments produced",dest="nsegments",default=1),
-    argument(     "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0)
+    argument(     "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
+    argument(     "--inc", help="If set, increments the number of events",dest="inc",default=False,action="store_true"),
 ])
 def finished(args):
     """
@@ -224,11 +225,18 @@ def finished(args):
     state='finished'
     if ec>0:
         state='failed'
-    update = f"""
-    update {tablename}
-    set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    """
+    if args.inc:
+        update = f"""
+        update {tablename}
+        set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents=nevents+{ne}
+        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        """
+    else:
+        update = f"""
+        update {tablename}
+        set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
+        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        """
     if args.verbose:
         print(update)
 
@@ -274,6 +282,7 @@ def exitcode(args):
 #_______________________________________________________________________________________________________
 @subcommand([
     argument(     "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
+    argument(     "--inc",  help="Sets increment mode",default=False,action="store_true"),
 ])
 def nevents(args):
     """
@@ -285,11 +294,19 @@ def nevents(args):
     seg=int(args.segment)
     id_ = getLatestId( tablename, dstname, run, seg )
     ne=int(args.nevents)
-    update = f"""
-    update {tablename}
-    set nevents={ne}
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    """
+    update=None
+    if args.inc:
+        update = f"""
+        update {tablename}
+        set nevents=nevents+{ne}
+        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        """
+    else:
+        update = f"""
+        update {tablename}
+        set nevents={ne}
+        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        """
     if args.verbose:
         print(update)
 
@@ -413,6 +430,7 @@ def catalog(args):
     argument( "--retries", help="Number of retries before silent failure", type=int, default=1 ),
     argument( "--hostname", help="host name of the filesystem", default="lustre", choices=["lustre","gpfs"] ),
     argument( "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
+    argument(     "--inc", help="If set, increments the number of events",dest="inc",default=False,action="store_true"),
     argument( "--dataset", help="sets the name of the dataset", default="test" ),
     argument( "--dsttype", help="sets the sphenix dsttype", default=None ),
     #argument( "--add-to-files",    dest="add_to_files", help="Adds to the file catalog", default=True, action="store_true"),
@@ -520,11 +538,20 @@ def stageout(args):
         run=int(args.run)
         seg=int(args.segment)
         id_ = getLatestId( tablename, dstname, run, seg )
-        update = f"""
-        update {tablename}
+        update=None
+        if args.inc:
+            update = f"""
+            update {tablename}
             set nevents=nevents+{args.nevents}
             where dstname='{dstname}' and run={run} and segment={seg} and id={id_};
-        """
+            """
+        else:
+            update = f"""
+            update {tablename}
+            set nevents={args.nevents}
+            where dstname='{dstname}' and run={run} and segment={seg} and id={id_};
+            """
+
         statusdbc.execute( update )
         statusdbc.commit()
 
