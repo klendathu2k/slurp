@@ -93,6 +93,7 @@ class SPhnxCondorJob:
     
     transfer_input_files:  str = None
     user_job_wrapper:      str = None
+    max_retries:           str = "0"  # default to no retries
 
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v }
@@ -660,7 +661,6 @@ def matches( rule, kwargs={} ):
     #
     repo_dir  = payload #'/'.join(payload.split('/')[1:]) 
     repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
-    #repo_url  = sh.git('config','--get','remote.origin.url',_cwd="MDC2/submit/rawdata/caloreco/rundir/").rstrip()  # TODO: fix hardcoded directory
     repo_url  = sh.git('config','--get','remote.origin.url',_cwd=payload ).rstrip()  # TODO: fix hardcoded directory
 
     setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
