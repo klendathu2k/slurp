@@ -54,6 +54,15 @@ def sanity_checks( params, inputq ):
     # extract the dst type, name, run, etc... based on the positions of fields separated
     # by the underscores and/or dashes.
     #
+    # These stageout.sh scripts are reasonably general, but limited in the way that they
+    # are extracting information from the filename.  The assume that the dst type, build,
+    # etc... can be extracted from fixed positions relative to the '_' in the filename.
+    # (and the filename are based on the params.name checked here...)
+    #
+    # We ought to be able to extend this for new workflows, so long as we generalize the 
+    # stageout script.  Once we generalize said script, we should be able to bring that
+    # script into the old workflows... and then not worry.
+    #
 
     # Name should be of the form DST_NAME_runXauau
     if re.match( "[A-Z][A-Z][A-Z]_[A-Z]+_[a-z0-9]+", params['name'] ) == None:
