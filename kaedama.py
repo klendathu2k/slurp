@@ -56,7 +56,7 @@ def sanity_checks( params, inputq ):
     #
 
     # Name should be of the form DST_NAME_runXauau
-    if re.match( "DST_[A-Z]+_[a-z0-9]+", params['name'] ) == None:
+    if re.match( "[A-Z][A-Z][A-Z]_[A-Z]+_[a-z0-9]+", params['name'] ) == None:
         logging.error( f'params.name {params["name"]} does not respect the sPHENIX convention:  DST_NAME_run<N>species' )
         result = False
 
