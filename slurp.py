@@ -431,7 +431,6 @@ def submit( rule, **kwargs ):
                 if k in str(submit_job):
                     d[k] = v
             mymatching.append(d)        
-            #pprint.pprint(m)
 
 
         
@@ -609,9 +608,7 @@ def matches( rule, kwargs={} ):
                 ERROR(f"Run number {run}-{segment} reached twice in this query...")
                 ERROR(rule.files)
                 exit(1)
-
             
-
         fc_map = { f.runnumber : f for f in fc_result }
 
     # Build lists of PFNs available for each run
