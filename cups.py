@@ -433,10 +433,7 @@ def catalog(args):
     argument(     "--inc", help="If set, increments the number of events",dest="inc",default=False,action="store_true"),
     argument( "--dataset", help="sets the name of the dataset", default="test" ),
     argument( "--dsttype", help="sets the sphenix dsttype", default=None ),
-    #argument( "--add-to-files",    dest="add_to_files", help="Adds to the file catalog", default=True, action="store_true"),
-    #argument( "--no-add-to-files", dest="add_to_files", help="Do not add to the file catalog", action="store_false"),
-    #argument( "--add-to-datasets",    dest="add_to_datasets", help="Adds to the file catalog", default=True, action="store_true"),
-    #argument( "--no-add-to-datasets", dest="add_to_datasets", help="Do not add to the file catalog", action="store_false"),    
+    argument( "--prodtype", dest="prodtype", help="sets the production type of the job...", required=True, choices=["many","only"] )
 ])
 def stageout(args):
     """
@@ -537,6 +534,7 @@ def stageout(args):
         dstname=args.dstname
         run=int(args.run)
         seg=int(args.segment)
+        if args.prodtype=="many": seg=0
         id_ = getLatestId( tablename, dstname, run, seg )
         update=None
         if args.inc:
