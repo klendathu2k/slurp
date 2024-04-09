@@ -207,7 +207,7 @@ def query_jobs_by_cluster(conditions=""):
                sum(nevents)                    as sum_events
        
             from   production_status 
-            where  status>='started'   and submitted>'{timestart}'
+            where  status>='started'   and submitted>'{timestart}'  and status<'failed'
             {conditions}
             group by dsttype,cluster
             order by dsttype desc
