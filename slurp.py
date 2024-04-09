@@ -162,6 +162,8 @@ class SPhnxMatch:
     inputs:   str = None;
     ranges:   str = None;
     rungroup: str = None;
+    #intputfile: str = None;
+    #outputfile: str = None;
 
     
 
@@ -637,6 +639,8 @@ def matches( rule, kwargs={} ):
 
     #
     # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
+    # N.b. Output file naming convention is fixed as DST_TYPE_system-run#-seg#.ext... so something having a run
+    # range may end up outside of the schema.
     #
     outputs = [ "%s_%s_%s-%08i-%04i.root"%(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
 
@@ -687,6 +691,8 @@ def matches( rule, kwargs={} ):
 
         #
         # Get the production status from the proposed output name
+        #
+        # TODO: Shouldn't we replace all suffixes here?
         #
         x    = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
