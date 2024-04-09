@@ -46,7 +46,7 @@ def apply_colorization(row,default_color=(Back.RESET,Fore.GREEN),fail_color=(Bac
 
     color=f"{default_color[0]}{default_color[1]}{Style.BRIGHT}"
     reset=f"{Fore.RESET}{Back.RESET}{Style.RESET_ALL}"
-    if getattr( row, 'num_failed', 0)>0 or "Held" in row:
+    if getattr( row, 'num_failed', 0)>0 or "Held" in row or " day " in str(getattr(row,"last_start","")):
         color=f"{fail_color[0]}{fail_color[1]}{Style.BRIGHT}"
         reset=f"{Fore.RESET}{Back.RESET}{Style.RESET_ALL}"
     myrow = [ 
@@ -187,14 +187,13 @@ def query_started_jobs(conditions=""):
 
 def query_jobs_by_cluster(conditions=""):
     print("Summary of jobs by condor cluster")
-#               min(age(ended,started))         as min_job_duration,
-#               max(age(ended,started))         as max_job_duration,
     psqlquery=f"""
             select dsttype,cluster,
                min(run) as min_run,
                max(run) as max_run,
                count(run)                      as num_jobs,
                min(started)                    as earliest_start,
+               max(started)                    as last_start,
                avg(age(started,submitting))    as avg_time_to_start,
                count( case status when 'submitted' then 1 else null end )
                                                as num_submitted,
