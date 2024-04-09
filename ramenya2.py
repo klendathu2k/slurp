@@ -222,11 +222,12 @@ def query_jobs_by_cluster(conditions=""):
 def query_failed_jobs(conditions="", title="Summary of failed jobs by run"):
     print(title)
     psqlquery=f"""
-            select dstname,run,segment,cluster,process,prod_id
+            select dstname,prod_id,string_agg( to_char(run,'FM00000000')||'-'||to_char(segment,'FM0000'),' ' )
             from   production_status 
             where  status='failed'   and submitted>'{timestart}'
             {conditions}
-            order by run
+            group by dstname,prod_id
+            order by prod_id
                ;
     """
     results = statusdbr.execute(psqlquery);
