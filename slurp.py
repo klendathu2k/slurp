@@ -616,7 +616,6 @@ def matches( rule, kwargs={} ):
             segment = f.segment
             #key     = f"'{run}-{segment}'"
             key     = unique_job_key(f,fc_columns)
-            print("key= " + key)
             if lfn_lists.get(key,None) == None:   # NOTE:  Possible (unlikely) breaking change
                 lfn_lists[ key ] = f.files.split()
                 rng_lists[ key ] = getattr( f, 'fileranges', '' ).split()
@@ -632,9 +631,6 @@ def matches( rule, kwargs={} ):
 
     # Build lists of PFNs available for each run
     for ujobid,lfns in lfn_lists.items():
-
-        print(ujobid)
-        pprint.pprint(lfns)
 
         lfns_ = [ f"'{x}'" for x in lfns ]
         list_of_lfns = ','.join(lfns_)
@@ -662,11 +658,12 @@ def matches( rule, kwargs={} ):
 
 
     #
-    # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
-    # N.b. Output file naming convention is fixed as DST_TYPE_system-run#-seg#.ext... so something having a run
-    # range may end up outside of the schema.
+    # Build the list of output files for the transformation 
     #
-    outputs = [ "%s_%s_%s-%08i-%04i.root"%(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
+    outputs = [
+        f"{name}_{build}_{tag}-{unique_job_key(x,fc_columns)}.root" for x in fc_result
+    ]
+
 
     #
     # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
@@ -678,7 +675,6 @@ def matches( rule, kwargs={} ):
     exists = {}
     for check in fccro.execute("select filename,runnumber,segment from datasets where filename like '"+dsttype+"%';"):
         exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
-
 
     # 
     # The production setup will be unique based on (1) the specified analysis build, (2) the specified DB tag,
@@ -695,6 +691,7 @@ def matches( rule, kwargs={} ):
     #
     prod_status = fetch_production_status ( setup, 0, -1, update )  # between run min and run max inclusive
 
+
     #
     # Map the production status table onto the output filename.  We use this map later on to determine whether
     # the proposed candidate output DST in the outputs list is currently being produced by a condor job, or
@@ -706,12 +703,14 @@ def matches( rule, kwargs={} ):
         file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        
         prod_status_map[file_basename] = stat.status
 
+
     #
     # Build the list of matches.  We iterate over the fc_result zipped with the set of proposed outputs
     # which derives from it.  Keep a list of all runs we are about to submit.
     #
     list_of_runs = []
-    for ((lfn,run,seg,*fc_rest),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
+    for (f,dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
+        (lfn,run,seg,*fc_rest) = f
 
         #
         # Get the production status from the proposed output name
@@ -743,7 +742,7 @@ def matches( rule, kwargs={} ):
         # Check consistentcy between the LFN list (from input query) and PFN list (from file catalog query) 
         # for the current run.  Verify that the two lists are consistent.
         #
-        key = f"'{run}-{seg}'"
+        key = unique_job_key( f, fc_columns )
         num_lfn = len( lfn_lists[key] )
         num_pfn = len( pfn_lists[key] )
         sanity = True
@@ -766,11 +765,9 @@ def matches( rule, kwargs={} ):
                 print(i)
             continue
 
-        #inputs_ = lfn_lists[f"'{run}-{seg}'"]
         inputs_ = pfn_lists[key]
         ranges_ = rng_lists[key]
         
-
         #
         # If the DST has been produced (and we make it to this point) we issue a warning that
         # it will be overwritten.
@@ -782,9 +779,6 @@ def matches( rule, kwargs={} ):
         #
         #
         if True:
-
-            if verbose>10:
-                INFO (lfn, run, seg, dst, "\n");
 
             myinputs = None
             myranges = None
@@ -849,7 +843,6 @@ def parse_command_line():
     global userargs
 
     args, userargs = arg_parser.parse_known_args()
-    #blocking_ = ["submitting","submitted","started","running","evicted","failed","finished"]
 
     if args.unblock:
         blocking = [ b for b in blocking if b not in args.unblock ]
