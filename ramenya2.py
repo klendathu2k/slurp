@@ -143,18 +143,22 @@ def query_pending_jobs( conditions="" ):
     order by dsttype desc
     ;
     """    
-    results = statusdbr.execute(psqlquery);
-    #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    table = [colorize(r) for r in results]
-    print( tabulate( table, labels, tablefmt=tablefmt ) )
+    try:
+        results = statusdbr.execute(psqlquery);
+        #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        table = [colorize(r) for r in results]
+        print( tabulate( table, labels, tablefmt=tablefmt ) )
+    except pyodbc.OperationalError: 
+        print("... could not query the db ... skipping report")
+
 
 
 def query_started_jobs(conditions=""):
     print("Summary of jobs which have reached staus='started'")
     #print("--------------------------------------------------")
     psqlquery=f"""
-    select dsttype,prod_id,
+    select dsttype,
     count(run)                      as num_jobs,
     avg(age(started,submitting))    as avg_time_to_start,
     count( case status when 'submitted' then 1 else null end )
@@ -166,23 +170,27 @@ def query_started_jobs(conditions=""):
     count( case status when 'failed' then 1 else null end )
     as num_failed,
     avg(age(ended,started))         as avg_job_duration,
-    min(age(ended,started))         as min_job_duration,
-    max(age(ended,started))         as max_job_duration,
+    max(started           )         as last_job_started,
+    max(ended             )         as last_job_finished,
     sum(nevents)                    as sum_events
        
     from   production_status 
     where  status>='started' and submitted>'{timestart}'
      {conditions}
-    group by dsttype,prod_id
+    group by dsttype
     order by dsttype desc
     ;
     """
-    results = statusdbr.execute(psqlquery);
-    #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    table = [colorize(r,fail_color=(Back.YELLOW,Fore.BLACK)) for r in results]
-    vistable = tabulate( table, labels, tablefmt=tablefmt ) 
-    print( vistable )
+    vistable="...could not make db query..."
+    try:
+        results = statusdbr.execute(psqlquery);
+        #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        table = [colorize(r,fail_color=(Back.YELLOW,Fore.BLACK)) for r in results]
+        vistable = tabulate( table, labels, tablefmt=tablefmt ) 
+        print( vistable )
+    except pyodbc.OperationalError: 
+        pass
     return vistable
 
 def query_jobs_by_cluster(conditions=""):
@@ -403,8 +411,8 @@ def submit(args):
 
         query_pending_jobs()
         query_started_jobs()
-        query_jobs_by_cluster()
-        query_failed_jobs()
+        # query_jobs_by_cluster()
+        # query_failed_jobs()
 
         if args.loop==False: break
         for i in tqdm( range( args.delay * 10), desc="Next submit" ):
