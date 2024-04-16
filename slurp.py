@@ -586,8 +586,9 @@ def matches( rule, kwargs={} ):
 
     # Build list of possible outputs from filelist query... (requires run,sequence as 2nd and 3rd
     # elements in the query result)
-    fc_result = []
-    fc_map    = None
+    fc_result  = []
+    fc_columns = []
+    fc_map     = None
 
 
     rl_result = None
@@ -598,8 +599,9 @@ def matches( rule, kwargs={} ):
     rng_lists  = {}  # LFN:firstevent:lastevent
 
     if rule.files:
-        curs      = cursors[ rule.filesdb ]
-        fc_result = list( curs.execute( rule.files ).fetchall() )
+        curs       = cursors[ rule.filesdb ]
+        fc_result  = list( curs.execute( rule.files ).fetchall() )
+        fc_columns = [ c[0] for c in curs.description ] 
         for f in fc_result:
             run     = f.runnumber
             segment = f.segment
