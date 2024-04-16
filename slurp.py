@@ -390,7 +390,9 @@ def submit( rule, **kwargs ):
         outdir = outdir.replace( '$(rungroup)', '{rungroup}')
         outdir = f'f"{outdir}"'
         for run in runlist:
-            rungroup=f'{100*math.floor(run/100):08d}_{100*math.ceil(run/100):08d}'
+            mnrun = 100 * ( math.floor(run/100) )
+            mxrun = mnrun+100
+            rungroup=f'{mnrun:08d}_{mxrun:08d}'
             pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
 
     #pprint.pprint(jobd)
