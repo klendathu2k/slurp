@@ -561,6 +561,15 @@ def sphenix_dstname( dsttype, build, dbtag ):
 def sphenix_base_filename( dsttype, build, dbtag, run, segment ):
     result = "%s-%08i-%04i" %( sphenix_dstname(dsttype, build, dbtag), int(run), int(segment) )
     return result
+
+
+def unique_job_key( f, cols ):
+    key=""
+    if "runnumber" in cols:        key+=f"{f.runnumber:08d}"
+    if "lastrun"   in cols:        key+=f"-{f.lastrun:08d}"
+    if "segment"   in cols:        key+=f"-{f.segment:04d}"
+    if "iteration" in cols:        key+=f"-{f.iteration:02d}"
+    return key
     
 
 def matches( rule, kwargs={} ):
@@ -605,9 +614,12 @@ def matches( rule, kwargs={} ):
         for f in fc_result:
             run     = f.runnumber
             segment = f.segment
-            if lfn_lists.get(run,None) == None:
-                lfn_lists[ f"'{run}-{segment}'" ] = f.files.split()
-                rng_lists[ f"'{run}-{segment}'" ] = getattr( f, 'fileranges', '' ).split()
+            #key     = f"'{run}-{segment}'"
+            key     = unique_job_key(f,fc_columns)
+            print("key= " + key)
+            if lfn_lists.get(key,None) == None:   # NOTE:  Possible (unlikely) breaking change
+                lfn_lists[ key ] = f.files.split()
+                rng_lists[ key ] = getattr( f, 'fileranges', '' ).split()
             else:
                 # If we hit this result, then the db query has resulted in two rows with identical
                 # run numbers.  Violating the implicit submission schema.
@@ -617,20 +629,25 @@ def matches( rule, kwargs={} ):
             
         fc_map = { f.runnumber : f for f in fc_result }
 
+
     # Build lists of PFNs available for each run
-    for runseg,lfns in lfn_lists.items():
+    for ujobid,lfns in lfn_lists.items():
+
+        print(ujobid)
+        pprint.pprint(lfns)
+
         lfns_ = [ f"'{x}'" for x in lfns ]
         list_of_lfns = ','.join(lfns_)
 
         # Add a new entry in the pfn_lists lookup table
-        if pfn_lists.get(runseg,None)==None:
-            pfn_lists[runseg]=[]
+        if pfn_lists.get(ujobid,None)==None:
+            pfn_lists[ujobid]=[]
 
         # Build list of PFNs via direct lookup and append the results
         if rule.direct:
             for direct in glob(rule.direct):
                 for p in [ direct+'/'+f for f in lfns if os.path.isfile(os.path.join(direct, f)) ]:
-                    pfn_lists[ runseg ].append( p )
+                    pfn_lists[ ujobid ].append( p )
             
 
         # Build list of PFNs via filecatalog lookup if direct path has not been specified
@@ -639,7 +656,10 @@ def matches( rule, kwargs={} ):
             select full_file_path,md5 from files where lfn in ( {list_of_lfns} );
             """        
             for pfnresult in fccro.execute( pfnquery ):
-                pfn_lists[ runseg ].append( pfnresult.full_file_path )
+                pfn_lists[ ujobid ].append( pfnresult.full_file_path )
+
+
+
 
     #
     # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
@@ -723,12 +743,13 @@ def matches( rule, kwargs={} ):
         # Check consistentcy between the LFN list (from input query) and PFN list (from file catalog query) 
         # for the current run.  Verify that the two lists are consistent.
         #
-        num_lfn = len( lfn_lists[f"'{run}-{seg}'"] )
-        num_pfn = len( pfn_lists[f"'{run}-{seg}'"] )
+        key = f"'{run}-{seg}'"
+        num_lfn = len( lfn_lists[key] )
+        num_pfn = len( pfn_lists[key] )
         sanity = True
-        pfn_check = [ x.split('/')[-1] for x in pfn_lists[f"'{run}-{seg}'"] ]
+        pfn_check = [ x.split('/')[-1] for x in pfn_lists[key] ]
         for x in pfn_check:
-            if x not in lfn_lists[f"'{run}-{seg}'"]:
+            if x not in lfn_lists[key]:
                 sanity = False
                 break
 
@@ -741,15 +762,13 @@ def matches( rule, kwargs={} ):
         if num_lfn > num_pfn or sanity==False:
             WARN(f"LFN list and PFN list are different.  Skipping this run {run} {seg}")
             WARN( f"{num_lfn} {num_pfn} {sanity}" )
-            for i in itertools.zip_longest( lfn_lists[f"'{run}-{seg}'"], pfn_lists[f"'{run}-{seg}'"] ):
+            for i in itertools.zip_longest( lfn_lists[key], pfn_lists[key] ):
                 print(i)
-            #WARN( lfn_lists )
-            #WARN( pfn_lists )
             continue
 
         #inputs_ = lfn_lists[f"'{run}-{seg}'"]
-        inputs_ = pfn_lists[f"'{run}-{seg}'"]
-        ranges_ = rng_lists[f"'{run}-{seg}'"]
+        inputs_ = pfn_lists[key]
+        ranges_ = rng_lists[key]
         
 
         #
