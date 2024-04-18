@@ -109,7 +109,7 @@ def main():
         run_condition = f"and runnumber={args.runs[0]}"
     elif len(args.runs)==2:
         run_condition = f"and runnumber>={args.runs[0]} and runnumber<={args.runs[1]}"
-    elif len(args.runs)==3:
+    elif len(args.runs)>=3:
         run_condition = "and runnumber in ( %s )" % ','.join( args.runs )
 
     seg_condition = ""
@@ -117,7 +117,7 @@ def main():
         seg_condition = f"and segment={args.segments[0]}"
     elif len(args.segments)==2:
         seg_condition = f"and segment>={args.segments[0]} and segment<={args.segments[1]}"
-    elif len(args.segments)==3:
+    elif len(args.segments)>=3:
         seg_condition = "and segment in ( %s )" % ','.join( args.segments )
 
     limit_condition=""
@@ -202,7 +202,10 @@ def main():
                          limit             = args.limit
                      )
 
-        # Extract the subset of parameters that we need to pass to submit
+        #
+        # Extract the subset of parameters that we need to pass to submit.  Note that (most) submitkw
+        # arguments will be passed down to the matches function in the kwargs dictionary.
+        #
         submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump", "neventsper"] }
 
         submit (dst_rule, nevents=args.nevents, **submitkw, **filesystem ) 
