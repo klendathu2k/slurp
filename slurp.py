@@ -723,9 +723,7 @@ def matches( rule, kwargs={} ):
     #
     prod_status_map = {}
     for stat in prod_status:
-        # replace with sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
-        file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        
-        prod_status_map[file_basename] = stat.status
+        prod_status_map[ stat.dstfile ] = stat.status
 
 
     #
