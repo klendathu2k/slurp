@@ -232,7 +232,6 @@ def getLatestId( tablename, dstname, run, seg ):  # limited to status db
     query=f"""
     select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
     """
-    print(f"getLastestId: {query}")
     result = statusdbw.execute(query).fetchone()[0]
     return result
 
@@ -242,9 +241,6 @@ def update_production_status( matching, setup, condor, state ):
     # NAMING CONVENTION DEPENDENCE...
     # 
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
-
-    print(f"update_production_status: name={name}")
-
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
@@ -252,7 +248,8 @@ def update_production_status( matching, setup, condor, state ):
         #
         # NAMING CONVENTION DEPENDENCE
         #
-        key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
+        #key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
+        key = sphenix_base_filename_( setup.name, setup.build, setup.dbtag, m, None )
 
         dsttype=setup.name
         dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
@@ -260,8 +257,8 @@ def update_production_status( matching, setup, condor, state ):
         #
         # NAMING CONVENTION DEPENDENCE
         #
-        dstfile=dstname+'-%08i-%04i'%(run,segment)
-        #print(f"update_production_status: name={name} key={key} dstfile={dstfile}")        
+        #dstfile=dstname+'-%08i-%04i'%(run,segment)
+        dstfile = key
 
         # 1s time resolution
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
@@ -277,8 +274,6 @@ def update_production_status( matching, setup, condor, state ):
         set     status='{state}',{state}='{timestamp}'
         where   dstname='{dstname}' and run={run} and segment={segment} and id={id_}
         """
-
-        print(f"update_production_status: name={name} key={key} dstfile={dstfile} update={update}")        
 
         statusdbw.execute(update)
         statusdbw.commit()
@@ -299,9 +294,6 @@ def insert_production_status( matching, setup, condor, state ):
 
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'Args':args }
 
-    print("insert_production_status:")
-    pprint.pprint(condor_map)
-
 
     # replace with sphenix_dstname( setup.name, setup.build, setup.dbtag )
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
@@ -314,15 +306,17 @@ def insert_production_status( matching, setup, condor, state ):
         #
         # NAMING CONVENTION DEPENDENCE
         #
-        key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
-        
+        #key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
+        key = sphenix_base_filename_( setup.name, setup.build, setup.dbtag, m, None )
+
         dsttype=setup.name
         dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
 
         #
         # NAMING CONVENTION DEPENDENCE
         #
-        dstfile=dstname+'-%08i-%04i'%(run,segment)
+        #dstfile=dstname+'-%08i-%04i'%(run,segment)
+        dstfile = key
         
         prod_id = setup.id
         try:
@@ -371,6 +365,7 @@ def submit( rule, **kwargs ):
     # Build list of LFNs which match the input
     matching, setup, runlist = matches( rule, kwargs )
 
+
     if len(matching)==0:
         WARN("No input files match the specifed rule.")
         return result
@@ -405,7 +400,6 @@ def submit( rule, **kwargs ):
 
     jobd = rule.job.dict()
 
-
     for outname in [ 'outdir', 'logdir', 'condor']:
 
         outdir=kwargs.get(outname,None)
@@ -421,21 +415,8 @@ def submit( rule, **kwargs ):
             rungroup=f'{mnrun:08d}_{mxrun:08d}'
             pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
 
-    #pprint.pprint(jobd)
-        # This is calling for a regex... 
-#$$        outdir = outdir.replace( "$$([", "{math.floorOPAR" ) # start of condor expr becomes start of python format expression
-#$$$       outdir = outdir.replace( "])",   "CPAR:06d}" ) # end of condor expr ...
-#$$        outdir = outdir.replace( "])",   "CPAR}" ) # end of condor expr ...
-#$$        outdir = outdir.replace( "$(", "" )    # condor macro "run" becomes local variable run.... hork.
-#$$        outdir = outdir.replace( ")",  "" )
-#$$        outdir = outdir.replace( "OPAR", "(" )
-#$$        outdir = outdir.replace( "CPAR", ")" )
-
-#$$        outdir = f'f"{outdir}"'
-#$$        for run in runlist:
-#$$            pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
-    
     submit_job = htcondor.Submit( jobd )
+
 
     if verbose>0:
         INFO(submit_job)
@@ -470,7 +451,7 @@ def submit( rule, **kwargs ):
         for run_submit_loop in [120,180,300,600]:
             try:
                 submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
-
+                
                 schedd_query = schedd.query(
                     constraint=f"ClusterId == {submit_result.cluster()}",
                     projection=["ClusterId", "ProcId", "Out", "Args" ]
@@ -595,10 +576,22 @@ def sphenix_base_filename_( name, build, dbtag, fcres, fccols ):
 
 def unique_job_key( f, cols ):
     key=""
-    if "runnumber" in cols:        key+=f"{f.runnumber:08d}"
-    if "lastrun"   in cols:        key+=f"-{f.lastrun:08d}"
-    if "segment"   in cols:        key+=f"-{f.segment:04d}"
-    if "iteration" in cols:        key+=f"-{f.iteration:02d}"
+    if cols==None:
+        cols=list(f.keys())
+    if type(f)==type({}):
+        if "runnumber" in cols:        key+=f"{int(f.get('runnumber')):08d}"
+        if "run"       in cols:        key+=f"{int(f.get('run')):08d}"
+        if "lastrun"   in cols:        key+=f"-{int(f.get('lastrun')):08d}"
+        if "segment"   in cols:        key+=f"-{int(f.get('segment')):04d}"
+        if "seg"       in cols:        key+=f"-{int(f.get('seg')):04d}"
+        if "iteration" in cols:        key+=f"-{int(f.get('iteration')):02d}"
+    else:    
+        if "runnumber" in cols:        key+=f"{int(getattr(f,'runnumber')):08d}"
+        if "run"       in cols:        key+=f"{int(getattr(f,'run')):08d}"
+        if "lastrun"   in cols:        key+=f"-{int(getattr(f,'lastrun')):08d}"
+        if "segment"   in cols:        key+=f"-{int(getattr(f,'segment')):04d}"
+        if "seg"       in cols:        key+=f"-{int(getattr(f,'seg')):04d}"
+        if "iteration" in cols:        key+=f"-{int(getattr(f,'iteration')):02d}"
     return key
     
 
