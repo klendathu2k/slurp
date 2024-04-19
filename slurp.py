@@ -206,30 +206,20 @@ def table_exists( tablename ):
 
 def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
     """
-    Given a production setup, returns the production status table....
+    Given a production setup, returns the production status table for the given setup.
+    NOTE:  This will be an exhaustively large table.  We ought to limit this.
     """
     result = [] # of SPhnxProductionStatus
 
-    name = "PRODUCTION_STATUS"
-    
-    if table_exists( name ):
+    query = f"select * from production_status where prod_id={setup.id}"
+    if ( runmn>runmx ): query = query + f" and run>={runmn};"
+    else              : query = query + f" and run>={runmn} and run<={runmx};"
 
-        query = f"select * from {name} where prod_id={setup.id}"
-        if ( runmn>runmx ): query = query + f" and run>={runmn};"
-        else              : query = query + f" and run>={runmn} and run<={runmx};"
+    dbresult = statusdbr.execute( query ).fetchall();
 
-        dbresult = statusdbr.execute( query ).fetchall();
+    # Transform the list of tuples from the db query to a list of production status dataclass objects
+    result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
 
-        # Transform the list of tuples from the db query to a list of prouction status dataclass objects
-        result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
-
-    elif update==True: # note: we should never reach this state ...  tables ought to exist already
-
-        create = sphnx_production_status_table_def( setup.name, setup.build, setup.dbtag )
-
-        statusdbw.execute(create) # 
-        statusdbw.commit()
-        
 
     return result
 
@@ -707,8 +697,6 @@ def matches( rule, kwargs={} ):
 
     exists = {}
     for check in fccro.execute("select filename,runnumber,segment from datasets where filename like '"+dsttype+"%';"):
-        # pprint.pprint(check)        
-        # Exists is a map between the filename and an arbitrary tuple
         exists[ check.filename ] = True # ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
 
 
