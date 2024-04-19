@@ -162,6 +162,8 @@ class SPhnxMatch:
     inputs:   str = None;
     ranges:   str = None;
     rungroup: str = None;
+    lastrun:  str = None;
+    iteration: str = None;
     #intputfile: str = None;
     #outputfile: str = None;
 
@@ -230,6 +232,7 @@ def getLatestId( tablename, dstname, run, seg ):  # limited to status db
     query=f"""
     select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
     """
+    print(f"getLastestId: {query}")
     result = statusdbw.execute(query).fetchone()[0]
     return result
 
@@ -240,6 +243,8 @@ def update_production_status( matching, setup, condor, state ):
     # 
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
 
+    print(f"update_production_status: name={name}")
+
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
@@ -248,10 +253,15 @@ def update_production_status( matching, setup, condor, state ):
         # NAMING CONVENTION DEPENDENCE
         #
         key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
-        
+
         dsttype=setup.name
         dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
+
+        #
+        # NAMING CONVENTION DEPENDENCE
+        #
         dstfile=dstname+'-%08i-%04i'%(run,segment)
+        #print(f"update_production_status: name={name} key={key} dstfile={dstfile}")        
 
         # 1s time resolution
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
@@ -267,6 +277,9 @@ def update_production_status( matching, setup, condor, state ):
         set     status='{state}',{state}='{timestamp}'
         where   dstname='{dstname}' and run={run} and segment={segment} and id={id_}
         """
+
+        print(f"update_production_status: name={name} key={key} dstfile={dstfile} update={update}")        
+
         statusdbw.execute(update)
         statusdbw.commit()
 
@@ -286,10 +299,9 @@ def insert_production_status( matching, setup, condor, state ):
 
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'Args':args }
 
+    print("insert_production_status:")
+    pprint.pprint(condor_map)
 
-# select * from status_dst_calor_auau23_ana387_2023p003;
-# id | run | segment | nsegments | inputs | prod_id | cluster | process | status | flags | exit_code 
-#----+-----+---------+-----------+--------+---------+---------+---------+--------+-------+-----------
 
     # replace with sphenix_dstname( setup.name, setup.build, setup.dbtag )
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
@@ -828,6 +840,8 @@ def matches( rule, kwargs={} ):
                 payload,                # payload directory
                 inputs=myinputs,        # space-separated list of input files
                 ranges=myranges,        # space-separated list of input files with first and last event separated by :
+                lastrun=getattr(f,'lastrun',None),
+                iteration=getattr(f,'iteration',None),
                 )
 
             match = match.dict()
