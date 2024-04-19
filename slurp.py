@@ -233,6 +233,9 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
 
     return result
 
+#
+# NAMING CONVENTION DEPENDENCE... will also need the iteration on this?
+#
 def getLatestId( tablename, dstname, run, seg ):  # limited to status db
     query=f"""
     select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
@@ -242,12 +245,18 @@ def getLatestId( tablename, dstname, run, seg ):  # limited to status db
 
 def update_production_status( matching, setup, condor, state ):
 
+    # 
+    # NAMING CONVENTION DEPENDENCE...
+    # 
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
 
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
 
+        #
+        # NAMING CONVENTION DEPENDENCE
+        #
         key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
         
         dsttype=setup.name
@@ -259,6 +268,10 @@ def update_production_status( matching, setup, condor, state ):
 
         id_ = getLatestId( 'production_status', dstname, run, segment )
 
+
+        #
+        # NAMING CONVENTION DEPENDENCE
+        #
         update=f"""
         update  production_status
         set     status='{state}',{state}='{timestamp}'
@@ -275,6 +288,10 @@ def insert_production_status( matching, setup, condor, state ):
         procId    = ad['ProcId']
         out       = ad['Out'].split('/')[-1]   # discard anything that looks like a filepath
         args      = ad['Args']
+
+        #
+        # NAMING CONVENTION DEPENDENCE
+        #
         key       = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
 
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'Args':args }
@@ -292,10 +309,17 @@ def insert_production_status( matching, setup, condor, state ):
         segment = int(m['seg'])
         dstfileinput = m['lfn'].split('.')[0]
 
+        #
+        # NAMING CONVENTION DEPENDENCE
+        #
         key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
         
         dsttype=setup.name
         dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
+
+        #
+        # NAMING CONVENTION DEPENDENCE
+        #
         dstfile=dstname+'-%08i-%04i'%(run,segment)
         
         prod_id = setup.id
@@ -562,6 +586,10 @@ def sphenix_base_filename( dsttype, build, dbtag, run, segment ):
     result = "%s-%08i-%04i" %( sphenix_dstname(dsttype, build, dbtag), int(run), int(segment) )
     return result
 
+def sphenix_base_filename_( name, build, dbtag, fcres, fccols ):
+    result = f"{name}_{build}_{dbtag}-{unique_job_key(fcres,fccols)}"
+    return result
+
 
 def unique_job_key( f, cols ):
     key=""
@@ -614,7 +642,6 @@ def matches( rule, kwargs={} ):
         for f in fc_result:
             run     = f.runnumber
             segment = f.segment
-            #key     = f"'{run}-{segment}'"
             key     = unique_job_key(f,fc_columns)
             if lfn_lists.get(key,None) == None:   # NOTE:  Possible (unlikely) breaking change
                 lfn_lists[ key ] = f.files.split()
@@ -622,17 +649,19 @@ def matches( rule, kwargs={} ):
             else:
                 # If we hit this result, then the db query has resulted in two rows with identical
                 # run numbers.  Violating the implicit submission schema.
-                ERROR(f"Run number {run}-{segment} reached twice in this query...")
+                ERROR(f"Run number reached twice in this query...")
+                ERROR(f"{key}")
                 ERROR(rule.files)
                 exit(1)
             
+        # TODO: This is probably defunct... remove it?
         fc_map = { f.runnumber : f for f in fc_result }
 
 
     # Build lists of PFNs available for each run
     for ujobid,lfns in lfn_lists.items():
 
-        lfns_ = [ f"'{x}'" for x in lfns ]
+        lfns_ = [ f"'{lfn}'" for lfn in lfns ]
         list_of_lfns = ','.join(lfns_)
 
         # Add a new entry in the pfn_lists lookup table
@@ -660,8 +689,11 @@ def matches( rule, kwargs={} ):
     #
     # Build the list of output files for the transformation 
     #
+#   outputs = [
+#       f"{name}_{build}_{tag}-{unique_job_key(fcres,fc_columns)}.root" for fcres in fc_result
+#   ]
     outputs = [
-        f"{name}_{build}_{tag}-{unique_job_key(x,fc_columns)}.root" for x in fc_result
+        f"{sphenix_base_filename_(name,build,tag,fcres,fc_columns)}.root" for fcres in fc_result
     ]
 
 
@@ -672,9 +704,13 @@ def matches( rule, kwargs={} ):
     # TODO: This is potentially a big, long query.  Limit query to the existing set of proposed output files or the 
     # list of runs...
     dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
+
     exists = {}
     for check in fccro.execute("select filename,runnumber,segment from datasets where filename like '"+dsttype+"%';"):
-        exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
+        # pprint.pprint(check)        
+        # Exists is a map between the filename and an arbitrary tuple
+        exists[ check.filename ] = True # ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
+
 
     # 
     # The production setup will be unique based on (1) the specified analysis build, (2) the specified DB tag,
