@@ -125,7 +125,12 @@ def main():
         limit_condition = f"limit {args.limit}"
         
     # Reduce configuration to this rule
-    config = config[ args.rule ]
+    try:
+        config = config[ args.rule ]
+    except KeyError:
+        logging.error(f"Could not locate '{args.rule}' in configuration file")
+        pprint.pprint( config.keys() )
+        return
 
     # Input query specifies the source of the input files
     input_         = config.get('input')
