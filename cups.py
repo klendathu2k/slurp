@@ -540,13 +540,13 @@ def stageout(args):
         if args.inc:
             update = f"""
             update {tablename}
-            set nevents=nevents+{args.nevents}
+            set nevents=nevents+{args.nevents},nsegments=nsegments+1
             where dstname='{dstname}' and run={run} and segment={seg} and id={id_};
             """
         else:
             update = f"""
             update {tablename}
-            set nevents={args.nevents}
+            set nevents={args.nevents},nsegments=nsegments+1
             where dstname='{dstname}' and run={run} and segment={seg} and id={id_};
             """
 
