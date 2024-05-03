@@ -151,6 +151,10 @@ def query_pending_jobs( conditions="" ):
         print( tabulate( table, labels, tablefmt=tablefmt ) )
     except pyodbc.OperationalError: 
         print("... could not query the db ... skipping report")
+        pass
+    except pyodbc.ProgrammingError:
+        print("... could not query the db ... skipping report")
+        pass
 
 
 
@@ -191,6 +195,8 @@ def query_started_jobs(conditions=""):
         print( vistable )
     except pyodbc.OperationalError: 
         pass
+    except pyodbc.ProgrammingError:
+        pass
     return vistable
 
 def query_jobs_by_cluster(conditions=""):
@@ -221,11 +227,18 @@ def query_jobs_by_cluster(conditions=""):
             order by dsttype desc
                ;
     """
-    results = statusdbr.execute(psqlquery);
+    try:
+        results = statusdbr.execute(psqlquery);
 
-    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    table = [colorize(r) for r in results]
-    print( tabulate( table, labels, tablefmt=tablefmt ) )
+        labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        table = [colorize(r) for r in results]
+        print( tabulate( table, labels, tablefmt=tablefmt ) )
+    except pyodbc.OperationalError: 
+        print("... could not query the db ... skipping report")
+        pass
+    except pyodbc.ProgrammingError:
+        print("... could not query the db ... skipping report")
+        pass
 
 def query_failed_jobs(conditions="", title="Summary of failed jobs by run"):
     print(title)
@@ -238,11 +251,18 @@ def query_failed_jobs(conditions="", title="Summary of failed jobs by run"):
             order by prod_id
                ;
     """
-    results = statusdbr.execute(psqlquery);
-    #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    table = [colorize(r,default_color=(Back.RED,Fore.WHITE)) for r in results]
-    print( tabulate( table, labels, tablefmt=tablefmt ) )
+    try:
+        results = statusdbr.execute(psqlquery);
+        #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        table = [colorize(r,default_color=(Back.RED,Fore.WHITE)) for r in results]
+        print( tabulate( table, labels, tablefmt=tablefmt ) )
+    except pyodbc.OperationalError: 
+        print("... could not query the db ... skipping report")
+        pass
+    except pyodbc.ProgrammingError:
+        print("... could not query the db ... skipping report")
+        pass
 
 
 def query_jobs_by_run(conditions="", title="Summary of jobs by run" ):
@@ -256,16 +276,23 @@ def query_jobs_by_run(conditions="", title="Summary of jobs by run" ):
             order by run
                ;
     """
-    print(psqlquery)
-    results = statusdbr.execute(psqlquery);
-    #for r in results:
-    #    print(f"{r.cluster} {r.process}")
+    #print(psqlquery)
+    try:
+        results = statusdbr.execute(psqlquery);
+        #for r in results:
+        #    print(f"{r.cluster} {r.process}")
 
-    #labels  = [ c[0] for c in statusdbr.description ]
-    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    table = [colorize(r) for r in results]
+        #labels  = [ c[0] for c in statusdbr.description ]
+        labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        table = [colorize(r) for r in results]
 
-    print( tabulate( table, labels, tablefmt=tablefmt ) )
+        print( tabulate( table, labels, tablefmt=tablefmt ) )
+    except pyodbc.OperationalError: 
+        print("... could not query the db ... skipping report")
+        pass
+    except pyodbc.ProgrammingError:
+        print("... could not query the db ... skipping report")
+        pass
 
 def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor state",  ):
     print(title)
@@ -278,7 +305,14 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
             order by run
                ;
     """
-    results = statusdbr.execute(psqlquery);
+    try:
+        results = statusdbr.execute(psqlquery);
+    except pyodbc.OperationalError: 
+        print("... could not query the db ... skipping report")
+        return
+    except pyodbc.ProgrammingError:
+        print("... could not query the db ... skipping report")
+        return
 
     schedd = htcondor.Schedd() 
     condor_job_status_map = {
