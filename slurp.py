@@ -416,6 +416,8 @@ def submit( rule, **kwargs ):
         for m in matching:
             pprint.pprint(m)
 
+    dispatched_runs = []
+
     if dump==False:
         if verbose==-10:
             INFO(submit_job)
@@ -435,6 +437,7 @@ def submit( rule, **kwargs ):
                 if k in str(submit_job):
                     d[k] = v
             mymatching.append(d)        
+            dispatched_runs.append( (d['run'],d['seg']) )
 
 
         
@@ -490,7 +493,7 @@ def submit( rule, **kwargs ):
                 line = ','.join(line)                
                 f.write(line+"\n")
 
-    return result                
+    return dispatched_runs
 
 def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
     """
