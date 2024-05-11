@@ -16,17 +16,31 @@ from slurp import daqc
 import sh
 import sys
 import re
+import os
+
+import platform
 
 from slurp import cursors
 
-
-#from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
 import logging
+from logging.handlers import RotatingFileHandler
+RotFileHandler = RotatingFileHandler(
+    filename='kaedama.log', 
+    mode='a',
+    maxBytes=5*1024*1024,
+#   maxBytes=5*1024,
+    backupCount=10,
+    encoding=None,
+    delay=0
+)
+
+# n.b. Adding the stream handler will echo to stdout
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler("kaedama.log"),
+        #logging.FileHandler("kaedama.log"),
+        RotFileHandler,
         logging.StreamHandler()
     ]
 )
@@ -90,12 +104,34 @@ def sanity_checks( params, inputq ):
     
     
     return result
+
+idw = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
+
+def dbconsistency():
+    idr = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
+    return (idr,idw)
     
 
 def main():
 
     # parse command line options
     args, userargs = slurp.parse_command_line()
+
+
+    # require consistent database
+    (idr, idw) = dbconsistency()
+    count=0
+    while idr < idw:
+        logging.warning(f"DB inconsistency.  Master at {idw} replica at {idr}.")
+        if count==5: 
+            logging.warning("Timeout after 5 min")
+            return
+        count=count+1
+        time.sleep(60)
+        (idr, idw) = dbconsistency()        
+
+    logging.info(f"Executing kaedama on {platform.node()} pid {os.getpid()}")
+    logging.info(f"DB consistency.  Master at {idw} replica at {idr}.")
 
     config={}
     with open(args.config,"r") as stream:
@@ -131,6 +167,8 @@ def main():
         logging.error(f"Could not locate '{args.rule}' in configuration file")
         pprint.pprint( config.keys() )
         return
+
+    logging.info( f"Executing rule {args.rule} where ... {run_condition} {seg_condition} {limit_condition}" )
 
     # Input query specifies the source of the input files
     input_         = config.get('input')
@@ -213,7 +251,10 @@ def main():
         #
         submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump", "neventsper"] }
 
-        submit (dst_rule, nevents=args.nevents, **submitkw, **filesystem ) 
+        dispatched = submit (dst_rule, nevents=args.nevents, **submitkw, **filesystem ) 
+        #for run in dispatched:
+            #name_ = params['name']
+        logging.info( f"Dispatched {args.rule}: {params['name']} {dispatched}" )
 
 
 if __name__ == '__main__': main()
