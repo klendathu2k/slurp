@@ -254,7 +254,12 @@ def main():
         dispatched = submit (dst_rule, nevents=args.nevents, **submitkw, **filesystem ) 
         #for run in dispatched:
             #name_ = params['name']
-        logging.info( f"Dispatched {args.rule}: {params['name']} {dispatched}" )
+
+        batch="batch"
+        if args.batch==False:
+            batch="user"
+
+        logging.info( f"Dispatched ({batch}) {args.rule}: {params['name']} {dispatched}" )
 
 
 if __name__ == '__main__': main()
