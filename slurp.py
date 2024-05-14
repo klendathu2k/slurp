@@ -82,7 +82,7 @@ class SPhnxCondorJob:
     should_transfer_files: str = "YES"
     output_destination:    str = "file://./output/"
     #output_destination:    str = "file:////sphenix/data/data02/sphnxpro/condorlog/$$($(run)/100)00"
-    when_to_transfer_output: str = "ON_EXIT_OR_EVICT"
+    when_to_transfer_output: str = "ON_EXIT"
     request_disk:          str = None    
     initialdir:            str = None
     accounting_group:      str = None
@@ -380,7 +380,7 @@ def submit( rule, **kwargs ):
     jobd = rule.job.dict()
 
 
-    for outname in [ 'outdir', 'logdir', 'condor']:
+    for outname in [ 'outdir', 'logdir', 'condor', 'histdir' ]:
 
         outdir=kwargs.get(outname,None)
         if outdir==None: continue
