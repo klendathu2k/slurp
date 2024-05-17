@@ -216,9 +216,9 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
     
     if table_exists( name ):
 
-        query = f"select * from {name} where prod_id={setup.id}"
-        if ( runmn>runmx ): query = query + f" and run>={runmn};"
-        else              : query = query + f" and run>={runmn} and run<={runmx};"
+        query = f"select * from {name} "
+        if ( runmn>runmx ): query = query + f" where run>={runmn};"
+        else              : query = query + f" where run>={runmn} and run<={runmx};"
 
         dbresult = statusdbr.execute( query ).fetchall();
 
