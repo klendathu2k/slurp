@@ -259,7 +259,7 @@ def main():
         if args.batch==False:
             batch="user"
 
-        logging.info( f"Dispatched ({batch}) {args.rule}: {params['name']} {dispatched}" )
+        logging.info( f"Dispatched ({batch} {args.runs}) {args.rule}: {params['name']} {dispatched}" )
 
 
 if __name__ == '__main__': main()
