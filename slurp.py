@@ -396,20 +396,6 @@ def submit( rule, **kwargs ):
             mxrun = mnrun+100
             rungroup=f'{mnrun:08d}_{mxrun:08d}'
             pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
-
-    #pprint.pprint(jobd)
-        # This is calling for a regex... 
-#$$        outdir = outdir.replace( "$$([", "{math.floorOPAR" ) # start of condor expr becomes start of python format expression
-#$$$       outdir = outdir.replace( "])",   "CPAR:06d}" ) # end of condor expr ...
-#$$        outdir = outdir.replace( "])",   "CPAR}" ) # end of condor expr ...
-#$$        outdir = outdir.replace( "$(", "" )    # condor macro "run" becomes local variable run.... hork.
-#$$        outdir = outdir.replace( ")",  "" )
-#$$        outdir = outdir.replace( "OPAR", "(" )
-#$$        outdir = outdir.replace( "CPAR", ")" )
-
-#$$        outdir = f'f"{outdir}"'
-#$$        for run in runlist:
-#$$            pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
     
     submit_job = htcondor.Submit( jobd )
 
