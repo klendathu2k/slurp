@@ -24,6 +24,8 @@ from dataclasses import dataclass, asdict, field
 
 from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
 
+import logging
+
 # List of states which block the job
 blocking = ["submitting","submitted","started","running","evicted","failed","finished"]
 #blocking = []
