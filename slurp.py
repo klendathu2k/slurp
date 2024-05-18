@@ -672,8 +672,9 @@ def matches( rule, kwargs={} ):
     prod_status_map = {}
     for stat in prod_status:
         # replace with sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
-        file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        
-        prod_status_map[file_basename] = stat.status
+        file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        # Not even sure how this was working???  This is the filename of the proposed job
+        fbn = stat.dstfile
+        prod_status_map[fbn] = stat.status  # supposed to be the map of the jobs which are in the production database to the filename of that job
 
     #
     # Build the list of matches.  We iterate over the fc_result zipped with the set of proposed outputs
