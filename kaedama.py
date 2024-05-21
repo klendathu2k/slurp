@@ -176,6 +176,9 @@ def main():
     input_query    = input_.get('query','').format(**locals())
     input_query_db = input_.get('db',None)
     input_query_direct = input_.get('direct_path',None)
+    if input_query_direct is not None:
+        input_query_direct = input_query_direct.format( **vars( args ) )
+
 
     runlist_query = config.get('runlist_query','').format(**locals())
     params        = config.get('params',None)
@@ -236,7 +239,7 @@ def main():
         dst_rule = Rule( name              = params['name'],
                          files             = input_query,
                          filesdb           = input_query_db,
-                         direct            = input_query_direct .format( **vars( args ) ),         
+                         direct            = input_query_direct,
                          runlist           = runlist_query,            # deprecated TODO
                          script            = params['script'],
                          build             = params['build'],
