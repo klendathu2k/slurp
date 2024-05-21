@@ -422,10 +422,19 @@ def submit(args):
 
     while ( go ):
 
-        if   len(args.runs)==1: kaedama = kaedama.bake( runs=args.runs[0] )
-        elif len(args.runs)==2: kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1] )
-        elif len(args.runs)==3: kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1], args.runs[2] )
-        else:                   kaedama = kaedama.bake( "--runs", "0", "999999" )
+        runreport = ""
+        if   len(args.runs)==1: 
+            kaedama = kaedama.bake( runs=args.runs[0] )
+            runreport = f"runs: {args.runs[0]}"
+        elif len(args.runs)==2: 
+            kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1] )
+            runreport = f"runs: {args.runs[0]} to {args.runs[1]}"
+        elif len(args.runs)==3: 
+            kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1], args.runs[2] )
+            runreport = f"runs: {args.runs}"
+        else:                   
+            kaedama = kaedama.bake( "--runs", "0", "999999" )
+            runreport = f"runs: 0 to 999999"
 
         list_of_active_rules = args.rules
         if args.rules_file:
@@ -438,6 +447,7 @@ def submit(args):
 
         print( "Active rules: " )
         print( tabulate( [ list_of_active_rules ], ['active rules'], tablefmt=tablefmt ) )
+        print( runreport )
 
         # Execute the specified rules
         for r in list_of_active_rules:
