@@ -58,7 +58,8 @@ arg_parser.add_argument( '--no-submit', help="Job will not be submitted... print
 arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=['26022'] )
 arg_parser.add_argument( '--segments', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[] )
 arg_parser.add_argument( '--config',help="Specifies the yaml configuration file")
-
+arg_parser.add_argument( '--docstring',default=None,help="Appends a documentation string to the log entry")
+arg_parser.add_argument( '--experiment-mode',dest="mode",help="Specifies the experiment mode (commissioing or physics) for direct lookup of input files.",default="physics")
 
 def sanity_checks( params, inputq ):
     result = True
@@ -235,7 +236,7 @@ def main():
         dst_rule = Rule( name              = params['name'],
                          files             = input_query,
                          filesdb           = input_query_db,
-                         direct            = input_query_direct,         
+                         direct            = input_query_direct .format( **vars( args ) ),         
                          runlist           = runlist_query,            # deprecated TODO
                          script            = params['script'],
                          build             = params['build'],
@@ -257,9 +258,12 @@ def main():
 
         batch="batch"
         if args.batch==False:
-            batch="user"
+            batch="user"        
+        if args.docstring:
+            batch=batch + " " + args.docstring
 
         logging.info( f"Dispatched ({batch} {args.runs}) {args.rule}: {params['name']} {dispatched}" )
+        logging.info( f"  with {args}" )
 
 
 if __name__ == '__main__': main()
