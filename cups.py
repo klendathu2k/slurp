@@ -49,9 +49,16 @@ subparsers = parser.add_subparsers(dest="subcommand")
 parser.add_argument( "-v", "--verbose",dest="verbose"   , default=False, action="store_true", help="Sets verbose output")
 parser.add_argument( "--no-update",    dest="noupdate"  , default=False, action="store_true", help="Does not update the DB table")
 parser.add_argument( "-t","--table"  , dest="table"     , default="production_status",help="Sets the name of the production status table table")
-parser.add_argument( "-d","--dstname", dest="dstname"   ,                                                   help="Set the DST name eg DST_CALO_auau1", required=True)
-parser.add_argument( "-r","--run"    , dest="run"       , default=None,help="Sets the run number for the update",required=True)
-parser.add_argument( "-s","--segment", dest="segment"   , default=None,help="Sets the segment number for the update",required=True)
+
+# These are required in a group
+parser.add_argument( "-d","--dstname", dest="dstname"   , default=None, help="Set the DST name eg DST_CALO_auau1" )
+parser.add_argument( "-r","--run"    , dest="run"       , default=None, help="Sets the run number for the update" )
+parser.add_argument( "-s","--segment", dest="segment"   , default=None, help="Sets the segment number for the update")
+
+# Or this one
+parser.add_argument( "--dstfile", dest="dstfile", help="Sets the dstfile key", default=None )
+
+
 parser.add_argument( "--timestamp"   , dest="timestamp" , default=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  ),
                      help="Sets the timestamp, default is now (and highly recommended)" )
 
@@ -90,11 +97,18 @@ def subcommand(args=[], parent=subparsers):
 def argument(*name_or_flags, **kwargs):
     return ([*name_or_flags], kwargs)
 
-def getLatestId( tablename, dstname, run, seg ):
-    query=f"""
-    select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
-    """
-    result = statusdbc.execute(query).fetchone()[0]
+def getLatestId( tablename, dstname, run=None, seg=None ):
+    result=""
+    if run==None:
+        query=f"""
+        select id from {tablename} where dstfile='{dstname}' order by id desc limit 1;
+        """
+        result = statusdbc.execute(query).fetchone()[0]
+    else:
+        query=f"""
+        select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
+        """
+        result = statusdbc.execute(query).fetchone()[0]
     return result
 
 # The submitting and submitted states are handled internally by slurp, and should not be 
@@ -156,12 +170,23 @@ def started(args):
     timestamp=args.timestamp
     run=int(args.run)
     seg=int(args.segment)
-    id_ = getLatestId( tablename, dstname, run, seg )
+
+
     update = f"""
-    update {tablename}
-    set status='started',started='{timestamp}'
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+    update {tablename} set status='started',started='{timestamp}'
     """
+
+    if args.dstfile:
+        id_ = getLatestId( tablename, args.dstfile )
+        update=update+f"""
+        where dstfile='{args.dstfile}' and id={id_}
+        """
+    else:
+        id_ = getLatestId( tablename, dstname, run, seg )
+        update=update+f"""
+        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        """
+
     if args.verbose:
         print(update)
 
@@ -186,12 +211,21 @@ def running(args):
     run=int(args.run)
     seg=int(args.segment)
     nsegments=int(args.nsegments)
-    id_ = getLatestId( tablename, dstname, run, seg )
+
     update = f"""
-    update {tablename}
-    set status='running',running='{timestamp}',nsegments={nsegments}
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+    update {tablename} set status='running',running='{timestamp}',nsegments={nsegments}
     """
+    if args.dstfile:
+        id_ = getLatestId( tablename, args.dstfile )
+        update+=f"""
+        where dstfile='{args.dstfile}' and id={id_}
+        """
+    else:
+        id_ = getLatestId( tablename, dstname, run, seg )
+        update+=f"""
+        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        """
+
     if args.verbose:
         print(update)
 
@@ -218,25 +252,32 @@ def finished(args):
     timestamp=args.timestamp
     run=int(args.run)
     seg=int(args.segment)
-    id_ = getLatestId( tablename, dstname, run, seg )
     ec=int(args.exit)
     ns=int(args.nsegments)
     ne=int(args.nevents)
     state='finished'
     if ec>0:
         state='failed'
+
     if args.inc:
         update = f"""
         update {tablename}
         set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents=nevents+{ne}
-        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
         """
     else:
         update = f"""
         update {tablename}
         set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
-        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
         """
+
+    if args.dstfile:
+        id_ = getLatestId( tablename, args.dstfile )
+        update+=f"where dstfile='{args.dstfile}' and id={id_}"
+    else:
+        id_ = getLatestId( tablename, dstname, run, seg )
+        update+=f"where dstname='{dstname}' and run={run} and segment={seg} and id={id_}"
+
+
     if args.verbose:
         print(update)
 
@@ -259,7 +300,6 @@ def exitcode(args):
     dstname=args.dstname
     run=int(args.run)
     seg=int(args.segment)
-    id_ = getLatestId( tablename, dstname, run, seg )
     ec=int(args.exit)
     state='finished'
     if ec>0:
@@ -267,8 +307,19 @@ def exitcode(args):
     update = f"""
     update {tablename}
     set status='{state}',exit_code={ec}
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
+
+    if args.dstfile:
+        id_ = getLatestId( tablename, args.dstfile )
+        update+=f"""
+        where dstfile='{args.dstfile}' and id={id_}
+        """
+    else:
+        id_ = getLatestId( tablename, dstname, run, seg )
+        update+=f"""
+        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        """
+
     if args.verbose:
         print(update)
 
@@ -292,21 +343,30 @@ def nevents(args):
     dstname=args.dstname
     run=int(args.run)
     seg=int(args.segment)
-    id_ = getLatestId( tablename, dstname, run, seg )
     ne=int(args.nevents)
     update=None
     if args.inc:
         update = f"""
         update {tablename}
         set nevents=nevents+{ne}
-        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
         """
     else:
         update = f"""
         update {tablename}
         set nevents={ne}
+        """
+
+    if args.dstfile:
+        id_ = getLatestId( tablename, args.dstfile )
+        update+=f"""
+        where dstfile='{args.dstfile}' and id={id_}
+        """
+    else:
+        id_ = getLatestId( tablename, dstname, run, seg )
+        update+=f"""
         where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
         """
+
     if args.verbose:
         print(update)
 
@@ -328,15 +388,24 @@ def inputs(args):
     dstname=args.dstname
     run=int(args.run)
     seg=int(args.segment)
-    id_ = getLatestId( tablename, dstname, run, seg )
     inputs = 'unset'
     if len(args.files)>0:
         inputs=' '.join(args.files)
     update = f"""
-    update {tablename}
-    set inputs='{inputs}'
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+    update {tablename} set inputs='{inputs}'
     """
+
+    if args.dstfile:
+        id_ = getLatestId( tablename, args.dstfile )
+        update += f"""
+        where dstfile='{args.dstfile}' and id={id_}
+        """
+    else:
+        id_ = getLatestId( tablename, dstname, run, seg )
+        update += f"""
+        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        """
+
     if args.verbose:
         print(update)
     if args.noupdate:
@@ -355,6 +424,7 @@ def inputs(args):
 #parser.add_argument( "--path", help="path to output file", default="./" )
 
 #_______________________________________________________________________________________________________
+# TODO:  Is this function deprecatable?  Probably yes.
 @subcommand([
     argument( "--replace",    help="remove and replace existing entries.", action="store_true", default=True ),
     argument( "--no-replace", help="remove and replace existing entries.", action="store_false", dest="replace" ),
@@ -535,19 +605,27 @@ def stageout(args):
         run=int(args.run)
         seg=int(args.segment)
         if args.prodtype=="many": seg=0
-        id_ = getLatestId( tablename, dstname, run, seg )
         update=None
         if args.inc:
             update = f"""
             update {tablename}
             set nevents=nevents+{args.nevents}
-            where dstname='{dstname}' and run={run} and segment={seg} and id={id_};
             """
         else:
             update = f"""
             update {tablename}
             set nevents={args.nevents}
-            where dstname='{dstname}' and run={run} and segment={seg} and id={id_};
+            """
+
+        if args.dstfile:
+            id_ = getLatestId( tablename, args.dstfile )
+            update += f"""
+            where dstfile='{args.dstfile}' and id={id_}
+            """
+        else:
+            id_ = getLatestId( tablename, dstname, run, seg )
+            update += f"""
+            where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
             """
 
         statusdbc.execute( update )
@@ -569,6 +647,7 @@ def stagein(args):
 
 
 #_______________________________________________________________________________________________________
+# TODO: Deprecatable?  Yes.
 @subcommand([
     argument( "script",       help="name of the script to exeute"),
     argument( "scriptargs",   help="arguments for the script", nargs="*" ),
@@ -616,7 +695,11 @@ def quality(args):
     dstname   = args.dstname
     run       = int( args.run )
     segment   = int( args.segment )
-    id_       = getLatestId( tablename, dstname, run, segment )    # the corresponding production status entry
+    id_       = 0
+    if args.dstfile:
+        id_ = getLatestId( tablename, args.dstfile )    # the corresponding production status entry
+    else:
+        id_ = getLatestId( tablename, dstname, run, segment )    # the corresponding production status entry
     qastring  = None
     with open( args.qafile, 'r') as qafile:
         qastring = str( json.load( qafile ) )
