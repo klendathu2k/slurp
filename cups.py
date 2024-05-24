@@ -423,6 +423,18 @@ def catalog(args):
     fcc.execute(insert)
     fcc.commit()
 
+@subcommand([
+    argument( "message", help="Message to be appended to the production status entry"),
+])
+def message(args):
+    """
+    Sets message field on the production status table
+    """
+    id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
+    update = f"update {args.table}    set message='{args.message}'    where id={id_};"
+    statusdbc.execute( update )
+    statusdbc.commit()
+
 #_______________________________________________________________________________________________________
 @subcommand([
     argument( "filename", help="Name of the file to be staged out"),
@@ -540,14 +552,14 @@ def stageout(args):
         if args.inc:
             update = f"""
             update {tablename}
-            set nevents=nevents+{args.nevents},nsegments=nsegments+1
-            where dstname='{dstname}' and run={run} and segment={seg} and id={id_};
+            set nevents=nevents+{args.nevents},nsegments=nsegments+1,message='last stageout {filename}'
+            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
             """
         else:
             update = f"""
             update {tablename}
-            set nevents={args.nevents},nsegments=nsegments+1
-            where dstname='{dstname}' and run={run} and segment={seg} and id={id_};
+            set nevents={args.nevents},nsegments=nsegments+1,message='last stageout {filename}'
+            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
             """
 
         statusdbc.execute( update )
