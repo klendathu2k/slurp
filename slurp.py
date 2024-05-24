@@ -24,6 +24,8 @@ from dataclasses import dataclass, asdict, field
 
 from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
 
+import logging
+
 # List of states which block the job
 blocking = ["submitting","submitted","started","running","evicted","failed","finished"]
 #blocking = []
@@ -82,7 +84,7 @@ class SPhnxCondorJob:
     should_transfer_files: str = "YES"
     output_destination:    str = "file://./output/"
     #output_destination:    str = "file:////sphenix/data/data02/sphnxpro/condorlog/$$($(run)/100)00"
-    when_to_transfer_output: str = "ON_EXIT_OR_EVICT"
+    when_to_transfer_output: str = "ON_EXIT"
     request_disk:          str = None    
     initialdir:            str = None
     accounting_group:      str = None
@@ -93,6 +95,7 @@ class SPhnxCondorJob:
     
     transfer_input_files:  str = None
     user_job_wrapper:      str = None
+    max_retries:           str = "0"  # default to no retries
 
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v }
@@ -161,6 +164,8 @@ class SPhnxMatch:
     inputs:   str = None;
     ranges:   str = None;
     rungroup: str = None;
+    #intputfile: str = None;
+    #outputfile: str = None;
 
     
 
@@ -174,7 +179,7 @@ class SPhnxMatch:
         b = b.replace(".","")
         object.__setattr__(self, 'build', b)                
         run = int(self.run)
-        object.__setattr__(self, 'rungroup', f'{100*math.floor(run/100):08d}_{100*math.ceil(run/100):08d}')
+        object.__setattr__(self, 'rungroup', f'{100*math.floor(run/100):08d}_{100*math.ceil((run+1)/100):08d}')
 
         #sldir = "/tmp/slurp/%i"%( math.trunc(run/100)*100 )
         #if self.condor == None: object.__setattr__(self, 'condor', sldir )
@@ -211,9 +216,9 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
     
     if table_exists( name ):
 
-        query = f"select * from {name} where prod_id={setup.id}"
-        if ( runmn>runmx ): query = query + f" and run>={runmn};"
-        else              : query = query + f" and run>={runmn} and run<={runmx};"
+        query = f"select * from {name} "
+        if ( runmn>runmx ): query = query + f" where run>={runmn};"
+        else              : query = query + f" where run>={runmn} and run<={runmx};"
 
         dbresult = statusdbr.execute( query ).fetchall();
 
@@ -377,7 +382,7 @@ def submit( rule, **kwargs ):
     jobd = rule.job.dict()
 
 
-    for outname in [ 'outdir', 'logdir', 'condor']:
+    for outname in [ 'outdir', 'logdir', 'condor', 'histdir' ]:
 
         outdir=kwargs.get(outname,None)
         if outdir==None: continue
@@ -387,22 +392,10 @@ def submit( rule, **kwargs ):
         outdir = outdir.replace( '$(rungroup)', '{rungroup}')
         outdir = f'f"{outdir}"'
         for run in runlist:
-            rungroup=f'{100*math.floor(run/100):08d}_{100*math.ceil(run/100):08d}'
+            mnrun = 100 * ( math.floor(run/100) )
+            mxrun = mnrun+100
+            rungroup=f'{mnrun:08d}_{mxrun:08d}'
             pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
-
-    #pprint.pprint(jobd)
-        # This is calling for a regex... 
-#$$        outdir = outdir.replace( "$$([", "{math.floorOPAR" ) # start of condor expr becomes start of python format expression
-#$$$       outdir = outdir.replace( "])",   "CPAR:06d}" ) # end of condor expr ...
-#$$        outdir = outdir.replace( "])",   "CPAR}" ) # end of condor expr ...
-#$$        outdir = outdir.replace( "$(", "" )    # condor macro "run" becomes local variable run.... hork.
-#$$        outdir = outdir.replace( ")",  "" )
-#$$        outdir = outdir.replace( "OPAR", "(" )
-#$$        outdir = outdir.replace( "CPAR", ")" )
-
-#$$        outdir = f'f"{outdir}"'
-#$$        for run in runlist:
-#$$            pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
     
     submit_job = htcondor.Submit( jobd )
 
@@ -410,6 +403,8 @@ def submit( rule, **kwargs ):
         INFO(submit_job)
         for m in matching:
             pprint.pprint(m)
+
+    dispatched_runs = []
 
     if dump==False:
         if verbose==-10:
@@ -430,7 +425,7 @@ def submit( rule, **kwargs ):
                 if k in str(submit_job):
                     d[k] = v
             mymatching.append(d)        
-            #pprint.pprint(m)
+            dispatched_runs.append( (d['run'],d['seg']) )
 
 
         
@@ -486,7 +481,7 @@ def submit( rule, **kwargs ):
                 line = ','.join(line)                
                 f.write(line+"\n")
 
-    return result                
+    return dispatched_runs
 
 def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
     """
@@ -608,9 +603,7 @@ def matches( rule, kwargs={} ):
                 ERROR(f"Run number {run}-{segment} reached twice in this query...")
                 ERROR(rule.files)
                 exit(1)
-
             
-
         fc_map = { f.runnumber : f for f in fc_result }
 
     # Build lists of PFNs available for each run
@@ -639,6 +632,8 @@ def matches( rule, kwargs={} ):
 
     #
     # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
+    # N.b. Output file naming convention is fixed as DST_TYPE_system-run#-seg#.ext... so something having a run
+    # range may end up outside of the schema.
     #
     outputs = [ "%s_%s_%s-%08i-%04i.root"%(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
 
@@ -660,7 +655,6 @@ def matches( rule, kwargs={} ):
     #
     repo_dir  = payload #'/'.join(payload.split('/')[1:]) 
     repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
-    #repo_url  = sh.git('config','--get','remote.origin.url',_cwd="MDC2/submit/rawdata/caloreco/rundir/").rstrip()  # TODO: fix hardcoded directory
     repo_url  = sh.git('config','--get','remote.origin.url',_cwd=payload ).rstrip()  # TODO: fix hardcoded directory
 
     setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
@@ -678,8 +672,9 @@ def matches( rule, kwargs={} ):
     prod_status_map = {}
     for stat in prod_status:
         # replace with sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
-        file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        
-        prod_status_map[file_basename] = stat.status
+        file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        # Not even sure how this was working???  This is the filename of the proposed job
+        fbn = stat.dstfile
+        prod_status_map[fbn] = stat.status  # supposed to be the map of the jobs which are in the production database to the filename of that job
 
     #
     # Build the list of matches.  We iterate over the fc_result zipped with the set of proposed outputs
@@ -690,6 +685,8 @@ def matches( rule, kwargs={} ):
 
         #
         # Get the production status from the proposed output name
+        #
+        # TODO: Shouldn't we replace all suffixes here?
         #
         x    = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )

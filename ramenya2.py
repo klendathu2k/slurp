@@ -15,6 +15,7 @@ import dateutil.parser
 from colorama import Fore, Back, Style, init
 from tqdm import tqdm
 import pydoc
+
 import htcondor
 import classad
 
@@ -45,7 +46,7 @@ def apply_colorization(row,default_color=(Back.RESET,Fore.GREEN),fail_color=(Bac
 
     color=f"{default_color[0]}{default_color[1]}{Style.BRIGHT}"
     reset=f"{Fore.RESET}{Back.RESET}{Style.RESET_ALL}"
-    if getattr( row, 'num_failed', 0)>0 or "Held" in row:
+    if getattr( row, 'num_failed', 0)>0 or "Held" in row or " day " in str(getattr(row,"last_start","")):
         color=f"{fail_color[0]}{fail_color[1]}{Style.BRIGHT}"
         reset=f"{Fore.RESET}{Back.RESET}{Style.RESET_ALL}"
     myrow = [ 
@@ -142,18 +143,26 @@ def query_pending_jobs( conditions="" ):
     order by dsttype desc
     ;
     """    
-    results = statusdbr.execute(psqlquery);
-    #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    table = [colorize(r) for r in results]
-    print( tabulate( table, labels, tablefmt=tablefmt ) )
+    try:
+        results = statusdbr.execute(psqlquery);
+        #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        table = [colorize(r) for r in results]
+        print( tabulate( table, labels, tablefmt=tablefmt ) )
+    except pyodbc.OperationalError: 
+        print("... could not query the db ... skipping report")
+        pass
+    except pyodbc.ProgrammingError:
+        print("... could not query the db ... skipping report")
+        pass
+
 
 
 def query_started_jobs(conditions=""):
     print("Summary of jobs which have reached staus='started'")
     #print("--------------------------------------------------")
     psqlquery=f"""
-    select dsttype,prod_id,
+    select dsttype,
     count(run)                      as num_jobs,
     avg(age(started,submitting))    as avg_time_to_start,
     count( case status when 'submitted' then 1 else null end )
@@ -165,35 +174,40 @@ def query_started_jobs(conditions=""):
     count( case status when 'failed' then 1 else null end )
     as num_failed,
     avg(age(ended,started))         as avg_job_duration,
-    min(age(ended,started))         as min_job_duration,
-    max(age(ended,started))         as max_job_duration,
+    max(started           )         as last_job_started,
+    max(ended             )         as last_job_finished,
     sum(nevents)                    as sum_events
        
     from   production_status 
     where  status>='started' and submitted>'{timestart}'
      {conditions}
-    group by dsttype,prod_id
+    group by dsttype
     order by dsttype desc
     ;
     """
-    results = statusdbr.execute(psqlquery);
-    #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    table = [colorize(r,fail_color=(Back.YELLOW,Fore.BLACK)) for r in results]
-    vistable = tabulate( table, labels, tablefmt=tablefmt ) 
-    print( vistable )
+    vistable="...could not make db query..."
+    try:
+        results = statusdbr.execute(psqlquery);
+        #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        table = [colorize(r,fail_color=(Back.YELLOW,Fore.BLACK)) for r in results]
+        vistable = tabulate( table, labels, tablefmt=tablefmt ) 
+        print( vistable )
+    except pyodbc.OperationalError: 
+        pass
+    except pyodbc.ProgrammingError:
+        pass
     return vistable
 
 def query_jobs_by_cluster(conditions=""):
     print("Summary of jobs by condor cluster")
-#               min(age(ended,started))         as min_job_duration,
-#               max(age(ended,started))         as max_job_duration,
     psqlquery=f"""
             select dsttype,cluster,
                min(run) as min_run,
                max(run) as max_run,
                count(run)                      as num_jobs,
                min(started)                    as earliest_start,
+               max(started)                    as last_start,
                avg(age(started,submitting))    as avg_time_to_start,
                count( case status when 'submitted' then 1 else null end )
                                                as num_submitted,
@@ -207,33 +221,48 @@ def query_jobs_by_cluster(conditions=""):
                sum(nevents)                    as sum_events
        
             from   production_status 
-            where  status>='started'   and submitted>'{timestart}'
+            where  status>='started'   and submitted>'{timestart}'  and status<'failed'
             {conditions}
             group by dsttype,cluster
             order by dsttype desc
                ;
     """
-    results = statusdbr.execute(psqlquery);
+    try:
+        results = statusdbr.execute(psqlquery);
 
-    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    table = [colorize(r) for r in results]
-    print( tabulate( table, labels, tablefmt=tablefmt ) )
+        labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        table = [colorize(r) for r in results]
+        print( tabulate( table, labels, tablefmt=tablefmt ) )
+    except pyodbc.OperationalError: 
+        print("... could not query the db ... skipping report")
+        pass
+    except pyodbc.ProgrammingError:
+        print("... could not query the db ... skipping report")
+        pass
 
 def query_failed_jobs(conditions="", title="Summary of failed jobs by run"):
     print(title)
     psqlquery=f"""
-            select dstname,run,segment,cluster,process,prod_id
+            select dstname,prod_id,string_agg( to_char(run,'FM00000000')||'-'||to_char(segment,'FM0000'),' ' )
             from   production_status 
             where  status='failed'   and submitted>'{timestart}'
             {conditions}
-            order by run
+            group by dstname,prod_id
+            order by prod_id
                ;
     """
-    results = statusdbr.execute(psqlquery);
-    #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    table = [colorize(r,default_color=(Back.RED,Fore.WHITE)) for r in results]
-    print( tabulate( table, labels, tablefmt=tablefmt ) )
+    try:
+        results = statusdbr.execute(psqlquery);
+        #labels  = [ f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        table = [colorize(r,default_color=(Back.RED,Fore.WHITE)) for r in results]
+        print( tabulate( table, labels, tablefmt=tablefmt ) )
+    except pyodbc.OperationalError: 
+        print("... could not query the db ... skipping report")
+        pass
+    except pyodbc.ProgrammingError:
+        print("... could not query the db ... skipping report")
+        pass
 
 
 def query_jobs_by_run(conditions="", title="Summary of jobs by run" ):
@@ -247,30 +276,43 @@ def query_jobs_by_run(conditions="", title="Summary of jobs by run" ):
             order by run
                ;
     """
-    print(psqlquery)
-    results = statusdbr.execute(psqlquery);
-    #for r in results:
-    #    print(f"{r.cluster} {r.process}")
+    #print(psqlquery)
+    try:
+        results = statusdbr.execute(psqlquery);
+        #for r in results:
+        #    print(f"{r.cluster} {r.process}")
 
-    #labels  = [ c[0] for c in statusdbr.description ]
-    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
-    table = [colorize(r) for r in results]
+        #labels  = [ c[0] for c in statusdbr.description ]
+        labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ]
+        table = [colorize(r) for r in results]
 
-    print( tabulate( table, labels, tablefmt=tablefmt ) )
+        print( tabulate( table, labels, tablefmt=tablefmt ) )
+    except pyodbc.OperationalError: 
+        print("... could not query the db ... skipping report")
+        pass
+    except pyodbc.ProgrammingError:
+        print("... could not query the db ... skipping report")
+        pass
 
-def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor state" ):
+def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor state",  ):
     print(title)
 #              count(run)                      as num_jobs,
     psqlquery=f"""
-            select dsttype,run,segment,status,cluster,process
+            select dsttype,run,segment,status,cluster,process,prod_id
             from   production_status 
-            where  status>='started'   and submitted>'{timestart}' and status!='finished'
+            where  status>='started' and submitted>'{timestart}' and status!='finished'
             {conditions}
             order by run
                ;
     """
-    print(psqlquery)
-    results = statusdbr.execute(psqlquery);
+    try:
+        results = statusdbr.execute(psqlquery);
+    except pyodbc.OperationalError: 
+        print("... could not query the db ... skipping report")
+        return
+    except pyodbc.ProgrammingError:
+        print("... could not query the db ... skipping report")
+        return
 
     schedd = htcondor.Schedd() 
     condor_job_status_map = {
@@ -287,7 +329,7 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
 #       constraint=f"(ClusterId=={r.cluster})&&(ProcId=={r.process})",
         projection=["ClusterId","ProcId","JobStatus","HoldReasonCode","HoldReasonSubcode","HoldReason","EnteredCurrentStatus","ExecutableSize"]
     )
-    #print(condor_query)
+
 
     condor_results = {}
 
@@ -323,8 +365,7 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
         process_entry["execsize"]=execsize
         process_entry["enteredcurrentstatus"]=str( datetime.datetime.utcfromtimestamp(enteredcurrentstatus) )
         process_entry["holdreasoncode"]=holdreasoncode
-        process_entry["holdreasonsubcode"]=holdreasonsubcode
-        
+        process_entry["holdreasonsubcode"]=holdreasonsubcode        
 
     merged = []
     for r in results:
@@ -336,7 +377,6 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
 
         process_entry = cluster_entry.get( int(r.process), None )
         if process_entry==None:
-#            print(f"{r.process} has no cluster entry")
             continue
 
         myresults = [ i for i in r ]
@@ -348,16 +388,9 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
             process_entry["holdreasonsubcode"],
             ]
 
-        merged.append( myresults + extend )
+        merged.append( myresults + extend )    
 
- 
-
-    
-
-
-        
-    #labels  = [ c[0] for c in statusdbr.description ]
-    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ] + ["condor status","at","hold code","..."]
+    labels  = [ c[0] if args.html else f"{Style.BRIGHT}{c[0]}{Style.RESET_ALL}" for c in statusdbr.description ] + ["condor status","at","hold code","sub code"]
     table = [colorize(r) for r in merged]
 
     print( tabulate( table, labels, tablefmt=tablefmt ) )
@@ -371,7 +404,7 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
     argument( "--rules", default=[], nargs="?", help="Sets the name of the rule to be used"),
     argument( "--rules-file", dest="rules_file", default=None, help="If specified, read the list of active rules from the given file on each pass of the loop" ),
     argument( "--timestart",default=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),help="Specifies UTC timestamp (in ISO format, e.g. YYYY-MM-DD) for query.", type=dateutil.parser.parse),
-    argument( "--test",default=False,help=argparse.SUPPRESS,action="store_true") # kaedama will be submitted in batch mode
+    argument( "--test",default=False,help=argparse.SUPPRESS,action="store_true"), # kaedama will be submitted in batch mode
     argument( "SLURPFILE",   help="Specifies the slurpfile(s) containing the job definitions" )
 ])
 def submit(args):
@@ -389,10 +422,19 @@ def submit(args):
 
     while ( go ):
 
-        if   len(args.runs)==1: kaedama = kaedama.bake( runs=args.runs[0] )
-        elif len(args.runs)==2: kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1] )
-        elif len(args.runs)==3: kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1], args.runs[2] )
-        else:                   kaedama = kaedama.bake( "--runs", "0", "999999" )
+        runreport = ""
+        if   len(args.runs)==1: 
+            kaedama = kaedama.bake( runs=args.runs[0] )
+            runreport = f"runs: {args.runs[0]}"
+        elif len(args.runs)==2: 
+            kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1] )
+            runreport = f"runs: {args.runs[0]} to {args.runs[1]}"
+        elif len(args.runs)==3: 
+            kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1], args.runs[2] )
+            runreport = f"runs: {args.runs}"
+        else:                   
+            kaedama = kaedama.bake( "--runs", "0", "999999" )
+            runreport = f"runs: 0 to 999999"
 
         list_of_active_rules = args.rules
         if args.rules_file:
@@ -405,6 +447,7 @@ def submit(args):
 
         print( "Active rules: " )
         print( tabulate( [ list_of_active_rules ], ['active rules'], tablefmt=tablefmt ) )
+        print( runreport )
 
         # Execute the specified rules
         for r in list_of_active_rules:
@@ -412,8 +455,8 @@ def submit(args):
 
         query_pending_jobs()
         query_started_jobs()
-        query_jobs_by_cluster()
-        query_failed_jobs()
+        # query_jobs_by_cluster()
+        # query_failed_jobs()
 
         if args.loop==False: break
         for i in tqdm( range( args.delay * 10), desc="Next submit" ):
@@ -427,12 +470,22 @@ query_choices=[
     "failed",
 ]
 
+
+fmap = {
+    "pending" : query_pending_jobs,
+    "started" : query_started_jobs,
+    "clusters" : query_jobs_by_cluster,
+    "runs" : query_jobs_by_run,
+    "failed": query_failed_jobs,
+    "condor": query_jobs_by_condor,
+}
+
 @subcommand([
     argument( '--runs',  nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[0,999999] ),
     argument( "--loop", default=False, action="store_true", help="Run query in loop with default 5min delay"),
     argument( "--delay", default=300, help="Set the loop delay",type=int),
     argument( "--dstname", default=["all"], nargs="+", help="Specifies one or more dstnames to select on the display query" ),
-    argument( "--reports", default=["started"], nargs="+", help="Queries the status DB and produces summary reports"),
+    argument( "--reports", default=["started"], nargs="+", help="Queries the status DB and produces summary reports",choices=fmap.keys()),
     argument( "--timestart",default=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),help="Specifies UTC timestamp (in ISO format, e.g. YYYY-MM-DD) for query.", type=dateutil.parser.parse)
 
 ])
@@ -442,17 +495,6 @@ def query(args):
     """
     global timestart
     timestart=str(args.timestart)
-
-
-    fmap = {
-        "pending" : query_pending_jobs,
-        "started" : query_started_jobs,
-        "clusters" : query_jobs_by_cluster,
-        "runs" : query_jobs_by_run,
-        "failed": query_failed_jobs,
-        "condor": query_jobs_by_condor,
-    }
-
 
     go = True
     while ( go ):

@@ -16,17 +16,31 @@ from slurp import daqc
 import sh
 import sys
 import re
+import os
+
+import platform
 
 from slurp import cursors
 
-
-#from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
 import logging
+from logging.handlers import RotatingFileHandler
+RotFileHandler = RotatingFileHandler(
+    filename='kaedama.log', 
+    mode='a',
+    maxBytes=5*1024*1024,
+#   maxBytes=5*1024,
+    backupCount=10,
+    encoding=None,
+    delay=0
+)
+
+# n.b. Adding the stream handler will echo to stdout
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler("kaedama.log"),
+        #logging.FileHandler("kaedama.log"),
+        RotFileHandler,
         logging.StreamHandler()
     ]
 )
@@ -44,7 +58,8 @@ arg_parser.add_argument( '--no-submit', help="Job will not be submitted... print
 arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=['26022'] )
 arg_parser.add_argument( '--segments', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[] )
 arg_parser.add_argument( '--config',help="Specifies the yaml configuration file")
-
+arg_parser.add_argument( '--docstring',default=None,help="Appends a documentation string to the log entry")
+arg_parser.add_argument( '--experiment-mode',dest="mode",help="Specifies the experiment mode (commissioing or physics) for direct lookup of input files.",default="physics")
 
 def sanity_checks( params, inputq ):
     result = True
@@ -54,9 +69,18 @@ def sanity_checks( params, inputq ):
     # extract the dst type, name, run, etc... based on the positions of fields separated
     # by the underscores and/or dashes.
     #
+    # These stageout.sh scripts are reasonably general, but limited in the way that they
+    # are extracting information from the filename.  The assume that the dst type, build,
+    # etc... can be extracted from fixed positions relative to the '_' in the filename.
+    # (and the filename are based on the params.name checked here...)
+    #
+    # We ought to be able to extend this for new workflows, so long as we generalize the 
+    # stageout script.  Once we generalize said script, we should be able to bring that
+    # script into the old workflows... and then not worry.
+    #
 
     # Name should be of the form DST_NAME_runXauau
-    if re.match( "DST_[A-Z]+_[a-z0-9]+", params['name'] ) == None:
+    if re.match( "[A-Z][A-Z][A-Z]_([A-Z]+_)+[a-z0-9]+", params['name'] ) == None:
         logging.error( f'params.name {params["name"]} does not respect the sPHENIX convention:  DST_NAME_run<N>species' )
         result = False
 
@@ -81,12 +105,34 @@ def sanity_checks( params, inputq ):
     
     
     return result
+
+idw = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
+
+def dbconsistency():
+    idr = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
+    return (idr,idw)
     
 
 def main():
 
     # parse command line options
     args, userargs = slurp.parse_command_line()
+
+
+    # require consistent database
+    (idr, idw) = dbconsistency()
+    count=0
+    while idr < idw:
+        logging.warning(f"DB inconsistency.  Master at {idw} replica at {idr}.")
+        if count==5: 
+            logging.warning("Timeout after 5 min")
+            return
+        count=count+1
+        time.sleep(60)
+        (idr, idw) = dbconsistency()        
+
+    logging.info(f"Executing kaedama on {platform.node()} pid {os.getpid()}")
+    logging.info(f"DB consistency.  Master at {idw} replica at {idr}.")
 
     config={}
     with open(args.config,"r") as stream:
@@ -100,7 +146,7 @@ def main():
         run_condition = f"and runnumber={args.runs[0]}"
     elif len(args.runs)==2:
         run_condition = f"and runnumber>={args.runs[0]} and runnumber<={args.runs[1]}"
-    elif len(args.runs)==3:
+    elif len(args.runs)>=3:
         run_condition = "and runnumber in ( %s )" % ','.join( args.runs )
 
     seg_condition = ""
@@ -108,7 +154,7 @@ def main():
         seg_condition = f"and segment={args.segments[0]}"
     elif len(args.segments)==2:
         seg_condition = f"and segment>={args.segments[0]} and segment<={args.segments[1]}"
-    elif len(args.segments)==3:
+    elif len(args.segments)>=3:
         seg_condition = "and segment in ( %s )" % ','.join( args.segments )
 
     limit_condition=""
@@ -116,13 +162,23 @@ def main():
         limit_condition = f"limit {args.limit}"
         
     # Reduce configuration to this rule
-    config = config[ args.rule ]
+    try:
+        config = config[ args.rule ]
+    except KeyError:
+        logging.error(f"Could not locate '{args.rule}' in configuration file")
+        pprint.pprint( config.keys() )
+        return
+
+    logging.info( f"Executing rule {args.rule} where ... {run_condition} {seg_condition} {limit_condition}" )
 
     # Input query specifies the source of the input files
     input_         = config.get('input')
     input_query    = input_.get('query','').format(**locals())
     input_query_db = input_.get('db',None)
     input_query_direct = input_.get('direct_path',None)
+    if input_query_direct is not None:
+        input_query_direct = input_query_direct.format( **vars( args ) )
+
 
     runlist_query = config.get('runlist_query','').format(**locals())
     params        = config.get('params',None)
@@ -183,7 +239,7 @@ def main():
         dst_rule = Rule( name              = params['name'],
                          files             = input_query,
                          filesdb           = input_query_db,
-                         direct            = input_query_direct,         
+                         direct            = input_query_direct,
                          runlist           = runlist_query,            # deprecated TODO
                          script            = params['script'],
                          build             = params['build'],
@@ -193,10 +249,24 @@ def main():
                          limit             = args.limit
                      )
 
-        # Extract the subset of parameters that we need to pass to submit
+        #
+        # Extract the subset of parameters that we need to pass to submit.  Note that (most) submitkw
+        # arguments will be passed down to the matches function in the kwargs dictionary.
+        #
         submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump", "neventsper"] }
 
-        submit (dst_rule, nevents=args.nevents, **submitkw, **filesystem ) 
+        dispatched = submit (dst_rule, nevents=args.nevents, **submitkw, **filesystem ) 
+        #for run in dispatched:
+            #name_ = params['name']
+
+        batch="batch"
+        if args.batch==False:
+            batch="user"        
+        if args.docstring:
+            batch=batch + " " + args.docstring
+
+        logging.info( f"Dispatched ({batch} {args.runs}) {args.rule}: {params['name']} {dispatched}" )
+        logging.info( f"  with {args}" )
 
 
 if __name__ == '__main__': main()

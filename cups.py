@@ -205,7 +205,8 @@ def running(args):
 @subcommand([
     argument("-e","--exit",help="Exit code of the payload macro",dest="exit",default=-1),
     argument(     "--nsegments",help="Number of segments produced",dest="nsegments",default=1),
-    argument(     "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0)
+    argument(     "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
+    argument(     "--inc", help="If set, increments the number of events",dest="inc",default=False,action="store_true"),
 ])
 def finished(args):
     """
@@ -224,11 +225,18 @@ def finished(args):
     state='finished'
     if ec>0:
         state='failed'
-    update = f"""
-    update {tablename}
-    set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    """
+    if args.inc:
+        update = f"""
+        update {tablename}
+        set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents=nevents+{ne}
+        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        """
+    else:
+        update = f"""
+        update {tablename}
+        set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
+        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        """
     if args.verbose:
         print(update)
 
@@ -274,6 +282,7 @@ def exitcode(args):
 #_______________________________________________________________________________________________________
 @subcommand([
     argument(     "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
+    argument(     "--inc",  help="Sets increment mode",default=False,action="store_true"),
 ])
 def nevents(args):
     """
@@ -285,11 +294,19 @@ def nevents(args):
     seg=int(args.segment)
     id_ = getLatestId( tablename, dstname, run, seg )
     ne=int(args.nevents)
-    update = f"""
-    update {tablename}
-    set nevents={ne}
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    """
+    update=None
+    if args.inc:
+        update = f"""
+        update {tablename}
+        set nevents=nevents+{ne}
+        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        """
+    else:
+        update = f"""
+        update {tablename}
+        set nevents={ne}
+        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        """
     if args.verbose:
         print(update)
 
@@ -406,6 +423,18 @@ def catalog(args):
     fcc.execute(insert)
     fcc.commit()
 
+@subcommand([
+    argument( "message", help="Message to be appended to the production status entry"),
+])
+def message(args):
+    """
+    Sets message field on the production status table
+    """
+    id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
+    update = f"update {args.table}    set message='{args.message}'    where id={id_};"
+    statusdbc.execute( update )
+    statusdbc.commit()
+
 #_______________________________________________________________________________________________________
 @subcommand([
     argument( "filename", help="Name of the file to be staged out"),
@@ -413,12 +442,10 @@ def catalog(args):
     argument( "--retries", help="Number of retries before silent failure", type=int, default=1 ),
     argument( "--hostname", help="host name of the filesystem", default="lustre", choices=["lustre","gpfs"] ),
     argument( "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
+    argument(     "--inc", help="If set, increments the number of events",dest="inc",default=False,action="store_true"),
     argument( "--dataset", help="sets the name of the dataset", default="test" ),
     argument( "--dsttype", help="sets the sphenix dsttype", default=None ),
-    #argument( "--add-to-files",    dest="add_to_files", help="Adds to the file catalog", default=True, action="store_true"),
-    #argument( "--no-add-to-files", dest="add_to_files", help="Do not add to the file catalog", action="store_false"),
-    #argument( "--add-to-datasets",    dest="add_to_datasets", help="Adds to the file catalog", default=True, action="store_true"),
-    #argument( "--no-add-to-datasets", dest="add_to_datasets", help="Do not add to the file catalog", action="store_false"),    
+    argument( "--prodtype", dest="prodtype", help="sets the production type of the job...", required=True, choices=["many","only"] )
 ])
 def stageout(args):
     """
@@ -431,8 +458,9 @@ def stageout(args):
     if args.verbose:
         print("Copy back file")
 
+    # Copy the file
     shutil.copy2( f"{args.filename}", f"{args.outdir}" )
-    # md5check = md5sum( f"{args.outdir}/{args.filename}" )
+
     sz  = int( os.path.getsize(f"{args.outdir}/{args.filename}") ) 
 
     if args.verbose:
@@ -488,7 +516,6 @@ def stageout(args):
         fcc.commit()
 
 
-
         # Insert into datasets primary key: (filename,dataset)
         if args.verbose:
             print("Insert into datasets")
@@ -510,6 +537,34 @@ def stageout(args):
 
         fcc.execute(insert)
         fcc.commit()
+
+
+        # Add to nevents in the production status
+        if args.verbose:
+            print("Update nevents")
+        tablename=args.table
+        dstname=args.dstname
+        run=int(args.run)
+        seg=int(args.segment)
+        if args.prodtype=="many": seg=0
+        id_ = getLatestId( tablename, dstname, run, seg )
+        update=None
+        if args.inc:
+            update = f"""
+            update {tablename}
+            set nevents=nevents+{args.nevents},nsegments=nsegments+1,message='last stageout {filename}'
+            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
+            """
+        else:
+            update = f"""
+            update {tablename}
+            set nevents={args.nevents},nsegments=nsegments+1,message='last stageout {filename}'
+            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
+            """
+
+        statusdbc.execute( update )
+        statusdbc.commit()
+
 
         # and remove the file
         if args.verbose:
