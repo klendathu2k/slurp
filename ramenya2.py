@@ -406,6 +406,7 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
     argument( "--timestart",default=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),help="Specifies UTC timestamp (in ISO format, e.g. YYYY-MM-DD) for query.", type=dateutil.parser.parse),
     argument( "--test",default=False,help=argparse.SUPPRESS,action="store_true"), # kaedama will be submitted in batch mode
     argument( "--experiment-mode", default=None, help="Sets experiment-mode for kaedama", dest="mode" ),
+    argument( "--resubmit", default=False, action="store_true", help="Adds the -r option to kaedama" ),
     argument( "SLURPFILE",   help="Specifies the slurpfile(s) containing the job definitions" )
 ])
 def submit(args):
@@ -422,22 +423,24 @@ def submit(args):
         kaedama = kaedama.bake( "--batch" )
     if args.mode is not None:
         kaedama = kaedama.bake( "--experiment-mode", args.mode )
+    if args.resubmit:
+        kaedama.bake( "-r ")
+
+    runreport = ""
+    if   len(args.runs)==1: 
+        kaedama = kaedama.bake( runs=args.runs[0] )
+        runreport = f"runs: {args.runs[0]}"
+    elif len(args.runs)==2: 
+        kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1] )
+        runreport = f"runs: {args.runs[0]} to {args.runs[1]}"
+    elif len(args.runs)==3: 
+        kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1], args.runs[2] )
+        runreport = f"runs: {args.runs}"
+    else:                   
+        kaedama = kaedama.bake( "--runs", "0", "999999" )
+        runreport = f"runs: 0 to 999999"
 
     while ( go ):
-
-        runreport = ""
-        if   len(args.runs)==1: 
-            kaedama = kaedama.bake( runs=args.runs[0] )
-            runreport = f"runs: {args.runs[0]}"
-        elif len(args.runs)==2: 
-            kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1] )
-            runreport = f"runs: {args.runs[0]} to {args.runs[1]}"
-        elif len(args.runs)==3: 
-            kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1], args.runs[2] )
-            runreport = f"runs: {args.runs}"
-        else:                   
-            kaedama = kaedama.bake( "--runs", "0", "999999" )
-            runreport = f"runs: 0 to 999999"
 
         list_of_active_rules = args.rules
         if args.rules_file:
