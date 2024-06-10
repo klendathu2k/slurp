@@ -348,7 +348,6 @@ def submit( rule, **kwargs ):
     matching, setup, runlist = matches( rule, kwargs )
 
     if len(matching)==0:
-        WARN("No input files match the specifed rule.")
         return result
 
     #
@@ -803,6 +802,10 @@ def matches( rule, kwargs={} ):
             #
             if rule.limit and len(result)>= rule.limit:
                 break    
+
+    if len(result)==0:
+        WARN("No input files match the specifed rule.")
+        
 
     return result, setup, list_of_runs
 
