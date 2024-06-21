@@ -143,3 +143,40 @@ def sphnx_production_quality_table_def():
 
     );
     """
+
+
+#_____________________________________
+def sphnx_production_dataset():
+
+    return """
+    CREATE TABLE if not exists DATASET_STATUS (
+       id        serial      unique  
+    ,  dstname   varchar(32) not null 
+    ,  run       int         not null
+    ,  lastrun   int         default 0
+    ,  revision  int         default 0      -- incremented each time the dataset is resubmitted
+    ,  nsegments int         default 0      -- total number of segments (files) produced in this dataset
+    ,  parent    text        default 'DAQ'  -- parent dataset (upgrade? comma separated list of datasets?)
+    ,  created   timestamp                  -- timestamp when the dataset was created (job submitted by kaedama)
+    ,  updated   timestamp                  -- timestamp for the last update (file added to the dataset)
+    ,  finalized timestamp                  -- timestamp when the dataset is finalized (event builder ends / downstream job produces last segment)
+    ,  status    text                       -- arbitrary status string
+    ,  blame     text                       -- who updated the status
+    ,  primary key(id,dstname,run)
+    );
+    """
+
+@dataclass( frozen=True )
+class SPhnxDatasetStatus:
+    id: int
+    dstname: str
+    run: int
+    lastrun: int
+    revision: int
+    nsegments: int
+    parent: str
+    submitted: str
+    updated: str
+    finalized: str
+    status: str
+    blame: str
