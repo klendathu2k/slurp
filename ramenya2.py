@@ -15,6 +15,7 @@ import dateutil.parser
 from colorama import Fore, Back, Style, init
 from tqdm import tqdm
 import pydoc
+import datetime
 
 import htcondor
 import classad
@@ -60,6 +61,9 @@ tablefmt="psql"
 
 statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
 statusdbr = statusdbr_.cursor()
+
+statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
+statusdbw = statusdbw_.cursor()
 
 timestart=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
 time.sleep(1)
@@ -294,6 +298,92 @@ def query_jobs_by_run(conditions="", title="Summary of jobs by run" ):
         print("... could not query the db ... skipping report")
         pass
 
+def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with condor state",  ):
+    query=f"select id,cluster,process from production_status where status='running' and {conditions}"
+    try:
+        results = statusdbr.execute(query);
+    except pyodbc.OperationalError: 
+        print("... could not query the db ... skipping report")
+        return
+    except pyodbc.ProgrammingError:
+        print("... could not query the db ... skipping report")
+        return
+
+    schedd = htcondor.Schedd() 
+    condor_job_status_map = {
+        1:"Idle",
+        2:"Running",
+        3:"Removing",
+        4:"Completed",
+        5:"Held",
+        6:"Transferring Output",
+        7:"Suspended",
+    }
+
+    # Query held jobs
+    condor_query = schedd.query(
+        constraint=f"JobStatus==5",
+        projection=["ClusterId","ProcId","JobStatus","HoldReasonCode","HoldReasonSubcode","HoldReason","EnteredCurrentStatus","ExecutableSize"]
+    )
+
+    # map each cluster.process to an ID in the production status table 
+    c2ps = {}
+    for r in results:
+        key = f"{r.cluster}.{r.process}"
+        c2ps[key]=int(r.id)
+
+    # map each cluster.process to the condor query
+    c2cq = {}
+    for q in condor_query:
+        clusterid = int(q.lookup("ClusterId"))
+        processid = int(q.lookup("ProcId"))
+        jobstatus = int(q.lookup("JobStatus"))
+        enteredcurrentstatus = int(q.lookup("EnteredCurrentStatus"))
+        timestamp=datetime.datetime.fromtimestamp(enteredcurrentstatus,datetime.timezone.utc)
+        holdreason=None
+        if jobstatus==5:
+            holdreason = q.lookup('HoldReason')
+        key = f"{clusterid}.{processid}"
+        try:
+            id_ = c2ps[key]
+            c2cq[ id_ ] = {
+                'JobStatus' : jobstatus,
+                'EnteredCurrentStatus' : timestamp,                
+                'HoldReason' : holdreason,
+            }
+        except KeyError:
+            # Reaches here if there is a held job in condor unknown to the production status table
+            pass
+
+    #pprint.pprint(c2cq)
+
+
+    for i,cq in c2cq.items():
+
+        message=str(cq['HoldReason']).replace("'"," ")
+        enteredcurrentstatus=str(cq['EnteredCurrentStatus'])
+        update = f"""
+        update production_status
+        set status='failed',
+            flags=5,
+            message='{message}',
+            ended='{enteredcurrentstatus}'
+        where id={i};
+        """
+        print(update)
+
+        statusdbw.execute(update)
+        statusdbw.commit()
+
+            
+
+                                   
+
+    #pprint.pprint( c2ps )
+    #pprint.pprint( c2cq )
+        
+    
+
 def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor state",  ):
     print(title)
 #              count(run)                      as num_jobs,
@@ -474,6 +564,7 @@ query_choices=[
     "running",
     "finished",
     "failed",
+    "held",
 ]
 
 
@@ -484,6 +575,7 @@ fmap = {
     "runs" : query_jobs_by_run,
     "failed": query_failed_jobs,
     "condor": query_jobs_by_condor,
+    "held"  : query_jobs_held_by_condor,
 }
 
 @subcommand([
