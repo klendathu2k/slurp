@@ -63,6 +63,14 @@ cursors = {
 
 verbose=0
 
+#
+# Format strings for run and segment numbers.  n.b. that the "rungroup" which defines the logfile and output file directory structure
+# hardcodes "08d" as the run format...  
+#
+RUNFMT = "%08i"
+SEGFMT = "%04i"
+DSTFMT = "%s_%s_%s-" + RUNFMT + "-" + SEGFMT + ".root"
+
 @dataclass
 class SPhnxCondorJob:
     """
@@ -72,9 +80,9 @@ class SPhnxCondorJob:
     executable:            str = "$(script)"    
     arguments:             str = "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
     batch_name:            str = "$(name)_$(build)_$(tag)"
-    output:                str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).stdout"
-    error:                 str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).stderr"
-    log:                   str = "$(condor)/$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).condor"
+    output:                str = f"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).stdout"
+    error:                 str = f"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).stderr"
+    log:                   str = f"$(condor)/$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).condor"
     periodichold: 	   str = "(NumJobStarts>=1 && JobStatus == 1)"
     priority:              str = "1958"
     job_lease_duration:    str = "3600"
@@ -96,6 +104,8 @@ class SPhnxCondorJob:
     transfer_input_files:  str = None
     user_job_wrapper:      str = None
     max_retries:           str = "0"  # default to no retries
+
+    request_xferslots:     str = None
 
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v }
@@ -254,7 +264,8 @@ def update_production_status( matching, setup, condor, state ):
         
         dsttype=setup.name
         dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
-        dstfile=dstname+'-%08i-%04i'%(run,segment)
+        #dstfile=dstname+'-%08i-%04i'%(run,segment)
+        dstfile=( dstname + '-' + RUNFMT + '-' + '-' + SEGFMT ) % (run,segment)
 
         # 1s time resolution
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
@@ -298,7 +309,8 @@ def insert_production_status( matching, setup, condor, state ):
         
         dsttype=setup.name
         dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
-        dstfile=dstname+'-%08i-%04i'%(run,segment)
+        #dstfile=dstname+'-%08i-%04i'%(run,segment)
+        dstfile=( dstname + '-' + RUNFMT + '-' + '-' + SEGFMT ) % (run,segment)
         
         prod_id = setup.id
         try:
@@ -549,7 +561,8 @@ def sphenix_dstname( dsttype, build, dbtag ):
     return result
 
 def sphenix_base_filename( dsttype, build, dbtag, run, segment ):
-    result = "%s-%08i-%04i" %( sphenix_dstname(dsttype, build, dbtag), int(run), int(segment) )
+    #result = "%s-%08i-%04i" %( sphenix_dstname(dsttype, build, dbtag), int(run), int(segment) )
+    result = ("%s-" + RUNFMT + "-" + SEGFMT) % ( sphenix_dstname(dsttype, build, dbtag), int(run), int(segment) )
     return result
     
 
@@ -634,7 +647,8 @@ def matches( rule, kwargs={} ):
     # N.b. Output file naming convention is fixed as DST_TYPE_system-run#-seg#.ext... so something having a run
     # range may end up outside of the schema.
     #
-    outputs = [ "%s_%s_%s-%08i-%04i.root"%(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
+    #outputs = [ "%s_%s_%s-%08i-%04i.root"%(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
+    outputs = [ DSTFMT %(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
 
     #
     # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
