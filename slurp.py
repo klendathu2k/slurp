@@ -68,7 +68,7 @@ verbose=0
 # hardcodes "08d" as the run format...  
 #
 RUNFMT = "%08i"
-SEGFMT = "%04i"
+SEGFMT = "%05i"
 DSTFMT = "%s_%s_%s-" + RUNFMT + "-" + SEGFMT + ".root"
 
 @dataclass
@@ -265,7 +265,7 @@ def update_production_status( matching, setup, condor, state ):
         dsttype=setup.name
         dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
         #dstfile=dstname+'-%08i-%04i'%(run,segment)
-        dstfile=( dstname + '-' + RUNFMT + '-' + '-' + SEGFMT ) % (run,segment)
+        dstfile=( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
 
         # 1s time resolution
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
@@ -310,7 +310,7 @@ def insert_production_status( matching, setup, condor, state ):
         dsttype=setup.name
         dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
         #dstfile=dstname+'-%08i-%04i'%(run,segment)
-        dstfile=( dstname + '-' + RUNFMT + '-' + '-' + SEGFMT ) % (run,segment)
+        dstfile=( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
         
         prod_id = setup.id
         try:
