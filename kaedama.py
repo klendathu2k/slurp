@@ -13,6 +13,9 @@ from slurp import arg_parser
 from slurp import fccro as fcc  # production status DB cursor
 from slurp import daqc 
 
+#from slurp import RUNFMT
+#from slurp import SEGFMT
+
 import sh
 import sys
 import re
@@ -44,8 +47,6 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-
-
 
 import pprint
 
@@ -157,6 +158,10 @@ def main():
     elif len(args.segments)>=3:
         seg_condition = "and segment in ( %s )" % ','.join( args.segments )
 
+
+    RUNFMT = slurp.RUNFMT
+    SEGFMT = slurp.SEGFMT
+
     limit_condition=""
     if args.limit>0:
         limit_condition = f"limit {args.limit}"
@@ -182,6 +187,18 @@ def main():
 
     runlist_query = config.get('runlist_query','').format(**locals())
     params        = config.get('params',None)
+    if params:
+        for key in ['outbase','logbase']:
+            try:
+                params[key]=params[key].format(**locals())
+            except KeyError:
+                print(key)
+                print(params[key])
+                pprint.pprint(locals())
+                params[key]=params[key].format(**locals())
+                
+                
+
     filesystem    = config.get('filesystem',None)
     job_          = config.get('job',None) #config['job']
     presubmit     = config.get('presubmit',None)
@@ -226,6 +243,7 @@ def main():
         assert( params     is not None )
         for k,v in job_.items():
             jobkw[k] = v.format( **locals(), **filesystem, **params )
+
 
         # And now we can create the job definition thusly
         job = Job( **jobkw )
