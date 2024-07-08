@@ -16,6 +16,7 @@ from colorama import Fore, Back, Style, init
 from tqdm import tqdm
 import pydoc
 import datetime
+import traceback
 
 import htcondor
 import classad
@@ -62,8 +63,8 @@ tablefmt="psql"
 statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
 statusdbr = statusdbr_.cursor()
 
-statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
-statusdbw = statusdbw_.cursor()
+#statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
+#statusdbw = statusdbw_.cursor()
 
 timestart=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
 time.sleep(1)
@@ -299,14 +300,23 @@ def query_jobs_by_run(conditions="", title="Summary of jobs by run" ):
         pass
 
 def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with condor state",  ):
+
+    # Write connection to DB
+    statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
+    statusdbw = statusdbw_.cursor()
+
     query=f"select id,cluster,process from production_status where status='running' and {conditions}"
     try:
-        results = statusdbr.execute(query);
+        results = statusdbw.execute(query);
     except pyodbc.OperationalError: 
         print("... could not query the db ... skipping report")
+        del statusdbw_
+        del statusdbw
         return
     except pyodbc.ProgrammingError:
         print("... could not query the db ... skipping report")
+        del statusdbw_
+        del statusdbw
         return
 
     schedd = htcondor.Schedd() 
@@ -321,10 +331,16 @@ def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with 
     }
 
     # Query held jobs
-    condor_query = schedd.query(
-        constraint=f"JobStatus==5",
-        projection=["ClusterId","ProcId","JobStatus","HoldReasonCode","HoldReasonSubcode","HoldReason","EnteredCurrentStatus","ExecutableSize"]
-    )
+    try:
+        condor_query = schedd.query(
+            constraint=f"JobStatus==5",
+            projection=["ClusterId","ProcId","JobStatus","HoldReasonCode","HoldReasonSubcode","HoldReason","EnteredCurrentStatus","ExecutableSize"]
+        )
+    except htcondor.HTCondorIOError:
+        print("... could not query condor.  skipping report ...")
+        del statusdbw_
+        del statusdbw
+        return
 
     # map each cluster.process to an ID in the production status table 
     c2ps = {}
@@ -342,7 +358,10 @@ def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with 
         timestamp=datetime.datetime.fromtimestamp(enteredcurrentstatus,datetime.timezone.utc)
         holdreason=None
         if jobstatus==5:
-            holdreason = q.lookup('HoldReason')
+            try:
+                holdreason = q.lookup('HoldReason')
+            except KeyError:
+                holdreason = "unknown"
         key = f"{clusterid}.{processid}"
         try:
             id_ = c2ps[key]
@@ -352,11 +371,7 @@ def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with 
                 'HoldReason' : holdreason,
             }
         except KeyError:
-            # Reaches here if there is a held job in condor unknown to the production status table
             pass
-
-    #pprint.pprint(c2cq)
-
 
     for i,cq in c2cq.items():
 
@@ -375,9 +390,9 @@ def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with 
         statusdbw.execute(update)
         statusdbw.commit()
 
-            
-
-                                   
+    # Delete (and drop connection) to the DB
+    del statusdbw
+    del statusdbw_
 
     #pprint.pprint( c2ps )
     #pprint.pprint( c2cq )
@@ -530,6 +545,7 @@ def submit(args):
         kaedama = kaedama.bake( "--runs", "0", "999999" )
         runreport = f"runs: 0 to 999999"
 
+    tracebacks = []
     while ( go ):
 
         list_of_active_rules = args.rules
@@ -541,13 +557,24 @@ def submit(args):
 
         clear()
 
-        print( "Active rules: " )
+        print( f"Active rules: {args.SLURPFILE} {args.rules} "  )
         print( tabulate( [ list_of_active_rules ], ['active rules'], tablefmt=tablefmt ) )
         print( runreport )
 
+        if len(tracebacks)>0:
+            print( "Failed on last iteration:")
+            print( tabulate( [ tracebacks ], ['failures'], tablefmt=tablefmt ) )
+            tracebacks = []
+
         # Execute the specified rules
         for r in list_of_active_rules:
-            kaedama( batch=True, rule=r, _out=sys.stdout )
+            try:
+                kaedama( batch=True, rule=r, _out=sys.stdout )
+            except sh.ErrorReturnCode_1:
+                print(traceback.format_exc())
+                tracebacks.append( r )
+                
+
 
         query_pending_jobs()
         query_started_jobs()
