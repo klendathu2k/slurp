@@ -125,7 +125,8 @@ class SPhnxProductionStatus:
     exit_code: int 
     nevents : int
     message : str
-    
+    submission_host: str
+    execution_node: str
 
 
 def sphnx_production_quality_table_def():
