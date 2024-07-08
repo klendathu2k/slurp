@@ -17,6 +17,7 @@ import json
 import hashlib
 import os
 import shutil
+import platform
 
 # Production status ... 
 statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
@@ -157,9 +158,13 @@ def started(args):
     run=int(args.run)
     seg=int(args.segment)
     id_ = getLatestId( tablename, dstname, run, seg )
+    node=platform.node()
     update = f"""
     update {tablename}
-    set status='started',started='{timestamp}'
+    set 
+         status='started',
+         started='{timestamp}',
+         execution_node='{node}'
     where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     """
     if args.verbose:
