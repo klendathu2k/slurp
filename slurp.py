@@ -15,6 +15,7 @@ import time
 import itertools
 from  glob import glob
 import math
+import platform
 
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
@@ -329,11 +330,12 @@ def insert_production_status( matching, setup, condor, state ):
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
 
         # TODO: Handle conflict
+        node=platform.node().split('.')[0]
 
         insert=f"""
         insert into production_status
-               (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents )
-        values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0 )
+               (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents, submission_host )
+        values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )
         """
 
         statusdbw.execute(insert)
@@ -393,6 +395,13 @@ def submit( rule, **kwargs ):
     jobd = rule.job.dict()
 
 
+    #
+    # Make target output directories.  We abuse the python string formatting facility
+    # in order to parameterize the directory path(s) we will be creating.  We want to
+    # substitute in the build argument, the dbtag, etc...    The path will utilize the
+    # condor macro substitutions... so we translate these into local variables, which
+    # are then replaced in the 'eval' of the oiutput directory below.
+    #
     for outname in [ 'outdir', 'logdir', 'condor', 'histdir' ]:
 
         outdir=kwargs.get(outname,None)
@@ -401,7 +410,11 @@ def submit( rule, **kwargs ):
         outdir = outdir.replace('//','/')
 
         outdir = outdir.replace( '$(rungroup)', '{rungroup}')
+        outdir = outdir.replace( '$(build)',    '{rule.buildarg}' )
+        outdir = outdir.replace( '$(tag)',      '{rule.tag}' )
+                                 
         outdir = f'f"{outdir}"'
+
         for run in runlist:
             mnrun = 100 * ( math.floor(run/100) )
             mxrun = mnrun+100
