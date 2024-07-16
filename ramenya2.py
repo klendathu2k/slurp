@@ -568,6 +568,7 @@ def submit(args):
 
         # Execute the specified rules
         for r in list_of_active_rules:
+            print( f"Trying rule ... {r} {datetime.datetime.now().replace(microsecond=0)}" )
             try:
                 kaedama( batch=True, rule=r, _out=sys.stdout )
             except sh.ErrorReturnCode_1:
