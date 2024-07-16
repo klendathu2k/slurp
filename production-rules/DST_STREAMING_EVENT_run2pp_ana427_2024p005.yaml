@@ -13,7 +13,7 @@ PHYS_DST_STREAMING_EVENT_run2pp:
      payload :   ./production-rules/streaming/
      mem     :   4096MB
      neventsper: 2500
-     comment:    "run2pp_ana272_2024p005"
+     comment:    "run2pp_ana272_2024p005_v1"
 
    input:
       db: daqdb
@@ -35,6 +35,9 @@ PHYS_DST_STREAMING_EVENT_run2pp:
              (filename  like '/bbox%/GL1_physics%'       and lastevent>2 ) or
              (filename  like '/bbox%/physics_mvtx%.evt'  and lastevent>2 )
            )
+
+           and runnumber>=43855
+
            {run_condition}
 
          group by runnumber
@@ -48,16 +51,18 @@ PHYS_DST_STREAMING_EVENT_run2pp:
                    sum( case when filename like '/bbox%/physics%intt%' then 1 else 0 end )>0 or
                    sum( case when filename like '/bbox%/physics_mvtx%.evt' then 1 else 0 end )>0 
                 )
+
          order by runnumber
+
                 {limit_condition}
               ;
 
    # TODO:  Need to add error checking to make sure that outdir, logdir, etc... are quoted properly.  Else, this will cause problems with argument substitution
    filesystem:  
-     outdir  : "/sphenix/lustre01/sphnxpro/physics/slurp/streaming/physics/$(build)_$(tag)/run_$(rungroup)"
-     logdir  : "file:///sphenix/data/data02/sphnxpro/streaminglogs/$(build)_$(tag)/run_$(rungroup)"
-     histdir :       "/sphenix/data/data02/sphnxpro/streamhist/$(build)_$(tag)/run_$(rungroup)"
-     condor :        "/tmp/streaming/$(build)_$(tag)/run_$(rungroup)"
+     outdir  :           "/sphenix/lustre01/sphnxpro/production/streaming/dsts/$(build)_$(tag)/run_$(rungroup)"
+     logdir  : "file:///sphenix/data/data02/sphnxpro/production/streaming/logs/$(build)_$(tag)/run_$(rungroup)"
+     histdir :        "/sphenix/data/data02/sphnxpro/production/streaming/hist/$(build)_$(tag)/run_$(rungroup)"
+     condor :                                  "/tmp/production/streaming/condor/$(build)_$(tag)/run_$(rungroup)"
 
    #
    # Again I note the need to ensure that the arguments are properly specified given the
