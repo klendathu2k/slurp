@@ -84,7 +84,8 @@ class SPhnxCondorJob:
     output:                str = f"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).stdout"
     error:                 str = f"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).stderr"
     log:                   str = f"$(condor)/$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).condor"
-    periodichold: 	   str = "(NumJobStarts>=1 && JobStatus == 1) || (NumJobStarts>=2 && JobStatus == 2)"
+#   periodichold: 	   str = "(NumJobStarts>=1 && JobStatus == 1) || (NumJobStarts>=2 && JobStatus == 2)"
+    periodichold: 	   str = "(NumJobStarts>=1 && JobStatus == 1)"
     priority:              str = "1958"
     job_lease_duration:    str = "3600"
     requirements:          str = '(CPU_Type == "mdc2")';    
