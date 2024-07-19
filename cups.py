@@ -251,6 +251,7 @@ def finished(args):
         statusdbc.execute( update )
         statusdbc.commit()
 
+
 #_______________________________________________________________________________________________________
 @subcommand([
     argument("-e","--exit",help="Exit code of the payload macro",dest="exit",default=-1),
@@ -429,14 +430,16 @@ def catalog(args):
     fcc.commit()
 
 @subcommand([
-    argument( "message", help="Message to be appended to the production status entry"),
+    argument( "message", help="Message to be appended to the production status entry" ),
+    argument( "flag",    help="Adds a value to the flags", default='0' ),
 ])
 def message(args):
     """
     Sets message field on the production status table
     """
+    flaginc=int(args.flag)
     id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
-    update = f"update {args.table}    set message='{args.message}'    where id={id_};"
+    update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc}  where id={id_};"
     statusdbc.execute( update )
     statusdbc.commit()
 
