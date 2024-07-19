@@ -410,7 +410,7 @@ def submit( rule, **kwargs ):
         outdir = outdir.replace('//','/')
 
         outdir = outdir.replace( '$(rungroup)', '{rungroup}')
-        outdir = outdir.replace( '$(build)',    '{rule.buildarg}' )
+        outdir = outdir.replace( '$(build)',    '{rule.build}' )
         outdir = outdir.replace( '$(tag)',      '{rule.tag}' )
                                  
         outdir = f'f"{outdir}"'
