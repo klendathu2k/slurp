@@ -305,7 +305,7 @@ def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with 
     statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
     statusdbw = statusdbw_.cursor()
 
-    query=f"select id,cluster,process from production_status where status in ( 'running','submitted' ) and {conditions}"
+    query=f"select id,cluster,process from production_status where {conditions} and status!='failed'"
     try:
         results = statusdbw.execute(query);
     except pyodbc.OperationalError: 
