@@ -431,7 +431,8 @@ def catalog(args):
 
 @subcommand([
     argument( "message", help="Message to be appended to the production status entry" ),
-    argument( "flag",    help="Adds a value to the flags", default='0' ),
+    argument( "--flag",    help="Adds a value to the flags", default='0' ),
+    argument( "--logsize", help="Sets the log file size", default='0' ),
 ])
 def message(args):
     """
@@ -439,7 +440,7 @@ def message(args):
     """
     flaginc=int(args.flag)
     id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
-    update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc}  where id={id_};"
+    update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};"
     statusdbc.execute( update )
     statusdbc.commit()
 
