@@ -127,6 +127,7 @@ class SPhnxProductionStatus:
     message : str
     submission_host: str
     execution_node: str
+    logsize: int
 
 
 def sphnx_production_quality_table_def():
