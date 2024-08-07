@@ -1,0 +1,197 @@
+DST_TRIGGERED_EVENT_run2pp_ana430_2024p007:
+   params:
+     name:       DST_TRIGGERED_EVENT_run2pp
+     build:      ana.430
+     build_name: ana430
+     dbtag:      2024p007
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT})
+     outbase :   $(name)_$(build)_$(tag)
+     script  :   run.sh
+     payload :   ./slurp-examples/sPHENIX/triggers/
+     mem     :   8192MB
+     neventsper: 10000
+
+   #
+   # input query:
+   #
+   # This builds a list of all runs known to the file catalog "datasets" table.
+   # The query should return:
+   # 1. The source of the information (formatted as database name/table name)
+   # 2. The run number
+   # 3. A sequence number (a placeholder fixed at zero for event builders)
+   # 4. And a space-separated list of logical filenames 
+   #
+   # The {*_condition} parameters (run, seg, limit) are substituted by kaedama
+   # based on (optional) command line options.
+   #
+   # For now, require GL1 files...
+   #
+   input:
+      db: daqdb
+      direct_path: /sphenix/lustre01/sphnxpro/{mode}/*/physics/
+      query: |-
+         select 
+                'daqdb/filelist'                                                                                    as source      , 
+                runnumber                                                                                                          , 
+                0                                                                                                   as segment     , 
+                string_agg( distinct split_part(filename,'/',-1), ' ' )                                             as files       ,   
+                string_agg( distinct split_part(filename,'/',-1) || ':' || firstevent || ':' || lastevent, ' ' )    as fileranges  
+         from  
+                filelist
+         where 
+           ( 
+             (filename  like '/bbox%/%emcal%physics%'    and lastevent>2 ) or 
+             (filename  like '/bbox%/%HCal%physics%'     and lastevent>2 ) or
+             (filename  like '/bbox%/%LL1%physics%'      and lastevent>2 ) or
+             (filename  like '/bbox%/GL1_physics%'       and lastevent>2 ) or
+             (filename  like '/bbox%/%mbd%physics%'      and lastevent>2 ) or
+             (filename  like '/bbox%/%ZDC%physics%'      and lastevent>2 )
+           )
+           {run_condition}
+
+         group by runnumber
+
+         having
+                every(transferred_to_sdcc)   and
+                max(lastevent)>1000          and
+                sum( case when filename like '/bbox%/GL1_physics%' then 1 else 0 end )>0 and
+                (
+                   sum( case when filename like '/bbox%/%emcal%physics%'  then 1 else 0 end )>0 or
+                   sum( case when filename like '/bbox%/%HCal%physics%'   then 1 else 0 end )>0 
+                )
+
+         order by runnumber
+                {limit_condition}
+
+              ;              
+
+   # TODO:  Need to add error checking to make sure that outdir, logdir, etc... are quoted properly.  Else, this will cause problems with argument substitution
+   filesystem:  
+     outdir : "/sphenix/lustre01/sphnxpro/physics/slurp/calophysics/$(build)_$(tag)/run_$(rungroup)"
+     logdir : "file:///sphenix/data/data02/sphnxpro/calologs/$(build)_$(tag)/run_$(rungroup)"
+     histdir :       "/sphenix/data/data02/sphnxpro/calohist/$(build)_$(tag)/run_$(rungroup)"
+     condor :        "/tmp/calologs/$(build)_$(tag)/run_$(rungroup)"
+
+   #
+   # Again I note the need to ensure that the arguments are properly specified given the
+   # definition of the payload script.
+   #
+   job:
+     executable            : "{payload}/run.sh"
+     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {histdir}"
+     output_destination    : '{logdir}'
+     transfer_input_files  : "{payload},cups.py,bachi.py,odbc.ini"
+     log                   : '{condor}/{logbase}.condor'
+     accounting_group      : "group_sphenix.mdc2"
+     accounting_group_user : "sphnxpro"
+     priority : '3890'
+     transfer_output_files : ""
+     request_xferslots: '1'
+#    output                : '{logbase}.condor.stdout'
+#    error                 : '{logbase}.condor.stderr'
+
+
+
+# Downstream products
+DST_CALO_Y2_FITTING:
+   params:
+     name:       DST_CALOFITTING_run2pp
+     build:      ana.430
+     build_name: ana430
+     dbtag:      2024p007
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT})
+     outbase :   $(name)_$(build)_$(tag)
+     script  :   runy2fitting.sh
+     payload :   ./slurp-examples/sPHENIX/CaloProduction/
+     mem     :   4096MB
+     neventsper: 50000
+   input:
+     db: filecatalog
+     query: |-
+         select 
+                'filecatalog/datasets'                                  as source      , 
+                runnumber                                                              , 
+                segment                                                                ,
+                filename                                                as files       ,
+                filename || ':' || 0 || ':' || events                   as fileranges 
+         from  
+                datasets
+         where 
+                filename like 'DST_TRIGGERED_EVENT_run2pp%2024p007%'
+                {run_condition}
+           
+         {limit_condition}
+
+         ;
+   job:
+     executable            : "{payload}/runy2fitting.sh"
+     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {histdir}"
+     output_destination    : '{logdir}'
+     transfer_input_files  : "{payload},cups.py,bachi.py,odbc.ini"
+     log                   : '{condor}/{logbase}.condor'
+     accounting_group      : "group_sphenix.mdc2"
+     accounting_group_user : "sphnxpro"
+     priority : '3810'
+     transfer_output_files : ""
+#     output                : '{logbase}.condor.stdout'
+#     error                 : '{logbase}.condor.stderr'
+
+
+
+   filesystem:  
+     outdir : "/sphenix/lustre01/sphnxpro/physics/slurp/caloy2fitting/$(build)_$(tag)/run_$(rungroup)"
+     logdir : "file:///sphenix/data/data02/sphnxpro/caloy2fitting/$(build)_$(tag)/run_$(rungroup)"
+     histdir :       "/sphenix/data/data02/sphnxpro/calohist/$(build)_$(tag)/run_$(rungroup)"
+     condor :        "/tmp/caloy2fitting/run_$(rungroup)"
+
+
+# Downstream products
+DST_CALO_Y2_CALIB:
+   params:
+     name:       DST_CALO_run2pp
+     build:      ana.430
+     build_name: ana430
+     dbtag:      2024p007
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT})
+     outbase :   $(name)_$(build)_$(tag)
+     script  :   runy2calib.sh
+     payload :   ./slurp-examples/sPHENIX/CaloProduction/
+     mem     :   4096MB
+     neventsper: 50000
+   input:
+     db: filecatalog
+     query: |-
+         select 
+                'filecatalog/datasets'                                  as source      , 
+                runnumber                                                              , 
+                segment                                                                ,
+                filename                                                as files       ,
+                filename || ':' || 0 || ':' || events                   as fileranges 
+         from  
+                datasets
+         where 
+                filename like 'DST_CALOFITTING_run2pp_ana430_2024p007%'
+                {run_condition}
+           
+         {limit_condition}
+
+         ;
+   job:
+     executable            : "{payload}/runy2calib.sh"
+     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {histdir}"
+     output_destination    : '{logdir}'
+     transfer_input_files  : "{payload},cups.py,bachi.py,odbc.ini"
+     log                   : '{condor}/{logbase}.condor'
+     accounting_group      : "group_sphenix.mdc2"
+     accounting_group_user : "sphnxpro"
+     priority : '3800'
+     transfer_output_files : ""
+#     output                : '{logbase}.condor.stdout'
+#     error                 : '{logbase}.condor.stderr'
+
+
+   filesystem:  
+     outdir : "/sphenix/lustre01/sphnxpro/physics/slurp/caloy2calib/$(build)_$(tag)/run_$(rungroup)"
+     logdir : "file:///sphenix/data/data02/sphnxpro/caloy2calib/$(build)_$(tag)/run_$(rungroup)"
+     histdir :       "/sphenix/data/data02/sphnxpro/calohist/$(build)_$(tag)/run_$(rungroup)"
+     condor :        "/tmp/caloy2calib/run_$(rungroup)"
