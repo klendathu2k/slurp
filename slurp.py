@@ -478,11 +478,11 @@ def submit( rule, **kwargs ):
             pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
     
     submit_job = htcondor.Submit( jobd )
-
     if verbose>0:
         INFO(submit_job)
-        for m in matching:
-            pprint.pprint(m)
+        if verbose>10:
+            for m in matching:
+                pprint.pprint(m)
 
     dispatched_runs = []
 
