@@ -334,13 +334,18 @@ def update_production_status( matching, setup, condor, state ):
 
 def insert_production_status( matching, setup, condor, state ):
 
+    # Condor map contains a dictionary keyed on the "output" field of the job description.
+    # The map contains the cluster ID, the process ID, the arguments, and the output log.
+    # (This is the condor.stdout log...)
     condor_map = {}
     for ad in condor:
         clusterId = ad['ClusterId']
         procId    = ad['ProcId']
         out       = ad['Out'].split('/')[-1]   # discard anything that looks like a filepath
+        ulog      = ad['UserLog'].split('/')[-1] 
         args      = ad['Args']
-        key       = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
+        #key      = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
+        key       = ulog.split('.')[0].lower()  # lowercase b/c referenced by file basename
 
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'Args':args }
 
@@ -513,7 +518,7 @@ def submit( rule, **kwargs ):
 
                 schedd_query = schedd.query(
                     constraint=f"ClusterId == {submit_result.cluster()}",
-                    projection=["ClusterId", "ProcId", "Out", "Args" ]
+                    projection=["ClusterId", "ProcId", "Out", "UserLog", "Args" ]
                 )
                 break # success... break past the else clause
             
