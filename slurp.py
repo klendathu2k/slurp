@@ -132,7 +132,7 @@ class SPhnxCondorJob:
     request_xferslots:     str = None
 
     def dict(self):
-        return { k: str(v) for k, v in asdict(self).items() if v }
+        return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
     def __post_init__(self):
         pass
