@@ -103,8 +103,10 @@ class SPhnxCondorJob:
     executable:            str = "$(script)"    
     arguments:             str = "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
     batch_name:            str = "$(name)_$(build)_$(tag)"
-    output:                str = f"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).stdout"
-    error:                 str = f"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).stderr"
+    #output:                str = f"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).stdout"
+    #error:                 str = f"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).stderr"
+    output:                str = None 
+    error:                 str = None
     log:                   str = f"$(condor)/$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).condor"
 #   periodichold: 	   str = "(NumJobStarts>=1 && JobStatus == 1) || (NumJobStarts>=2 && JobStatus == 2)"
     periodichold: 	   str = "(NumJobStarts>=1 && JobStatus == 1)"
@@ -129,6 +131,9 @@ class SPhnxCondorJob:
     user_job_wrapper:      str = None
     max_retries:           str = None # No default...
     request_xferslots:     str = None
+
+    transferout:           str = "false"
+    transfererr:           str = "false"
 
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
