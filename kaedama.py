@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 
+import cProfile
 import slurp
 import yaml
+import datetime
+import pathlib
 
 from slurp import SPhnxRule  as Rule
 from slurp import SPhnxMatch as Match
@@ -27,26 +30,8 @@ from slurp import cursors
 
 import logging
 from logging.handlers import RotatingFileHandler
-RotFileHandler = RotatingFileHandler(
-    filename='kaedama.log', 
-    mode='a',
-    maxBytes=5*1024*1024,
-#   maxBytes=5*1024,
-    backupCount=10,
-    encoding=None,
-    delay=0
-)
 
-# n.b. Adding the stream handler will echo to stdout
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        #logging.FileHandler("kaedama.log"),
-        RotFileHandler,
-        logging.StreamHandler()
-    ]
-)
+
 
 import pprint
 
@@ -118,6 +103,31 @@ def main():
 
     # parse command line options
     args, userargs = slurp.parse_command_line()
+
+    mylogdir=f"/tmp/kaedama/kaedama/{args.rule}"; #{str(datetime.datetime.today().date())}.log",
+    pathlib.Path(mylogdir).mkdir( parents=True, exist_ok=True )            
+
+    RotFileHandler = RotatingFileHandler(
+    #    filename='kaedama.log', 
+        filename=f"{mylogdir}/{str(datetime.datetime.today().date())}.log",
+        mode='a',
+        maxBytes=25*1024*1024,
+    #   maxBytes=5*1024,
+        backupCount=10,
+        encoding=None,
+        delay=0
+    )
+
+    # n.b. Adding the stream handler will echo to stdout
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[
+            #logging.FileHandler("kaedama.log"),
+            RotFileHandler,
+            logging.StreamHandler()
+        ]
+    )
 
 
     # require consistent database
@@ -283,8 +293,33 @@ def main():
         if args.docstring:
             batch=batch + " " + args.docstring
 
-        logging.info( f"Dispatched ({batch} {args.runs}) {args.rule}: {params['name']} {dispatched}" )
-        logging.info( f"  with {args}" )
+        #ndispatched=len(dispatched)
+        #runs={}
+        #runslist=[]
+        #for k,v in dispatched.items():
+        #    try:
+        #        runs[k].append( v )
+        #    except KeyError:
+        #        runs[k] = []
+        #        runslist.append(k)
+        runcount = {}
+        ndisp=0
+        if type(dispatched) == type([]):
+            ndisp=len(dispatched)
+            for tup in dispatched:
+                arr = runcount.get( tup[0], [] )
+                arr.append( tup[1] )
 
 
-if __name__ == '__main__': main()
+        logging.info( f"Dispatched ({batch} {args.runs}) {args.rule}: {params['name']} {ndisp} dispatched" )
+        logging.info( f"  with {args}" )        
+        keys = runcount.keys()
+        for k in keys:
+            logging.info( f"Dispatched run {k} segments: {','.join(runcount[k])}" )
+
+            
+
+
+if __name__ == '__main__': 
+    #cProfile.run('main()')
+    main()
