@@ -127,8 +127,7 @@ class SPhnxCondorJob:
     
     transfer_input_files:  str = None
     user_job_wrapper:      str = None
-    max_retries:           str = "0"  # default to no retries
-
+    max_retries:           str = None # No default...
     request_xferslots:     str = None
 
     def dict(self):
