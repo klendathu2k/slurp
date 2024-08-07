@@ -19,6 +19,7 @@ import platform
 
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
+from slurptables import SPhnxInvalidRunList
 from slurptables import sphnx_production_status_table_def
 
 from dataclasses import dataclass, asdict, field
@@ -246,6 +247,30 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
         
 
     return result
+
+def fetch_invalid_run_entry( dstname, run, seg ):
+
+    query = f"""
+    select 
+    ,   id
+    ,   dstname
+    ,   first_run
+    ,   last_run
+    ,   first_segment
+    ,   last_segment
+        expires_at at time zone 'utc' as expires 
+        from invalid_run_list
+    where 
+        (dstname='{dstname}' or dstname='all' or dstname='ALL' ) and first_run<={run} and ( last_run>={run} or last_run=-1 ) and first_segment<={segment} and last_segment>={segment};       
+    """
+
+
+    return [ 
+        SPhnxInvalidRunList(*db) 
+        for db in 
+               statusdbr.execute( query ).fetchall() 
+    ]
+
 
 def getLatestId( tablename, dstname, run, seg ):  # limited to status db
     query=f"""

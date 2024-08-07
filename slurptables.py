@@ -182,3 +182,32 @@ class SPhnxDatasetStatus:
     finalized: str
     status: str
     blame: str
+
+
+#_____________________________________
+def sphnx_invalid_run_list():
+    
+    return """
+    CREATE TABLE if not exists INVALID_RUN_LIST (
+       id            serial      unique  
+    ,  dstname       varchar(32) not null 
+    ,  first_run     int         not null
+    ,  last_run      int         not null default    -1
+    ,  first_segment int         not null default     0
+    ,  last_segment  int         not null default 99999
+    ,  created_at    timestamp   not null default (now()                 at time zone 'utc')
+    ,  expires_at    timestamp   not null default ('2161-10-11 00:00:00' at time zone 'utc')
+    ,  primary key(id,dstname,run )
+    );
+    """
+
+@dataclass( frozen=True )
+class SPhnxInvalidRunList:
+    id: int
+    dstname: str
+    run: int
+    first_segment: int
+    last_segment: int
+    created_at: str
+    expires_at: str
+    
