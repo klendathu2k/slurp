@@ -63,8 +63,19 @@ tablefmt="psql"
 statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
 statusdbr = statusdbr_.cursor()
 
-#statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
-#statusdbw = statusdbw_.cursor()
+try:
+    statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
+    statusdbr = statusdbr_.cursor()
+except pyodbc.InterfaceError:
+    for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
+        print(f"Could not connect to DB... retry in {s}s")
+        time.sleep(s)
+        try:
+            statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
+            statusdbr = statusdbr_.cursor()
+        except:
+            exit(0)
+
 
 timestart=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
 time.sleep(1)
@@ -155,11 +166,15 @@ def query_pending_jobs( conditions="" ):
         table = [colorize(r) for r in results]
         print( tabulate( table, labels, tablefmt=tablefmt ) )
     except pyodbc.OperationalError: 
-        print("... could not query the db ... skipping report")
+        print("... could not query the db ... skipping report [OperationError]")
         pass
     except pyodbc.ProgrammingError:
-        print("... could not query the db ... skipping report")
+        print("... could not query the db ... skipping report [ProgrammingError]")
         pass
+    except pyodbc.Error:
+        print("... could not query the db ... skipping report [Error]")
+        pass
+
 
 
 
@@ -302,8 +317,12 @@ def query_jobs_by_run(conditions="", title="Summary of jobs by run" ):
 def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with condor state",  ):
 
     # Write connection to DB
-    statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
-    statusdbw = statusdbw_.cursor()
+    try:
+        statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
+        statusdbw = statusdbw_.cursor()
+    except pyodbc.InterfaceError:
+        print("... could not query the db ... skipping report")
+        return
 
     query=f"select id,cluster,process from production_status where {conditions} and status!='failed'"
     try:
@@ -379,7 +398,7 @@ def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with 
         enteredcurrentstatus=str(cq['EnteredCurrentStatus'])
         update = f"""
         update production_status
-        set status='failed',
+        set status='failed', 
             flags=5,
             message='{message}',
             ended='{enteredcurrentstatus}'
@@ -578,7 +597,7 @@ def submit(args):
 
 
         query_pending_jobs()
-        query_started_jobs()
+        # query_started_jobs()
         # query_jobs_by_cluster()
         # query_failed_jobs()
 
@@ -593,8 +612,10 @@ query_choices=[
     "finished",
     "failed",
     "held",
+    "none"
 ]
 
+def query_jobs_none(): pass
 
 fmap = {
     "pending" : query_pending_jobs,
@@ -604,7 +625,10 @@ fmap = {
     "failed": query_failed_jobs,
     "condor": query_jobs_by_condor,
     "held"  : query_jobs_held_by_condor,
+    "none"  : query_jobs_none,
 }
+
+
 
 @subcommand([
     argument( '--runs',  nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[0,999999] ),
