@@ -43,11 +43,32 @@ __rules__  = []
 #fc = pyodbc.connect("DSN=FileCatalog")
 #fcc = fc.cursor()
 
-statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
-statusdbr = statusdbr_.cursor()
+try:
+    statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
+    statusdbr = statusdbr_.cursor()
+except pyodbc.InterfaceError:
+    for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
+        print(f"Could not connect to DB... retry in {s}s")
+        time.sleep(s)
+        try:
+            statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
+            statusdbr = statusdbr_.cursor()
+        except:
+            exit(0)
 
-statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
-statusdbw = statusdbw_.cursor()
+
+try:
+    statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
+    statusdbw = statusdbw_.cursor()
+except pyodbc.InterfaceError:
+    for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
+        print(f"Could not connect to DB... retry in {s}s")
+        time.sleep(s)
+        try:
+            statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
+            statusdbw = statusdbw_.cursor()
+        except:
+            exit(0)
 
 fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
 fccro = fcro.cursor()
