@@ -19,9 +19,22 @@ import os
 import shutil
 import platform
 
-# Production status ... 
-statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
-statusdbc = statusdb.cursor()
+# Production status connection
+try:
+    statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
+    statusdbc = statusdb.cursor()
+except pyodbc.InterfaceError:
+    for s in [ 10*random.random(), 20*random.random(), 30*random.random(), 60*random.random(), 120*random.random() ]:
+        print(f"Could not connect to DB... retry in {s}s")
+        time.sleep(s)
+        try:
+            statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
+            statusdbc = statusdb.cursor()
+        except:
+            pass
+
+
+
 
 def md5sum( filename ):
     file_hash=None

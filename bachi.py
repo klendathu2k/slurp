@@ -21,8 +21,18 @@ import hashlib
 import os
 import shutil
 
-statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
-statusdbc = statusdb.cursor()
+try:
+    statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
+    statusdbc = statusdb.cursor()
+except pyodbc.InterfaceError:
+    for s in [ 10*random.random(), 20*random.random(), 30*random.random(), 60*random.random(), 120*random.random() ]:
+        print(f"Could not connect to DB... retry in {s}s")
+        time.sleep(s)
+        try:
+            statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
+            statusdbc = statusdb.cursor()
+        except:
+            pass
 
 parser     = argparse.ArgumentParser(prog='bachi')
 subparsers = parser.add_subparsers(dest="subcommand")
