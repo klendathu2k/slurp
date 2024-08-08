@@ -244,7 +244,7 @@ def table_exists( tablename ):
 
 
 
-def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
+def fetch_production_status( setup, runmn=0, runmx=-1, update=True, dstname=None ):
     """
     Given a production setup, returns the production status table....
     """
@@ -254,9 +254,18 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True ):
     
     if table_exists( name ):
 
-        query = f"select * from {name} "
-        if ( runmn>runmx ): query = query + f" where run>={runmn};"
-        else              : query = query + f" where run>={runmn} and run<={runmx};"
+        query = f"select * from {name} where true"
+        if ( runmn>runmx ): 
+            query = query + f" and run>={runmn}"
+        else              : 
+            query = query + f" and run>={runmn} and run<={runmx}"
+
+        if dstname is not None:
+            query = query + f" and dstfile like '{dstname}%'"
+
+        query=query+";"
+
+
 
         dbresult = statusdbr.execute( query ).fetchall();
 
@@ -753,7 +762,7 @@ def matches( rule, kwargs={} ):
     #
     # Returns the production status table from the database
     #
-    prod_status = fetch_production_status ( setup, 0, -1, update )  # between run min and run max inclusive
+    prod_status = fetch_production_status ( setup, 0, -1, update, sphenix_dstname(setup.name,setup.build,setup.dbtag))  # between run min and run max inclusive
 
     #
     # Map the production status table onto the output filename.  We use this map later on to determine whether
