@@ -716,7 +716,6 @@ def matches( rule, kwargs={} ):
     # N.b. Output file naming convention is fixed as DST_TYPE_system-run#-seg#.ext... so something having a run
     # range may end up outside of the schema.
     #
-    #outputs = [ "%s_%s_%s-%08i-%04i.root"%(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
     outputs = [ DSTFMT %(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
 
     #
