@@ -669,12 +669,16 @@ def matches( rule, kwargs={} ):
     pfn_lists  = {}  # PFN lists per run existing on disk
     rng_lists  = {}  # LFN:firstevent:lastevent
 
+    runMin=999999
+    runMax=0
     if rule.files:
         curs      = cursors[ rule.filesdb ]
         fc_result = list( curs.execute( rule.files ).fetchall() )
         for f in fc_result:
             run     = f.runnumber
             segment = f.segment
+            if run>runMax: runMax=run
+            if run<runMin: runMin=run
             if lfn_lists.get(run,None) == None:
                 lfn_lists[ f"'{run}-{segment}'" ] = f.files.split()
                 rng_lists[ f"'{run}-{segment}'" ] = getattr( f, 'fileranges', '' ).split()
