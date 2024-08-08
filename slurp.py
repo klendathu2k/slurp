@@ -730,9 +730,15 @@ def matches( rule, kwargs={} ):
     # list of runs...
     dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
     exists = {}
-    for check in fccro.execute("select filename,runnumber,segment from datasets where filename like '"+dsttype+"%';"):
-        exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
 
+    #fileexists = f"""
+    #select filename, runnumber, segment from datasets where filename in ( {','.join( ["'"+x+"'" for x in outputs] )} );
+    #"""
+    #for check in fccro.execute(fileexists):
+    #    exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
+
+    for check in fccro.execute(f"select filename,runnumber,segment from datasets where runnumber>={runMin} and runnumber<={runMax} and filename like'"+dsttype+"%';"):
+        exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
 
     # 
     # The production setup will be unique based on (1) the specified analysis build, (2) the specified DB tag,
