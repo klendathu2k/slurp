@@ -124,7 +124,7 @@ class SPhnxCondorJob:
     accounting_group:      str = None
     accounting_group_user: str = None
 #   transfer_output_files: str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).out,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).err"
-    transfer_output_files: str = None
+    transfer_output_files: str = '""'
     transfer_output_remaps: str = None
     
     transfer_input_files:  str = None
@@ -487,6 +487,7 @@ def submit( rule, **kwargs ):
             pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
     
     submit_job = htcondor.Submit( jobd )
+    #INFO(submit_job)
     if verbose>0:
         INFO(submit_job)
         if verbose>10:
