@@ -112,60 +112,24 @@ def argument(*name_or_flags, **kwargs):
     return ([*name_or_flags], kwargs)
 
 def getLatestId( tablename, dstname, run, seg ):
+
+    cache="cups.cache"
+
+    result  = 0
     query=f"""
-    select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
+    select id,dstname from {tablename} where run={run} and segment={seg} order by id desc;
     """
-    result = statusdbc.execute(query).fetchone()[0]
+    results = list( statusdbc.execute(query).fetchall() )
+
+    # Find the most recent ID with the given dstname
+    for r in results:
+        if r.dstname == dstname:
+            result = r.id
+            break
+
+    if r==0: print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
     return result
 
-# The submitting and submitted states are handled internally by slurp, and should not be 
-# set by the running job.
-
-#@subcommand()
-#def submitting(args):
-#    """
-#    Executed by slurp when the jobs are being submitted to condor.
-#    """
-#    tablename=args.table
-#    dstname=args.dstname
-#    timestamp=args.timestamp
-#    run=int(args.run)
-#    seg=int(args.segment)
-#    id_ = getLatestId( tablename, dstname, run, seg )
-#    update = f"""
-#    update {tablename}
-#    set status='submitting',submitting='{timestamp}'
-#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-#    """
-#    if args.noupdate:
-#        print(update)
-#    else:
-#        print(update)
-#        statusdbc.execute( update )
-#        statusdbc.commit()
-
-#@subcommand()
-#def submitted(args):
-#    """
-#    Executed by slurp when the jobs have been submitted to condor.
-#    """
-#    tablename=args.table
-#    dstname=args.dstname
-#    timestamp=args.timestamp
-#    run=int(args.run)
-#    seg=int(args.segment)
-#    id_ = getLatestId( tablename, dstname, run, seg )
-#    update = f"""
-#    update {tablename}
-#    set status='submitted',submitted='{timestamp}'
-#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-#    """
-#    if args.noupdate:
-#        print(update)
-#    else:
-#        print(update)
-#        statusdbc.execute( update )
-#        statusdbc.commit()
 
 @subcommand()
 def started(args):
@@ -185,14 +149,15 @@ def started(args):
          status='started',
          started='{timestamp}',
          execution_node='{node}'
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    """
+    where id={id_}
+    """    
+    #where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+
     if args.verbose:
         print(update)
 
     if args.noupdate:
         pass
-        #print(update)
     else:
         statusdbc.execute( update )
         statusdbc.commit()
@@ -215,8 +180,9 @@ def running(args):
     update = f"""
     update {tablename}
     set status='running',running='{timestamp}',nsegments={nsegments}
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+    where id={id_}
     """
+#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     if args.verbose:
         print(update)
 
@@ -254,14 +220,16 @@ def finished(args):
         update = f"""
         update {tablename}
         set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents=nevents+{ne}
-        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        where id={id_}
         """
+#        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     else:
         update = f"""
         update {tablename}
         set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
-        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        where id={id_}
         """
+#        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     if args.verbose:
         print(update)
 
@@ -293,8 +261,9 @@ def exitcode(args):
     update = f"""
     update {tablename}
     set status='{state}',exit_code={ec}
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+    where id={id_}
     """
+#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     if args.verbose:
         print(update)
 
@@ -325,14 +294,16 @@ def nevents(args):
         update = f"""
         update {tablename}
         set nevents=nevents+{ne}
-        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        where id={id_}
         """
+#       where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     else:
         update = f"""
         update {tablename}
         set nevents={ne}
-        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+        where id={id_}
         """
+#       where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     if args.verbose:
         print(update)
 
@@ -361,8 +332,9 @@ def inputs(args):
     update = f"""
     update {tablename}
     set inputs='{inputs}'
-    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
+    where id={id_}
     """
+#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     if args.verbose:
         print(update)
     if args.noupdate:
@@ -582,14 +554,16 @@ def stageout(args):
             update = f"""
             update {tablename}
             set nevents=nevents+{args.nevents},nsegments=nsegments+1,message='last stageout {filename}'
-            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
+            where id={id_}
             """
+            #            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
         else:
             update = f"""
             update {tablename}
             set nevents={args.nevents},nsegments=nsegments+1,message='last stageout {filename}'
-            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
+            where id={id_}
             """
+#            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
 
         statusdbc.execute( update )
         statusdbc.commit()
