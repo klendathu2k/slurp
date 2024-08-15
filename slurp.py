@@ -706,6 +706,7 @@ def matches( rule, kwargs={} ):
 
     lfn_lists  = {}  # LFN lists per run requested in the input query
     pfn_lists  = {}  # PFN lists per run existing on disk
+    pth_lists  = {}  # PFN list in format DIR:file1,file2,...,fileN
     rng_lists  = {}  # LFN:firstevent:lastevent
 
     runMin=999999
@@ -739,12 +740,18 @@ def matches( rule, kwargs={} ):
         if pfn_lists.get(runseg,None)==None:
             pfn_lists[runseg]=[]
 
+        if pth_lists.get(runseg,None)==None:
+            pth_lists[runseg]={}
+
         # Build list of PFNs via direct lookup and append the results
         if rule.direct:
             for direct in glob(rule.direct):
+                if pth_lists[runseg].get(direct,None)==None:                    
+                    pth_lists[runseg][direct] = []
                 for p in [ direct+'/'+f for f in lfns if os.path.isfile(os.path.join(direct, f)) ]:
                     pfn_lists[ runseg ].append( p )
-            
+                for p in [ f for f in lfns if os.path.isfile(os.path.join(direct, f)) ]:
+                    pth_lists[ runseg ][ direct ].append( p )
 
         # Build list of PFNs via filecatalog lookup if direct path has not been specified
         if rule.direct==None:
