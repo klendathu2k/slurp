@@ -315,11 +315,30 @@ def fetch_invalid_run_entry( dstname, run, seg ):
     ]
 
 
-def getLatestId( tablename, dstname, run, seg ):  # limited to status db
+#def getLatestId( tablename, dstname, run, seg ):  # limited to status db
+#    query=f"""
+#    select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
+#    """
+#    result = statusdbw.execute(query).fetchone()[0]
+#    return result
+
+def getLatestId( tablename, dstname, run, seg ):
+
+    cache="cups.cache"
+
+    result  = 0
     query=f"""
-    select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
+    select id,dstname from {tablename} where run={run} and segment={seg} order by id desc;
     """
-    result = statusdbw.execute(query).fetchone()[0]
+    results = list( statusdbr.execute(query).fetchall() )
+
+    # Find the most recent ID with the given dstname
+    for r in results:
+        if r.dstname == dstname:
+            result = r.id
+            break
+
+    if r==0: print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
     return result
 
 def update_production_status( matching, setup, condor, state ):
@@ -345,8 +364,9 @@ def update_production_status( matching, setup, condor, state ):
         update=f"""
         update  production_status
         set     status='{state}',{state}='{timestamp}'
-        where   dstname='{dstname}' and run={run} and segment={segment} and id={id_}
+        where id={id_}
         """
+#       where   dstname='{dstname}' and run={run} and segment={segment} and id={id_}
         statusdbw.execute(update)
         statusdbw.commit()
 
