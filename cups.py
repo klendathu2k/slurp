@@ -40,6 +40,23 @@ except (pyodbc.InterfaceError,pyodbc.OperationalError) as e:
         print(e)
         exit(1)
 
+try:
+    statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
+    statusdbr = statusdbr_.cursor()
+except pyodbc.InterfaceError:
+    for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
+        print(f"Could not connect to DB... retry in {s}s")
+        time.sleep(s)
+        try:
+            statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
+            statusdbr = statusdbr_.cursor()
+        except:
+            exit(0)
+except pyodbc.Error as e:
+    print(e)
+    exit(1)
+
+
 
 
 
@@ -119,7 +136,7 @@ def getLatestId( tablename, dstname, run, seg ):
     query=f"""
     select id,dstname from {tablename} where run={run} and segment={seg} order by id desc;
     """
-    results = list( statusdbc.execute(query).fetchall() )
+    results = list( statusdbr.execute(query).fetchall() )
 
     # Find the most recent ID with the given dstname
     for r in results:
@@ -127,7 +144,7 @@ def getLatestId( tablename, dstname, run, seg ):
             result = r.id
             break
 
-    if r==0: print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
+    if result==0: print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
     return result
 
 
