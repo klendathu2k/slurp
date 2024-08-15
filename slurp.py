@@ -400,6 +400,9 @@ def insert_production_status( matching, setup, condor, state ):
         segment = int(m['seg'])
         dstfileinput = m['lfn'].split('.')[0]
 
+        # If the match contains a list of inputs... we will set it in the production status...
+        if m['inputs']:
+            dstfileinput=m['inputs']
         key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
         
         dsttype=setup.name
