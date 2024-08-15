@@ -34,6 +34,22 @@ except pyodbc.InterfaceError:
         except:
             pass
 
+try:
+    statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
+    statusdbr = statusdbr_.cursor()
+except pyodbc.InterfaceError:
+    for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
+        print(f"Could not connect to DB... retry in {s}s")
+        time.sleep(s)
+        try:
+            statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
+            statusdbr = statusdbr_.cursor()
+        except:
+            exit(0)
+except pyodbc.Error as e:
+    print(e)
+    exit(1)
+
 parser     = argparse.ArgumentParser(prog='bachi')
 subparsers = parser.add_subparsers(dest="subcommand")
 
@@ -55,15 +71,25 @@ def subcommand(args=[], parent=subparsers):
 def argument(*name_or_flags, **kwargs):
     return ([*name_or_flags], kwargs)
 
-def getLatestId( dstname, run ):
-    # There can (should) be only be one... but we will select the most recent to be safe
+
+def getLatestId( tablename, dstname, run, seg=None ):
+
+    cache="cups.cache"
+
+    result  = 0
     query=f"""
-    select id from dataset_status where dstname='{dstname}' and run={run} order by id desc limit 1;
+    select id,dstname from {tablename} where run={run} order by id desc;
     """
-    result = statusdbc.execute(query).fetchone()[0]
+    results = list( statusdbr.execute(query).fetchall() )
+
+    # Find the most recent ID with the given dstname
+    for r in results:
+        if r.dstname == dstname:
+            result = r.id
+            break
+
+    if r==0: print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
     return result
-
-
 
 
 @subcommand([
@@ -138,12 +164,13 @@ def finalized(args):
 
     now = str( args.timestamp )
 
+    id_ = getLatestId('dataset_status',dstname,run)
     upsert=f"""
     update dataset_status
         set finalized='{now}',
             status='finalized',
             blame='{blame}'
-    where dstname='{dstname}' and run={run};
+    where id={id_};
     """
     
     statusdbc.execute( upsert )
@@ -168,13 +195,14 @@ def updated(args):
 
     now = str( args.timestamp )
 
+    id_ = getLatestId('dataset_status',dstname,run)
     upsert=f"""
     update dataset_status
         set updated='{now}',
             status='updated',
             nsegments=nsegments+1,
             blame='{blame}'
-    where dstname='{dstname}' and run={run};
+    where id={id_};
     """    
 
     statusdbc.execute( upsert )
@@ -199,13 +227,14 @@ def broken(args):
     status  = "broken"
 
     now = str( args.timestamp )
+    id_ = getLatestId('dataset_status',dstname,run)
 
     upsert=f"""
     update dataset_status
         set broken='{now}',
             status='broken',
             blame='{blame}'
-    where dstname='{dstname}' and run={run};
+    where id={id_};
     """
     
     statusdbc.execute( upsert )
