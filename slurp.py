@@ -55,20 +55,29 @@ except pyodbc.InterfaceError:
             statusdbr = statusdbr_.cursor()
         except:
             exit(0)
+except pyodbc.Error as e:
+    print(e)
+    exit(0)
 
 
 try:
     statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
     statusdbw = statusdbw_.cursor()
-except pyodbc.InterfaceError:
+except (pyodbc.InterfaceError) as e:
     for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
         print(f"Could not connect to DB... retry in {s}s")
         time.sleep(s)
         try:
             statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
             statusdbw = statusdbw_.cursor()
+            break
         except:
-            exit(0)
+            pass
+    else:
+        exit(0) # no break in for loop
+except pyodbc.Error as e:
+    print(e)
+    exit(0)
 
 fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
 fccro = fcro.cursor()
