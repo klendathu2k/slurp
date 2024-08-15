@@ -292,7 +292,6 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True, dstname=None
     return result
 
 def fetch_invalid_run_entry( dstname, run, seg ):
-
     query = f"""
     select 
     ,   id
@@ -407,7 +406,6 @@ def insert_production_status( matching, setup, condor, state ):
         
         dsttype=setup.name
         dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
-        #dstfile=dstname+'-%08i-%04i'%(run,segment)
         dstfile=( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
         
         prod_id = setup.id
