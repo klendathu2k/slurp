@@ -88,6 +88,7 @@ fccro = fcro.cursor()
 daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;READONLY=True");
 daqc = daqdb.cursor()
 
+
 cursors = { 
     'daq':daqc,
     'fc':fccro,
@@ -888,6 +889,8 @@ def matches( rule, kwargs={} ):
         prod_status_map[fbn] = stat.status  # supposed to be the map of the jobs which are in the production database to the filename of that job
         #INFO(f"{fbn} : {stat.status}")
 
+
+
     #
     # Build the list of matches.  We iterate over the fc_result zipped with the set of proposed outputs
     # which derives from it.  Keep a list of all runs we are about to submit.
@@ -895,7 +898,7 @@ def matches( rule, kwargs={} ):
     list_of_runs = []
     INFO("Building matches")
     for ((lfn,run,seg,*fc_rest),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
-
+                
         #
         # Get the production status from the proposed output name
         #
@@ -903,6 +906,7 @@ def matches( rule, kwargs={} ):
         #
         x    = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
+
 
         #
         # There is a master list of states which result in a DST producion job being blocked.  By default
@@ -972,6 +976,7 @@ def matches( rule, kwargs={} ):
 
             myinputs = None
             myranges = None
+
             if inputs_:
                 myinputs = ' '.join(inputs_) ### ??????
 
@@ -991,6 +996,7 @@ def matches( rule, kwargs={} ):
             # 
             # Build the rule-match data structure and immediately convert it to a dictionary.
             #    
+
             match = SPhnxMatch(
                 name,                   # name of the DST, e.g. DST_CALO
                 script,                 # script which will be run on the worker node
