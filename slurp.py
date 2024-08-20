@@ -858,8 +858,12 @@ def matches( rule, kwargs={} ):
     #
     # Returns the production status table from the database
     #
-    prod_status = fetch_production_status ( setup, 0, -1, update, sphenix_dstname(setup.name,setup.build,setup.dbtag))  # between run min and run max inclusive
+    if runMin>runMax:
+        runMax=999999
+        runMin=0
+
     INFO("Fetching production status")
+    prod_status = fetch_production_status ( setup, runMin, runMax, update, sphenix_dstname(setup.name,setup.build,setup.dbtag))  # between run min and run max inclusive
 
     #
     # Map the production status table onto the output filename.  We use this map later on to determine whether
