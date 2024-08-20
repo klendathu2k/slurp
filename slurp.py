@@ -584,31 +584,30 @@ def submit( rule, **kwargs ):
             mymatching.append(d)        
             dispatched_runs.append( (d['run'],d['seg']) )
 
+            
 
-        
-        
+                
         run_submit_loop=30
         schedd_query = None
-        for run_submit_loop in [120,180,300,600]:
-            try:
-                submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
-
-                schedd_query = schedd.query(
-                    constraint=f"ClusterId == {submit_result.cluster()}",
-                    projection=["ClusterId", "ProcId", "Out", "UserLog", "Args" ]
-                )
-                break # success... break past the else clause
-            
-            except htcondor.HTCondorIOError:
-
-                WARN(f"Could not submit jobs to condor.  Retry in {run_submit_loop} seconds")
-                time.sleep( run_submit_loop )
-
-        else:
-            # Executes after final iteration
-            ERROR(f"ERROR: could not submit jobs to condor after several retries")
+        #        for run_submit_loop in [120,180,300,600]:
+        #            try:
         INFO("Submitting the jobs to the cluster")
+        submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
         INFO("Getting back the cluster and process IDs")
+        schedd_query = schedd.query(
+            constraint=f"ClusterId == {submit_result.cluster()}",
+            projection=["ClusterId", "ProcId", "Out", "UserLog", "Args" ]
+        )
+
+#                break # success... break past the else clause            
+#            except htcondor.HTCondorIOError:
+#
+#                WARN(f"Could not submit jobs to condor.  Retry in {run_submit_loop} seconds")
+#                time.sleep( run_submit_loop )
+#
+#        else:
+#            # Executes after final iteration
+#            ERROR(f"ERROR: could not submit jobs to condor after several retries")
             
             
  
