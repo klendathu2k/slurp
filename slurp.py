@@ -380,7 +380,7 @@ def update_production_status( matching, setup, condor, state ):
         set     status='{state}',{state}='{timestamp}'
         where id={id_}
         """
-#       where   dstname='{dstname}' and run={run} and segment={segment} and id={id_}
+        
         statusdbw.execute(update)
         statusdbw.commit()
 
