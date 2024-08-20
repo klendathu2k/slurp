@@ -85,7 +85,6 @@ DST_TRIGGERED_EVENT_run2pp_ana430_2024p007:
      accounting_group      : "group_sphenix.mdc2"
      accounting_group_user : "sphnxpro"
      priority : '3890'
-     transfer_output_files : ""
      request_xferslots: '1'
 #    output                : '{logbase}.condor.stdout'
 #    error                 : '{logbase}.condor.stderr'
@@ -132,9 +131,9 @@ DST_CALO_Y2_FITTING:
      accounting_group      : "group_sphenix.mdc2"
      accounting_group_user : "sphnxpro"
      priority : '3810'
-     transfer_output_files : ""
 #     output                : '{logbase}.condor.stdout'
 #     error                 : '{logbase}.condor.stderr'
+#     transfer_output_files : '"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).out"'
 
 
 
@@ -185,7 +184,6 @@ DST_CALO_Y2_CALIB:
      accounting_group      : "group_sphenix.mdc2"
      accounting_group_user : "sphnxpro"
      priority : '3800'
-     transfer_output_files : ""
 #     output                : '{logbase}.condor.stdout'
 #     error                 : '{logbase}.condor.stderr'
 

@@ -69,12 +69,9 @@ PHYS_DST_STREAMING_EVENT_run2pp:
      arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {comment} {histdir}"
      output_destination    : '{logdir}'
      transfer_input_files  : "{payload},cups.py,bachi.py,odbc.ini"
-     output                : '{logbase}.condor.stdout'
-     error                 : '{logbase}.condor.stderr'
      log                   : '{condor}/{logbase}.condor'
      accounting_group      : "group_sphenix.mdc2"
      accounting_group_user : "sphnxpro"
-     transfer_output_files : ""
      priority : '3800'
      request_xferslots: '0'
 
@@ -152,12 +149,9 @@ PHYS_DST_STREAMING_EVENT_cosmics:
      arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {comment} {histdir}"
      output_destination    : '{logdir}'
      transfer_input_files  : "{payload},cups.py,bachi.py,odbc.ini"
-     output                : '{logbase}.condor.stdout'
-     error                 : '{logbase}.condor.stderr'
      log                   : '{condor}/{logbase}.condor'
      accounting_group      : "group_sphenix.mdc2"
      accounting_group_user : "sphnxpro"
-     transfer_output_files : ""
      priority : '3800'
      request_xferslots: '0'
 
