@@ -827,10 +827,18 @@ def matches( rule, kwargs={} ):
                     pth_lists[ runseg ][ direct ].append( p )
 
         # Build list of PFNs via filecatalog lookup if direct path has not been specified
-        if rule.direct==None:
+        if rule.direct==None:            
+
+            number_of_lfns = len(list_of_lfns.split(','))
+
+            condition=f"lfn in ( {list_of_lfns} )"
+            if number_of_lfns==1:
+                condition=f"lfn={list_of_lfns}";
+
             pfnquery=f"""
-            select full_file_path,md5 from files where lfn in ( {list_of_lfns} );
+            select full_file_path from files where {condition} limit {number_of_lfns};
             """        
+
             for pfnresult in fccro.execute( pfnquery ):
                 pfn_lists[ runseg ].append( pfnresult.full_file_path )
 
