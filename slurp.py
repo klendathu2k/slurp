@@ -256,7 +256,7 @@ def table_exists( tablename ):
 
 
 
-def fetch_production_status( setup, runmn=0, runmx=-1, update=True, dstname=None ):
+def fetch_production_status( setup, runmn=0, runmx=-1, update=True, dstname=" " ):
     """
     Given a production setup, returns the production status table....
     """
@@ -272,17 +272,15 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True, dstname=None
         else              : 
             query = query + f" and run>={runmn} and run<={runmx}"
 
-        if dstname is not None:
-            query = query + f" and dstfile like '{dstname}%'"
+        #if dstname is not None:
+        #    query = query + f" and dstfile like '{dstname}%'"
 
         query=query+";"
 
-
-
-        dbresult = statusdbr.execute( query ).fetchall();
+        dbresult = statusdbw.execute( query ).fetchall();
 
         # Transform the list of tuples from the db query to a list of prouction status dataclass objects
-        result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
+        result = [ SPhnxProductionStatus( *db ) for db in dbresult if dstname in db.dstfile ]
 
     elif update==True: # note: we should never reach this state ...  tables ought to exist already
 
