@@ -382,7 +382,8 @@ def update_production_status( matching, setup, condor, state ):
         """
         
         statusdbw.execute(update)
-        statusdbw.commit()
+
+    statusdbw.commit()
 
 def insert_production_status( matching, setup, condor, state ):
 
