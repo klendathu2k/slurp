@@ -330,6 +330,25 @@ def nevents(args):
         statusdbc.execute( update )
         statusdbc.commit()
 
+#
+@subcommand([
+])
+def getinputs(args):
+    """
+    Retrieves the list of input files
+    """
+    tablename=args.table
+    dstname=args.dstname
+    run=int(args.run)
+    seg=int(args.segment)
+    id_ = getLatestId( tablename, dstname, run, seg )
+    query = f"""
+    select inputs from {tablename} where id={id_}
+    """
+    result = statusdbr.execute( query ).fetchone()
+    print(result[0])
+
+
 #_______________________________________________________________________________________________________
 @subcommand([
     argument(     "--files",  help="List of input files (and/or ranges)",dest="files",nargs="*"),

@@ -966,13 +966,22 @@ def matches( rule, kwargs={} ):
             if inputs_:
                 myinputs = ' '.join(inputs_) ### ??????
 
+            # Direct lookup used in event builder jobs and implies we should obtain our
+            # inputs from the database
+            #
+            #if inputs_ and rule.direct:
+            #    myinputs = "dbinputs"
+            #
+
+
+
             if ranges_:
                 myranges = ' '.join(ranges_)
 
             
             # 
             # Build the rule-match data structure and immediately convert it to a dictionary.
-            #
+            #    
             match = SPhnxMatch(
                 name,                   # name of the DST, e.g. DST_CALO
                 script,                 # script which will be run on the worker node
