@@ -38,14 +38,14 @@ try:
     statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
     statusdbr = statusdbr_.cursor()
 except pyodbc.InterfaceError:
-    for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
+    for s in [ 10*random.random(), 20*random.random(), 30*random.random(), 60*random.random(), 120*random.random() ]:
         print(f"Could not connect to DB... retry in {s}s")
         time.sleep(s)
         try:
             statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
             statusdbr = statusdbr_.cursor()
         except:
-            exit(0)
+            pass
 except pyodbc.Error as e:
     print(e)
     exit(1)
