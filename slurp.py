@@ -326,9 +326,11 @@ def getLatestId( tablename, dstname, run, seg ):
 
     cache="cups.cache"
 
+    # We are limiting to the list of all productions for a given run,segment pair.
+
     result  = 0
     query=f"""
-    select id,dstname from {tablename} where run={run} and segment={seg} order by id desc;
+    select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES};
     """
     results = list( statusdbr.execute(query).fetchall() )
 
