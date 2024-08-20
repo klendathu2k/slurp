@@ -330,19 +330,14 @@ def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with 
     try:
         statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
         statusdbw = statusdbw_.cursor()
-    except pyodbc.InterfaceError:
+    except (pyodbc.InterfaceError, pyodbc.Error,pyodbc.ProgrammingError) as e:
         print("... could not query the db ... skipping report")
         return
 
     query=f"select id,cluster,process from production_status where {conditions} and status!='failed' limit 1000"
     try:
         results = statusdbw.execute(query);
-    except pyodbc.OperationalError: 
-        print("... could not query the db ... skipping report")
-        del statusdbw_
-        del statusdbw
-        return
-    except pyodbc.ProgrammingError:
+    except (pyodbc.OperationalError,pyodbc.Error,pyodbc.ProgrammingError) as e: 
         print("... could not query the db ... skipping report")
         del statusdbw_
         del statusdbw
