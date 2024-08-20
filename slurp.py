@@ -332,15 +332,27 @@ def getLatestId( tablename, dstname, run, seg ):
     query=f"""
     select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES};
     """
-    results = list( statusdbr.execute(query).fetchall() )
-
     # Find the most recent ID with the given dstname
-    for r in results:
+
+    for r in list( statusdbw.execute(query).fetchall() ):
         if r.dstname == dstname:
             result = r.id
             break
 
-    if r==0: print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
+    # Possible that there may have been multiple jobs launched that pushes our entry below the limit... Try again w/ 10x higher limit.
+
+    if result==0: 
+        query=f"""
+        select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES*10};
+        """
+        for r in list( statusdbw.execute(query).fetchall() ):
+            if r.dstname == dstname:
+                result = r.id
+                break
+
+    if result==0:
+        print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
+
     return result
 
 def update_production_status( matching, setup, condor, state ):
