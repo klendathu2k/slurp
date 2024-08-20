@@ -35,7 +35,7 @@ DST_TRIGGERED_EVENT_run2pp_ana430_2024p007:
                 runnumber                                                                                                          , 
                 0                                                                                                   as segment     , 
                 string_agg( distinct split_part(filename,'/',-1), ' ' )                                             as files       ,   
-                string_agg( distinct split_part(filename,'/',-1) || ':' || firstevent || ':' || lastevent, ' ' )    as fileranges  
+                'X'                                                                                                 as fileranges  
          from  
                 filelist
          where 
