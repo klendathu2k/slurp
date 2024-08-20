@@ -383,11 +383,12 @@ def insert_production_status( matching, setup, condor, state ):
         procId    = ad['ProcId']
         out       = ad['Out'].split('/')[-1]   # discard anything that looks like a filepath
         ulog      = ad['UserLog'].split('/')[-1] 
-        args      = ad['Args']
+        #args      = ad['Args']
         #key      = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
         key       = ulog.split('.')[0].lower()  # lowercase b/c referenced by file basename
 
-        condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'Args':args, 'UserLog':ulog }
+        #condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'Args':args, 'UserLog':ulog }
+        condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
 
 
 # select * from status_dst_calor_auau23_ana387_2023p003;
