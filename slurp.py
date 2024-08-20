@@ -806,6 +806,15 @@ def matches( rule, kwargs={} ):
     # Build lists of PFNs available for each run
     INFO("Building PFN lists")
     for runseg,lfns in lfn_lists.items():
+
+        runnumber, segment = runseg.strip("'").split('-')        
+        output = DSTFMT %(name,build,tag,int(runnumber),int(segment))
+        
+        # If the output does not exist on disk OR the resubmit option is present we may need to build the job.  
+        # Otherwise we can szve time by skipping.
+        #if ( (resubmit==False) and (exists.get(output,None) == None) ):
+        #    continue
+
         lfns_ = [ f"'{x}'" for x in lfns ]
         list_of_lfns = ','.join(lfns_)
 
