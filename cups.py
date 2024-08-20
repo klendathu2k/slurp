@@ -19,6 +19,8 @@ import os
 import shutil
 import platform
 
+MAXDSTNAMES = 100
+
 #
 # Production status connection
 #
@@ -134,7 +136,7 @@ def getLatestId( tablename, dstname, run, seg ):
 
     result  = 0
     query=f"""
-    select id,dstname from {tablename} where run={run} and segment={seg} order by id desc;
+    select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES};
     """
     results = list( statusdbr.execute(query).fetchall() )
 
@@ -144,7 +146,18 @@ def getLatestId( tablename, dstname, run, seg ):
             result = r.id
             break
 
-    if result==0: print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
+    if result==0:
+        query=f"""
+        select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES*10};
+        """
+        for r in list( statusdbc.execute(query).fetchall() ):
+            if r.dstname == dstname:
+                result = r.id
+                break
+
+    if result==0: 
+        print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
+
     return result
 
 
