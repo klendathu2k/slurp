@@ -388,7 +388,7 @@ def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with 
         holdreason=None
         if jobstatus==5:
             try:
-                holdreason = q.lookup('HoldReason')
+                holdreason = q.lookup('HoldReason')[:1022] + " $" # save only 1022 characters and terminate with a $
             except KeyError:
                 holdreason = "unknown"
         key = f"{clusterid}.{processid}"
@@ -404,7 +404,8 @@ def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with 
 
     for i,cq in c2cq.items():
 
-        message=str(cq['HoldReason']).replace("'"," ")
+        # First 512 characters of the message
+        message=str(cq['HoldReason']).replace("'"," ") [:512]
         enteredcurrentstatus=str(cq['EnteredCurrentStatus'])
         update = f"""
         update production_status
