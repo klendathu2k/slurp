@@ -334,7 +334,7 @@ def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with 
         print("... could not query the db ... skipping report")
         return
 
-    query=f"select id,cluster,process from production_status where {conditions} and status!='failed'"
+    query=f"select id,cluster,process from production_status where {conditions} and status!='failed' limit 1000"
     try:
         results = statusdbw.execute(query);
     except pyodbc.OperationalError: 
