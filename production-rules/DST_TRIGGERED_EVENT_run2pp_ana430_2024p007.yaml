@@ -8,7 +8,7 @@ DST_TRIGGERED_EVENT_run2pp_ana430_2024p007:
      outbase :   $(name)_$(build)_$(tag)
      script  :   run.sh
      payload :   ./slurp-examples/sPHENIX/triggers/
-     mem     :   8192MB
+     mem     :   4096M
      neventsper: 10000
 
    #
