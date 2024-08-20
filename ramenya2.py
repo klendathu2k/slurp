@@ -430,6 +430,9 @@ def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with 
     
 
 def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor state",  ):
+    return
+
+
     print(title)
 #              count(run)                      as num_jobs,
     psqlquery=f"""
