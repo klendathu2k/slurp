@@ -489,6 +489,7 @@ def submit( rule, **kwargs ):
     # Build list of LFNs which match the input
     matching, setup, runlist = matches( rule, kwargs )
 
+    nmatches = len(matching)
     if len(matching)==0:
         return result
 
