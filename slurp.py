@@ -88,6 +88,10 @@ fccro = fcro.cursor()
 daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;READONLY=True");
 daqc = daqdb.cursor()
 
+#print(f"ProductionStatus [RO]: timeout {statusdbr_.timeout}s")
+#print(f"ProductionStatus [Wr]: timeout {statusdbw_.timeout}s")
+#print(f"FileCatalog [RO]:      timeout {fcro.timeout}s")
+#print(f"DaqDB [RO]:            timeout {daqdb.timeout}s")
 
 cursors = { 
     'daq':daqc,
