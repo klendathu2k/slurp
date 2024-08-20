@@ -588,6 +588,7 @@ def submit(args):
         clear()
 
         print( f"Active rules: {args.SLURPFILE} {args.rules} "  )
+        print( f"Defined in file: {args.rules_file}" )
         print( tabulate( [ list_of_active_rules ], ['active rules'], tablefmt=tablefmt ) )
         print( runreport )
 
