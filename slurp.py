@@ -614,14 +614,15 @@ def submit( rule, **kwargs ):
         # Update DB IFF we have a valid submission
         INFO("Insert and update the production_status")
         if ( schedd_query ):
+            
             INFO("... insert")
-
-            insert_production_status( matching, setup, schedd_query, state="submitting" ) 
+            insert_production_status( matching, setup, schedd_query, state="submitted" ) 
 
             INFO("... result")
             result = submit_result.cluster()
 
-            update_production_status( matching, setup, schedd_query, state="submitted" )
+            #INFO("... update")
+            #update_production_status( matching, setup, schedd_query, state="submitted" )
 
 
     else:
