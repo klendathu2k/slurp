@@ -69,8 +69,8 @@ def main():
 
 
         if 'pending' in args.outputs:
-            print("Summary of jobs which have not reached staus='started'")
-            print("------------------------------------------------------")
+            #print("Summary of jobs which have not reached staus='started'")
+            #print("------------------------------------------------------")
             psqlquery=f"""
             select dsttype,prod_id,
                count(run)                        as num_jobs           ,
@@ -84,11 +84,11 @@ def main():
             order by dsttype desc
             ;
             """
-            psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
+            #psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
 
         if 'started' in args.outputs:
-            print("Summary of jobs which have reached staus='started'")
-            print("--------------------------------------------------")
+            #print("Summary of jobs which have reached staus='started'")
+            #print("--------------------------------------------------")
             psqlquery=f"""
             select dsttype,prod_id,
                count(run)                      as num_jobs,
@@ -112,11 +112,11 @@ def main():
             order by dsttype desc
                ;
             """
-            psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
+            #psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
 
         if 'clusters' in args.outputs:
-            print("Summary of jobs which have reached staus='started'")
-            print("--------------------------------------------------")
+            #print("Summary of jobs which have reached staus='started'")
+            #print("--------------------------------------------------")
             psqlquery=f"""
             select dsttype,cluster,
                count(run)                      as num_jobs,
@@ -140,12 +140,13 @@ def main():
             order by dsttype desc
                ;
             """
-            psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
+            #psql(dbname="FileCatalog",command=psqlquery,_out=sys.stdout)
 
 
         if 'everything' in args.outputs:
-            psql(dbname="FileCatalog", 
-                 command="select dsttype,run,segment,cluster,process,status,nevents,started,running,ended,exit_code from production_status order by id;", _out=sys.stdout);
+            pass
+            #psql(dbname="FileCatalog", 
+            #     command="select dsttype,run,segment,cluster,process,status,nevents,started,running,ended,exit_code from production_status order by id;", _out=sys.stdout);
  
         if args.once:
             break
