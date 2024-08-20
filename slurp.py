@@ -775,9 +775,34 @@ def matches( rule, kwargs={} ):
     # These are not the droids you are looking for.  Move along.
     if len(lfn_lists)==0: return [], None, []
             
+    #
+    # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
+    # N.b. Output file naming convention is fixed as DST_TYPE_system-run#-seg#.ext... so something having a run
+    # range may end up outside of the schema.
+    #
     INFO("Building candidate outputs")
+    outputs = [ DSTFMT %(name,build,tag,int(x.runnumber),int(x.segment)) for x in fc_result ]
     INFO(f"... {len(outputs)} candidate outputs")
 
+    #
+    # We cannot prune outputs alone here.  It must be the same length as fc_result
+    #
+
+
+    # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
+    # we know that we do not have to produce it if it appears w/in the outputs list.
+    dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
+    
+    exists = {}
+    INFO("Building list of existing outputs")
+    for check in fccro.execute(f"select filename,runnumber,segment from datasets where runnumber>={runMin} and runnumber<={runMax} and filename like'"+dsttype+"%';"):
+        exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
+    INFO(f"... {len(exists.keys())} existing outputs")
+
+
+
+    
+    
     # Build lists of PFNs available for each run
     INFO("Building PFN lists")
     for runseg,lfns in lfn_lists.items():
@@ -809,30 +834,6 @@ def matches( rule, kwargs={} ):
             for pfnresult in fccro.execute( pfnquery ):
                 pfn_lists[ runseg ].append( pfnresult.full_file_path )
 
-    #
-    # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
-    # N.b. Output file naming convention is fixed as DST_TYPE_system-run#-seg#.ext... so something having a run
-    # range may end up outside of the schema.
-    #
-    outputs = [ DSTFMT %(name,build,tag,int(x[1]),int(x[2])) for x in fc_result ]
-
-    #
-    # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
-    # we know that we do not have to produce it if it appears w/in the outputs list.
-    #
-    # TODO: This is potentially a big, long query.  Limit query to the existing set of proposed output files or the 
-    # list of runs...
-    dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
-    exists = {}
-
-    #fileexists = f"""
-    #select filename, runnumber, segment from datasets where filename in ( {','.join( ["'"+x+"'" for x in outputs] )} );
-    #"""
-    #for check in fccro.execute(fileexists):
-    #    exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
-
-    for check in fccro.execute(f"select filename,runnumber,segment from datasets where runnumber>={runMin} and runnumber<={runMax} and filename like'"+dsttype+"%';"):
-        exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
     INFO(f"... {len(pfn_lists.keys())} pfn lists")
 
     # 
