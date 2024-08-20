@@ -28,6 +28,9 @@ from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
 
 import logging
 
+# This is the maximum number of DST names / types that will be in production at any one time
+MAXDSTNAMES = 100
+
 # List of states which block the job
 blocking = ["submitting","submitted","started","running","evicted","failed","finished"]
 #blocking = []
