@@ -775,6 +775,8 @@ def matches( rule, kwargs={} ):
     # These are not the droids you are looking for.  Move along.
     if len(lfn_lists)==0: return [], None, []
             
+    INFO("Building candidate outputs")
+    INFO(f"... {len(outputs)} candidate outputs")
 
     # Build lists of PFNs available for each run
     INFO("Building PFN lists")
