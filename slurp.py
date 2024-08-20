@@ -520,6 +520,7 @@ def submit( rule, **kwargs ):
             return result        
 
 
+    INFO("Get the job dictionary")
     jobd = rule.job.dict()
 
 
@@ -530,6 +531,7 @@ def submit( rule, **kwargs ):
     # condor macro substitutions... so we translate these into local variables, which
     # are then replaced in the 'eval' of the oiutput directory below.
     #
+    INFO("Creating directories if they do not exist")
     for outname in [ 'outdir', 'logdir', 'condor', 'histdir' ]:
 
         outdir=kwargs.get(outname,None)
@@ -549,8 +551,8 @@ def submit( rule, **kwargs ):
             rungroup=f'{mnrun:08d}_{mxrun:08d}'
             pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
     
+    INFO("Passing job to htcondor.Submit")
     submit_job = htcondor.Submit( jobd )
-    #INFO(submit_job)
     if verbose>0:
         INFO(submit_job)
         if verbose>10:
@@ -566,6 +568,7 @@ def submit( rule, **kwargs ):
         schedd = htcondor.Schedd()    
 
         # Strip out unused $(...) condor macros
+        INFO("Converting matches to list of dictionaries for schedd...")
         mymatching = []
         for m in iter(matching):
             d = {}
@@ -603,14 +606,19 @@ def submit( rule, **kwargs ):
         else:
             # Executes after final iteration
             ERROR(f"ERROR: could not submit jobs to condor after several retries")
+        INFO("Submitting the jobs to the cluster")
+        INFO("Getting back the cluster and process IDs")
             
             
  
         # Update DB IFF we have a valid submission
+        INFO("Insert and update the production_status")
         if ( schedd_query ):
+            INFO("... insert")
 
             insert_production_status( matching, setup, schedd_query, state="submitting" ) 
 
+            INFO("... result")
             result = submit_result.cluster()
 
             update_production_status( matching, setup, schedd_query, state="submitted" )
@@ -745,9 +753,11 @@ def matches( rule, kwargs={} ):
 
     runMin=999999
     runMax=0
+    INFO("Building candidate inputs")
     if rule.files:
         curs      = cursors[ rule.filesdb ]
         fc_result = list( curs.execute( rule.files ).fetchall() )
+        INFO(f"... {len(fc_result)} inputs")
         for f in fc_result:
             run     = f.runnumber
             segment = f.segment
@@ -766,6 +776,7 @@ def matches( rule, kwargs={} ):
         fc_map = { f.runnumber : f for f in fc_result }
 
     # Build lists of PFNs available for each run
+    INFO("Building PFN lists")
     for runseg,lfns in lfn_lists.items():
         lfns_ = [ f"'{x}'" for x in lfns ]
         list_of_lfns = ','.join(lfns_)
@@ -819,6 +830,7 @@ def matches( rule, kwargs={} ):
 
     for check in fccro.execute(f"select filename,runnumber,segment from datasets where runnumber>={runMin} and runnumber<={runMax} and filename like'"+dsttype+"%';"):
         exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
+    INFO(f"... {len(pfn_lists.keys())} pfn lists")
 
     # 
     # The production setup will be unique based on (1) the specified analysis build, (2) the specified DB tag,
@@ -828,12 +840,14 @@ def matches( rule, kwargs={} ):
     repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
     repo_url  = sh.git('config','--get','remote.origin.url',_cwd=payload ).rstrip()  # TODO: fix hardcoded directory
 
+    INFO("Fetching production setup")
     setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
     
     #
     # Returns the production status table from the database
     #
     prod_status = fetch_production_status ( setup, 0, -1, update, sphenix_dstname(setup.name,setup.build,setup.dbtag))  # between run min and run max inclusive
+    INFO("Fetching production status")
 
     #
     # Map the production status table onto the output filename.  We use this map later on to determine whether
@@ -841,17 +855,20 @@ def matches( rule, kwargs={} ):
     # has failed and needs expert attention.
     #
     prod_status_map = {}
+    INFO("Building production status map")    
     for stat in prod_status:
         # replace with sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
         file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        # Not even sure how this was working???  This is the filename of the proposed job
         fbn = stat.dstfile
         prod_status_map[fbn] = stat.status  # supposed to be the map of the jobs which are in the production database to the filename of that job
+        #INFO(f"{fbn} : {stat.status}")
 
     #
     # Build the list of matches.  We iterate over the fc_result zipped with the set of proposed outputs
     # which derives from it.  Keep a list of all runs we are about to submit.
     #
     list_of_runs = []
+    INFO("Building matches")
     for ((lfn,run,seg,*fc_rest),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
 
         #
@@ -978,6 +995,7 @@ def matches( rule, kwargs={} ):
     if len(result)==0:
         WARN("No input files match the specifed rule.")
         
+    INFO(f"Matched {len(result)} jobs to the rule")
 
     return result, setup, list_of_runs
 
