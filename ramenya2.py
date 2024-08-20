@@ -143,6 +143,8 @@ def argument(*name_or_flags, **kwargs):
     return ([*name_or_flags], kwargs)
 
 def query_pending_jobs( conditions="" ):
+    return
+
     print("Summary of jobs which have not reached staus='started'")
     #print("------------------------------------------------------")
     psqlquery=f"""
@@ -179,6 +181,8 @@ def query_pending_jobs( conditions="" ):
 
 
 def query_started_jobs(conditions=""):
+    return
+
     print("Summary of jobs which have reached staus='started'")
     #print("--------------------------------------------------")
     psqlquery=f"""
@@ -220,6 +224,8 @@ def query_started_jobs(conditions=""):
     return vistable
 
 def query_jobs_by_cluster(conditions=""):
+    return
+
     print("Summary of jobs by condor cluster")
     psqlquery=f"""
             select dsttype,cluster,
@@ -260,7 +266,10 @@ def query_jobs_by_cluster(conditions=""):
         print("... could not query the db ... skipping report")
         pass
 
+
 def query_failed_jobs(conditions="", title="Summary of failed jobs by run"):
+    return
+
     print(title)
     psqlquery=f"""
             select dstname,prod_id,string_agg( to_char(run,'FM00000000')||'-'||to_char(segment,'FM0000'),' ' )
@@ -286,6 +295,8 @@ def query_failed_jobs(conditions="", title="Summary of failed jobs by run"):
 
 
 def query_jobs_by_run(conditions="", title="Summary of jobs by run" ):
+    return
+
     print(title)
 #              count(run)                      as num_jobs,
     psqlquery=f"""
@@ -315,7 +326,6 @@ def query_jobs_by_run(conditions="", title="Summary of jobs by run" ):
         pass
 
 def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with condor state",  ):
-
     # Write connection to DB
     try:
         statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
