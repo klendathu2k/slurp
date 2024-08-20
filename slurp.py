@@ -771,6 +771,9 @@ def matches( rule, kwargs={} ):
                 ERROR(f"Run number {run}-{segment} reached twice in this query...")
                 ERROR(rule.files)
                 exit(1)
+
+    # These are not the droids you are looking for.  Move along.
+    if len(lfn_lists)==0: return [], None, []
             
 
     # Build lists of PFNs available for each run
