@@ -398,6 +398,8 @@ def insert_production_status( matching, setup, condor, state ):
     # replace with sphenix_dstname( setup.name, setup.build, setup.dbtag )
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
 
+    values = []
+
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
@@ -437,8 +439,22 @@ def insert_production_status( matching, setup, condor, state ):
         values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )
         """
 
-        statusdbw.execute(insert)
-        statusdbw.commit()
+        values.append( f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" )
+        
+
+        #statusdbw.execute(insert)
+        #statusdbw.commit()
+
+    insvals = ','.join(values)
+
+    insert = f"""
+    insert into production_status
+           (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents, submission_host )
+    values 
+           {insvals}
+    """
+    statusdbw.execute(insert)
+    statusdbw.commit()
 
         
 
