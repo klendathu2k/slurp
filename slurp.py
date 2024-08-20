@@ -740,9 +740,7 @@ def matches( rule, kwargs={} ):
 
     # Build list of possible outputs from filelist query... (requires run,sequence as 2nd and 3rd
     # elements in the query result)
-    fc_result = []
-    fc_map    = None
-
+    fc_result  = []
 
     rl_result = None
     rl_map    = None
@@ -774,7 +772,6 @@ def matches( rule, kwargs={} ):
                 ERROR(rule.files)
                 exit(1)
             
-        fc_map = { f.runnumber : f for f in fc_result }
 
     # Build lists of PFNs available for each run
     INFO("Building PFN lists")
