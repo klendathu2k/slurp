@@ -46,7 +46,10 @@ arg_parser.add_argument( '--segments', nargs='+', help="One argument for a speci
 arg_parser.add_argument( '--config',help="Specifies the yaml configuration file")
 arg_parser.add_argument( '--docstring',default=None,help="Appends a documentation string to the log entry")
 arg_parser.add_argument( '--experiment-mode',dest="mode",help="Specifies the experiment mode (commissioing or physics) for direct lookup of input files.",default="physics")
+
+arg_parser.add_argument( '--test-mode',dest="test_mode",default=False,help="Sets testing mode, which will mangle DST names and directory paths.")
 arg_parser.add_argument( '--mangle-dstname',dest='mangle_dstname',help="Replaces 'DST' with the specified name", default=None )
+arg_parser.add_argument( '--mangle-dirpath',dest='mangle_dirpath',help="Inserts string after sphnxpro/ (or tmp/) in the directory structure", default=None )
 
 def sanity_checks( params, inputq ):
     result = True
@@ -104,6 +107,11 @@ def main():
 
     # parse command line options
     args, userargs = slurp.parse_command_line()
+
+    if args.test_mode:
+        args.mangle_dstname = 'DST_TEST'
+        args.mangle_dirpath = 'testbed'
+        
 
     mylogdir=f"/tmp/kaedama/kaedama/{args.rule}"; #{str(datetime.datetime.today().date())}.log",
     pathlib.Path(mylogdir).mkdir( parents=True, exist_ok=True )            
@@ -215,7 +223,12 @@ def main():
                 
                 
 
-    filesystem    = config.get('filesystem',None)
+    filesystem    = config.get('filesystem',None)                         
+    if filesystem and args.mangle_dirpath:
+        for key,val in filesystem.items():
+            filesystem[key]=filesystem[key].replace("sphnxpro","sphnxpro/"+args.mangle_dirpath)
+            filesystem[key]=filesystem[key].replace("tmp","tmp/"+args.mangle_dirpath)
+
     job_          = config.get('job',None) #config['job']
     presubmit     = config.get('presubmit',None)
 
