@@ -46,6 +46,7 @@ arg_parser.add_argument( '--segments', nargs='+', help="One argument for a speci
 arg_parser.add_argument( '--config',help="Specifies the yaml configuration file")
 arg_parser.add_argument( '--docstring',default=None,help="Appends a documentation string to the log entry")
 arg_parser.add_argument( '--experiment-mode',dest="mode",help="Specifies the experiment mode (commissioing or physics) for direct lookup of input files.",default="physics")
+arg_parser.add_argument( '--mangle-dstname',dest='mangle_dstname',help="Replaces 'DST' with the specified name", default=None )
 
 def sanity_checks( params, inputq ):
     result = True
@@ -198,6 +199,11 @@ def main():
     runlist_query = config.get('runlist_query','').format(**locals())
     params        = config.get('params',None)
     if params:
+
+        if args.mangle_dstname:
+            params['name']=params['name'].replace('DST',args.mangle_dstname)
+            logging.info(f"DST name is mangled to {params['name']}")
+
         for key in ['outbase','logbase']:
             try:
                 params[key]=params[key].format(**locals())
