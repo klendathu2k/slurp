@@ -24,8 +24,6 @@ CREATE TABLE if not exists PRODUCTION_SETUP
        repo     text             not null,   -- git repo used
        dir      text             not null,   -- directory relative to repo
        hash     varchar(8)       not null,   -- hash for the production setup
-       int      fromrun                  ,   -- if set first run covered by the production setup
-       int      lastrun                  ,   -- if set last run covered by the production setup
        primary key (name,build,dbtag,hash)
 )
 """
@@ -93,6 +91,13 @@ CREATE TABLE if not exists PRODUCTION_STATUS
 
        nevents    int                     ,   -- number of events
 
+       submission_host varchar(16)        ,
+       execution_node  varchar(32)        ,
+ 
+       message text                       ,
+
+       logsize         int,
+
        foreign key (prod_id) references PRODUCTION_SETUP (id) ,
 
        primary key (id,run,segment,prod_id)         
@@ -153,7 +158,7 @@ def sphnx_production_dataset():
     return """
     CREATE TABLE if not exists DATASET_STATUS (
        id        serial      unique  
-    ,  dstname   varchar(32) not null 
+    ,  dstname   varchar(63) not null 
     ,  run       int         not null
     ,  lastrun   int         default 0
     ,  revision  int         default 0      -- incremented each time the dataset is resubmitted

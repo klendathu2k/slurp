@@ -47,6 +47,10 @@ arg_parser.add_argument( '--config',help="Specifies the yaml configuration file"
 arg_parser.add_argument( '--docstring',default=None,help="Appends a documentation string to the log entry")
 arg_parser.add_argument( '--experiment-mode',dest="mode",help="Specifies the experiment mode (commissioing or physics) for direct lookup of input files.",default="physics")
 
+arg_parser.add_argument( '--test-mode',dest="test_mode",default=False,help="Sets testing mode, which will mangle DST names and directory paths.",action="store_true")
+arg_parser.add_argument( '--mangle-dstname',dest='mangle_dstname',help="Replaces 'DST' with the specified name.", default=None )
+arg_parser.add_argument( '--mangle-dirpath',dest='mangle_dirpath',help="Inserts string after sphnxpro/ (or tmp/) in the directory structure", default=None )
+
 def sanity_checks( params, inputq ):
     result = True
 
@@ -92,10 +96,13 @@ def sanity_checks( params, inputq ):
     
     return result
 
-idw = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
 
 def dbconsistency():
-    idr = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
+    try:
+        idw = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
+        idr = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
+    except:
+        logging.warn( "Read and write instance of status db are out of sync / or could not connect to one or both." )
     return (idr,idw)
     
 
@@ -103,6 +110,15 @@ def main():
 
     # parse command line options
     args, userargs = slurp.parse_command_line()
+
+    mycwd = pathlib.Path(".")
+    if 'testbed' in str(mycwd.absolute()).lower():
+        args.test_mode = True
+        logging.info("Running in testbed mode.")
+
+    if args.test_mode:
+        args.mangle_dirpath = 'testbed'
+        
 
     mylogdir=f"/tmp/kaedama/kaedama/{args.rule}"; #{str(datetime.datetime.today().date())}.log",
     pathlib.Path(mylogdir).mkdir( parents=True, exist_ok=True )            
@@ -198,6 +214,11 @@ def main():
     runlist_query = config.get('runlist_query','').format(**locals())
     params        = config.get('params',None)
     if params:
+
+        if args.mangle_dstname:
+            params['name']=params['name'].replace('DST',args.mangle_dstname)
+            logging.info(f"DST name is mangled to {params['name']}")
+
         for key in ['outbase','logbase']:
             try:
                 params[key]=params[key].format(**locals())
@@ -209,7 +230,12 @@ def main():
                 
                 
 
-    filesystem    = config.get('filesystem',None)
+    filesystem    = config.get('filesystem',None)                         
+    if filesystem and args.mangle_dirpath:
+        for key,val in filesystem.items():
+            filesystem[key]=filesystem[key].replace("sphnxpro","sphnxpro/"+args.mangle_dirpath)
+            filesystem[key]=filesystem[key].replace("tmp","tmp/"+args.mangle_dirpath)
+
     job_          = config.get('job',None) #config['job']
     presubmit     = config.get('presubmit',None)
 
