@@ -72,7 +72,7 @@ def argument(*name_or_flags, **kwargs):
     return ([*name_or_flags], kwargs)
 
 
-def getLatestId( tablename, dstname, run, seg=None ):
+def getLatestId( tablename, dstname, run ):
 
     cache="cups.cache"
 
