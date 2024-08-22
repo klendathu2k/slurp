@@ -310,8 +310,6 @@ def main():
         submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump", "neventsper"] }
 
         dispatched = submit (dst_rule, nevents=args.nevents, **submitkw, **filesystem ) 
-        #for run in dispatched:
-            #name_ = params['name']
 
         batch="batch"
         if args.batch==False:
