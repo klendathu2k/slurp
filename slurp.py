@@ -477,7 +477,7 @@ def insert_production_status( matching, setup, condor, state ):
         
 
 
-def submit( rule, **kwargs ):
+def submit( rule, maxjobs, **kwargs ):
 
     # Will return cluster ID
     result = 0
@@ -567,6 +567,17 @@ def submit( rule, **kwargs ):
 
     dispatched_runs = []
 
+
+    #
+    # At this point in the code, matching jobs are storred in the array 'matching'.
+    # All jobs in this array are ripe for submission.  If maxjobs is defined, this
+    # is the point where we can truncate the matches...
+    #
+    if maxjobs:
+        INFO(f"Truncating the number of jobs to maxjobs={maxjobs}")        
+        matching = matching[:int(maxjobs)]
+
+
     if dump==False:
         if verbose==-10:
             INFO(submit_job)
@@ -594,8 +605,10 @@ def submit( rule, **kwargs ):
                 
         run_submit_loop=30
         schedd_query = None
-        #        for run_submit_loop in [120,180,300,600]:
-        #            try:
+
+#        for run_submit_loop in [120,180,300,600]:
+#            try:
+
         INFO("Submitting the jobs to the cluster")
         submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
         INFO("Getting back the cluster and process IDs")
