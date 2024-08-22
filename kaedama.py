@@ -111,6 +111,7 @@ def main():
     mycwd = pathlib.Path(".")
     if 'testbed' in str(mycwd.absolute()).lower():
         args.test_mode = True
+        logging.info("Running in testbed mode.")
 
     if args.test_mode:
         args.mangle_dirpath = 'testbed'
