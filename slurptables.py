@@ -24,8 +24,6 @@ CREATE TABLE if not exists PRODUCTION_SETUP
        repo     text             not null,   -- git repo used
        dir      text             not null,   -- directory relative to repo
        hash     varchar(8)       not null,   -- hash for the production setup
-       int      fromrun                  ,   -- if set first run covered by the production setup
-       int      lastrun                  ,   -- if set last run covered by the production setup
        primary key (name,build,dbtag,hash)
 )
 """
@@ -92,6 +90,10 @@ CREATE TABLE if not exists PRODUCTION_STATUS
        exit_code  int                     ,   -- exit code of user script
 
        nevents    int                     ,   -- number of events
+
+       submission_host varchar(16)        ,
+       execution_node  varchar(32)        ,
+       logsize         int,
 
        foreign key (prod_id) references PRODUCTION_SETUP (id) ,
 
