@@ -96,10 +96,13 @@ def sanity_checks( params, inputq ):
     
     return result
 
-idw = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
 
 def dbconsistency():
-    idr = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
+    try:
+        idw = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
+        idr = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
+    except:
+        logging.warn( "Read and write instance of status db are out of sync / or could not connect to one or both." )
     return (idr,idw)
     
 
