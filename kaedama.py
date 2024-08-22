@@ -49,7 +49,9 @@ arg_parser.add_argument( '--experiment-mode',dest="mode",help="Specifies the exp
 
 arg_parser.add_argument( '--test-mode',dest="test_mode",default=False,help="Sets testing mode, which will mangle DST names and directory paths.",action="store_true")
 arg_parser.add_argument( '--mangle-dstname',dest='mangle_dstname',help="Replaces 'DST' with the specified name.", default=None )
-arg_parser.add_argument( '--mangle-dirpath',dest='mangle_dirpath',help="Inserts string after sphnxpro/ (or tmp/) in the directory structure", default=None )
+arg_parser.add_argument( '--mangle-dirpath',dest='mangle_dirpath',help="Inserts string after sphnxpro/ (or tmp/) in the directory structure", default=None, type=int )
+
+arg_parser.add_argument( '--maxjobs',dest="maxjobs",help="Maximum number of jobs to pass to condor", default=None )
 
 def sanity_checks( params, inputq ):
     result = True
@@ -309,7 +311,7 @@ def main():
         #
         submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump", "neventsper"] }
 
-        dispatched = submit (dst_rule, nevents=args.nevents, **submitkw, **filesystem ) 
+        dispatched = submit (dst_rule, args.maxjobs, nevents=args.nevents, **submitkw, **filesystem ) 
 
         batch="batch"
         if args.batch==False:
