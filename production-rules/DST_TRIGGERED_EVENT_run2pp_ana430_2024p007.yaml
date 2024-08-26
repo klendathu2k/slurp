@@ -10,6 +10,8 @@ DST_TRIGGERED_EVENT_run2pp_ana430_2024p007:
      payload :   ./slurp-examples/sPHENIX/triggers/
      mem     :   4096M
      neventsper: 10000
+     rsync  : "{payload},cups.py,bachi.py,odbc.ini"
+
 
    #
    # input query:
@@ -78,16 +80,13 @@ DST_TRIGGERED_EVENT_run2pp_ana430_2024p007:
    #
    job:
      executable            : "{payload}/run.sh"
-     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {histdir}"
+     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {histdir} {PWD} {rsync}"
      output_destination    : '{logdir}'
-     transfer_input_files  : "{payload},cups.py,bachi.py,odbc.ini"
      log                   : '{condor}/{logbase}.condor'
      accounting_group      : "group_sphenix.mdc2"
      accounting_group_user : "sphnxpro"
      priority : '3890'
      request_xferslots: '1'
-#    output                : '{logbase}.condor.stdout'
-#    error                 : '{logbase}.condor.stderr'
 
 
 
@@ -124,17 +123,12 @@ DST_CALO_Y2_FITTING:
          ;
    job:
      executable            : "{payload}/runy2fitting.sh"
-     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {histdir}"
+     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {histdir} {PWD} {rsync}"
      output_destination    : '{logdir}'
-     transfer_input_files  : "{payload},cups.py,bachi.py,odbc.ini"
      log                   : '{condor}/{logbase}.condor'
      accounting_group      : "group_sphenix.mdc2"
      accounting_group_user : "sphnxpro"
      priority : '3810'
-#     output                : '{logbase}.condor.stdout'
-#     error                 : '{logbase}.condor.stderr'
-#     transfer_output_files : '"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).out"'
-
 
 
    filesystem:  
@@ -177,16 +171,12 @@ DST_CALO_Y2_CALIB:
          ;
    job:
      executable            : "{payload}/runy2calib.sh"
-     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {histdir}"
+     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {histdir} {PWD} {rsync}"
      output_destination    : '{logdir}'
-     transfer_input_files  : "{payload},cups.py,bachi.py,odbc.ini"
      log                   : '{condor}/{logbase}.condor'
      accounting_group      : "group_sphenix.mdc2"
      accounting_group_user : "sphnxpro"
      priority : '3800'
-#     output                : '{logbase}.condor.stdout'
-#     error                 : '{logbase}.condor.stderr'
-
 
    filesystem:  
      outdir : "/sphenix/lustre01/sphnxpro/physics/slurp/caloy2calib/$(build)_$(tag)/run_$(rungroup)"
