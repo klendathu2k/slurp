@@ -10,7 +10,7 @@ DST_TRIGGERED_EVENT_run2pp_ana430_2024p007:
      payload :   ./slurp-examples/sPHENIX/triggers/
      mem     :   4096M
      neventsper: 10000
-     rsync  : "{payload},cups.py,bachi.py,odbc.ini"
+     rsync  : "./slurp-examples/sPHENIX/triggers/*,cups.py,bachi.py,odbc.ini"
 
 
    #
@@ -103,6 +103,8 @@ DST_CALO_Y2_FITTING:
      payload :   ./slurp-examples/sPHENIX/CaloProduction/
      mem     :   4096MB
      neventsper: 50000
+     rsync  : "./slurp-examples/sPHENIX/triggers/*,cups.py,bachi.py,odbc.ini"
+
    input:
      db: filecatalog
      query: |-
@@ -151,6 +153,8 @@ DST_CALO_Y2_CALIB:
      payload :   ./slurp-examples/sPHENIX/CaloProduction/
      mem     :   4096MB
      neventsper: 50000
+     rsync  : "./slurp-examples/sPHENIX/triggers/*,cups.py,bachi.py,odbc.ini"
+
    input:
      db: filecatalog
      query: |-
