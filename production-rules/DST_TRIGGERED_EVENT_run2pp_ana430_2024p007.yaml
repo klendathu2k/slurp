@@ -103,7 +103,7 @@ DST_CALO_Y2_FITTING:
      payload :   ./slurp-examples/sPHENIX/CaloProduction/
      mem     :   4096MB
      neventsper: 50000
-     rsync  : "./slurp-examples/sPHENIX/triggers/*,cups.py,bachi.py,odbc.ini"
+     rsync  : "./slurp-examples/sPHENIX/CaloProduction/*,cups.py,bachi.py,odbc.ini"
 
    input:
      db: filecatalog
@@ -153,7 +153,7 @@ DST_CALO_Y2_CALIB:
      payload :   ./slurp-examples/sPHENIX/CaloProduction/
      mem     :   4096MB
      neventsper: 50000
-     rsync  : "./slurp-examples/sPHENIX/triggers/*,cups.py,bachi.py,odbc.ini"
+     rsync  : "./slurp-examples/sPHENIX/CaloProduction/*,cups.py,bachi.py,odbc.ini"
 
    input:
      db: filecatalog
