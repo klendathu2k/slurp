@@ -31,8 +31,6 @@ from slurp import cursors
 import logging
 from logging.handlers import RotatingFileHandler
 
-
-
 import pprint
 
 # Extend the command line arguments
@@ -189,6 +187,7 @@ def main():
 
     RUNFMT = slurp.RUNFMT
     SEGFMT = slurp.SEGFMT
+    PWD    = str(pathlib.Path(".").absolute())
 
     limit_condition=""
     if args.limit>0:
