@@ -32,6 +32,7 @@ DST_TRIGGERED_EVENT_run2pp_ana430_2024p007:
       db: daqdb
       direct_path: /sphenix/lustre01/sphnxpro/{mode}/*/physics/
       query: |-
+         with partialrun as (
          select 
                 'daqdb/filelist'                                                                                    as source      , 
                 runnumber                                                                                                          , 
@@ -63,9 +64,47 @@ DST_TRIGGERED_EVENT_run2pp_ana430_2024p007:
                 )
 
          order by runnumber
-                {limit_condition}
+         ),
 
-              ;              
+         fullrun as (
+         select 
+                'daqdb/filelist'                                                                                    as source      , 
+                runnumber                                                                                                          , 
+                0                                                                                                   as segment     , 
+                string_agg( distinct split_part(filename,'/',-1), ' ' )                                             as files       ,   
+                'X'                                                                                                 as fileranges  
+         from  
+                filelist
+         where 
+           ( 
+             (filename  like '/bbox%/%emcal%physics%.prdf'    and lastevent>2 ) or 
+             (filename  like '/bbox%/%HCal%physics%.prdf'     and lastevent>2 ) or
+             (filename  like '/bbox%/%LL1%physics%.prdf'      and lastevent>2 ) or
+             (filename  like '/bbox%/GL1_physics%.evt'       and lastevent>2 ) or
+             (filename  like '/bbox%/%mbd%physics%.prdf'      and lastevent>2 ) or
+             (filename  like '/bbox%/%ZDC%physics%.prdf'      and lastevent>2 )
+           )
+           {run_condition}
+
+         group by runnumber
+
+         having
+                every(transferred_to_sdcc)   and
+                max(lastevent)>1000          and
+                sum( case when filename like '/bbox%/GL1_physics%' then 1 else 0 end )>0 and
+                (
+                   sum( case when filename like '/bbox%/%emcal%physics%'  then 1 else 0 end )>0 or
+                   sum( case when filename like '/bbox%/%HCal%physics%'   then 1 else 0 end )>0 
+                )
+
+         order by runnumber
+         )
+
+         select *,'partial run' as runtype from partialrun where runnumber not in ( select runnumber from fullrun ) 
+              union all 
+         select *,'full run' as runtype from fullrun where true 
+
+         ;              
 
    # TODO:  Need to add error checking to make sure that outdir, logdir, etc... are quoted properly.  Else, this will cause problems with argument substitution
    filesystem:  
