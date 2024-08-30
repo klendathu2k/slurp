@@ -42,12 +42,12 @@ DST_TRIGGERED_EVENT_run2pp_ana430_2024p007:
                 filelist
          where 
            ( 
-             (filename  like '/bbox%/%emcal%physics%'    and lastevent>2 ) or 
-             (filename  like '/bbox%/%HCal%physics%'     and lastevent>2 ) or
-             (filename  like '/bbox%/%LL1%physics%'      and lastevent>2 ) or
-             (filename  like '/bbox%/GL1_physics%'       and lastevent>2 ) or
-             (filename  like '/bbox%/%mbd%physics%'      and lastevent>2 ) or
-             (filename  like '/bbox%/%ZDC%physics%'      and lastevent>2 )
+             (filename  like '/bbox%/%emcal%physics%-0000.prdf'    and lastevent>2 ) or 
+             (filename  like '/bbox%/%HCal%physics%-0000.prdf'     and lastevent>2 ) or
+             (filename  like '/bbox%/%LL1%physics%-0000.prdf'      and lastevent>2 ) or
+             (filename  like '/bbox%/GL1_physics%-0000.evt'       and lastevent>2 ) or
+             (filename  like '/bbox%/%mbd%physics%-0000.prdf'      and lastevent>2 ) or
+             (filename  like '/bbox%/%ZDC%physics%-0000.prdf'      and lastevent>2 )
            )
            {run_condition}
 
