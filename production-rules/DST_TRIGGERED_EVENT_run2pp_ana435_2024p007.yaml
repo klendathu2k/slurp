@@ -1,8 +1,8 @@
-DST_TRIGGERED_EVENT_run2pp_ana430_2024p007:
+DST_TRIGGERED_EVENT_run2pp_ana435_2024p007:
    params:
      name:       DST_TRIGGERED_EVENT_run2pp
-     build:      ana.430
-     build_name: ana430
+     build:      ana.435
+     build_name: ana435
      dbtag:      2024p007
      logbase :   $(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT})
      outbase :   $(name)_$(build)_$(tag)
@@ -50,7 +50,8 @@ DST_TRIGGERED_EVENT_run2pp_ana430_2024p007:
              (filename  like '/bbox%/%mbd%physics%-0000.prdf'      and lastevent>2 ) or
              (filename  like '/bbox%/%ZDC%physics%-0000.prdf'      and lastevent>2 )
            )
-           {run_condition} and run<=52331
+           {run_condition}
+           and run>52331
 
          group by runnumber
 
@@ -84,7 +85,8 @@ DST_TRIGGERED_EVENT_run2pp_ana430_2024p007:
              (filename  like '/bbox%/%mbd%physics%.prdf'      and lastevent>2 ) or
              (filename  like '/bbox%/%ZDC%physics%.prdf'      and lastevent>2 )
            )
-           {run_condition} and run<=52331
+           {run_condition}
+           and run>52331
 
          group by runnumber
 
@@ -133,8 +135,8 @@ DST_TRIGGERED_EVENT_run2pp_ana430_2024p007:
 DST_CALO_Y2_FITTING:
    params:
      name:       DST_CALOFITTING_run2pp
-     build:      ana.430
-     build_name: ana430
+     build:      ana.435
+     build_name: ana435
      dbtag:      2024p007
      logbase :   $(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT})
      outbase :   $(name)_$(build)_$(tag)
@@ -183,8 +185,8 @@ DST_CALO_Y2_FITTING:
 DST_CALO_Y2_CALIB:
    params:
      name:       DST_CALO_run2pp
-     build:      ana.430
-     build_name: ana430
+     build:      ana.435
+     build_name: ana435
      dbtag:      2024p007
      logbase :   $(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT})
      outbase :   $(name)_$(build)_$(tag)
@@ -206,7 +208,7 @@ DST_CALO_Y2_CALIB:
          from  
                 datasets
          where 
-                filename like 'DST_CALOFITTING_run2pp_ana430_2024p007%'
+                filename like 'DST_CALOFITTING_run2pp_ana435_2024p007%'
                 {run_condition}
            
          {limit_condition}
