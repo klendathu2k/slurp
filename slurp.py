@@ -454,6 +454,7 @@ def insert_production_status( matching, setup, condor, state ):
         insert=f"""
         insert into production_status
                (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents, submission_host )
+
         values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )
         """
 
@@ -470,9 +471,16 @@ def insert_production_status( matching, setup, condor, state ):
            (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents, submission_host )
     values 
            {insvals}
+
+    returning id
     """
     statusdbw.execute(insert)
     statusdbw.commit()
+
+    result=[ int(x.id) for x in statusdbw.fetchall() ]
+
+    return result
+    
 
         
 
