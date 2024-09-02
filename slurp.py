@@ -633,7 +633,6 @@ def submit( rule, maxjobs, **kwargs ):
             projection=["ClusterId", "ProcId", "Out", "UserLog", "Args" ]
         )
 
- 
         # Update DB IFF we have a valid submission
         INFO("Insert and update the production_status")
         if ( schedd_query ):
