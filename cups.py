@@ -356,10 +356,13 @@ def getinputs(args):
     seg=int(args.segment)
     id_ = getLatestId( tablename, dstname, run, seg )
     query = f"""
-    select inputs from {tablename} where id={id_}
+    select inputs from {tablename} where id={id_} limit 1
     """
-    result = statusdbr.execute( query ).fetchone()
-    print(result[0])
+    result = statusdbr.execute( query ).fetchone()    
+    flist = str(result[0]).split(' ')
+    for f in flist:
+        print(f)
+
 
 
 #_______________________________________________________________________________________________________
