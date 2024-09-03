@@ -457,10 +457,6 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
             cluster = condor_map[ key.lower() ][ 'ClusterId' ]
             process = condor_map[ key.lower() ][ 'ProcId'    ]
         except KeyError:
-            ERROR("Key Error getting cluster and/or process number from the class ads map.")
-            ERROR(f"  key={key}")
-            pprint.pprint( condor_map )
-            ERROR("Assuming this is an issue with condor, setting cluster=0, process=0 and trying to continue...")
             cluster = 0
             process = 0
 
