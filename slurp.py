@@ -369,6 +369,19 @@ def getLatestId( tablename, dstname, run, seg ):
 
 def update_production_status( matching, setup, condor, state ):
 
+    # Condor map contains a dictionary keyed on the "output" field of the job description.
+    # The map contains the cluster ID, the process ID, the arguments, and the output log.
+    # (This is the condor.stdout log...)
+    condor_map = {}
+    for ad in condor:
+        clusterId = ad['ClusterId']
+        procId    = ad['ProcId']
+        out       = ad['Out'].split('/')[-1]   # discard anything that looks like a filepath
+        ulog      = ad['UserLog'].split('/')[-1] 
+        key       = ulog.split('.')[0].lower()  # lowercase b/c referenced by file basename
+
+        condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
+
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
 
     for m in matching:
@@ -376,6 +389,17 @@ def update_production_status( matching, setup, condor, state ):
         segment = int(m['seg'])
 
         key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
+
+        try:
+            cluster = condor_map[ key.lower() ][ 'ClusterId' ]
+            process = condor_map[ key.lower() ][ 'ProcId'    ]
+        except KeyError:
+            ERROR("Key Error getting cluster and/or process number from the class ads map.")
+            ERROR(f"  key={key}")
+            #pprint.pprint( condor_map )
+            ERROR("Assuming this is an issue with condor, setting cluster=0, process=0 and trying to continue...")
+            cluster=0
+            process=0
         
         dsttype=setup.name
         dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
@@ -389,7 +413,7 @@ def update_production_status( matching, setup, condor, state ):
 
         update=f"""
         update  production_status
-        set     status='{state}',{state}='{timestamp}'
+        set     status='{state}',{state}='{timestamp}',cluster={cluster},process={process}
         where id={id_}
         """
         
