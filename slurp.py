@@ -396,7 +396,6 @@ def update_production_status( matching, setup, condor, state ):
         
         dsttype=setup.name
         dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
-        #dstfile=dstname+'-%08i-%04i'%(run,segment)
         dstfile=( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
 
         # 1s time resolution
@@ -425,11 +424,8 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         procId    = ad['ProcId']
         out       = ad['Out'].split('/')[-1]   # discard anything that looks like a filepath
         ulog      = ad['UserLog'].split('/')[-1] 
-        #args      = ad['Args']
-        #key      = out.split('.')[0].lower()  # lowercase b/c referenced by file basename
         key       = ulog.split('.')[0].lower()  # lowercase b/c referenced by file basename
 
-        #condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'Args':args, 'UserLog':ulog }
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
 
 
