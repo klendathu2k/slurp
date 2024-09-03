@@ -51,7 +51,7 @@ DST_TRIGGERED_EVENT_run2pp_ana435_2024p007:
              (filename  like '/bbox%/%ZDC%physics%-0000.prdf'      and lastevent>2 )
            )
            {run_condition}
-           and run>52331
+           and runnumber>52331
 
          group by runnumber
 
@@ -86,7 +86,7 @@ DST_TRIGGERED_EVENT_run2pp_ana435_2024p007:
              (filename  like '/bbox%/%ZDC%physics%.prdf'      and lastevent>2 )
            )
            {run_condition}
-           and run>52331
+           and runnumber>52331
 
          group by runnumber
 

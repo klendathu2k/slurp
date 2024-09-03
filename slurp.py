@@ -589,19 +589,22 @@ def submit( rule, maxjobs, **kwargs ):
         mymatching = []
         for m in iter(matching):
             d = {}
+
             # massage the inputs from space to comma separated
             if m.get('inputs',None): 
                 m['inputs']= ','.join( m['inputs'].split() )
             if m.get('ranges',None):
                 m['ranges']= ','.join( m['ranges'].split() )
+
             for k,v in m.items():
                 if k in str(submit_job):
                     d[k] = v
+                if args.dbinput: 
+                    d['inputs']= 'dbinput'            
+                    d['ranges']= 'dbranges'
+
             mymatching.append(d)        
             dispatched_runs.append( (d['run'],d['seg']) )
-
-            
-
                 
         run_submit_loop=30
         schedd_query = None
@@ -1060,6 +1063,7 @@ arg_parser.add_argument( "--batch", default=False, action="store_true",help="Bat
 arg_parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=["submitting","submitted","started","running","evicted","failed","finished"] )
 arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, action='store_true', 
                          help='Existing filecatalog entry does not block a job')
+arg_parser.add_argument( "--dbinput", default=False, action="store_true",help="Passes input filelist through the production status db rather than the argument list of the production script." )
 
 def parse_command_line():
     global blocking
