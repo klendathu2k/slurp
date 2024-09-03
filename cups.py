@@ -359,7 +359,7 @@ def getinputs(args):
     select inputs from {tablename} where id={id_} limit 1
     """
     result = statusdbr.execute( query ).fetchone()    
-    flist = str(result[0]).split(' ')
+    flist = str(result[0]).split(',')
     for f in flist:
         print(f)
 
