@@ -589,21 +589,22 @@ def submit( rule, maxjobs, **kwargs ):
         mymatching = []
         for m in iter(matching):
             d = {}
+
             # massage the inputs from space to comma separated
             if m.get('inputs',None): 
-                if args.dbinput: m['inputs']= 'dbinput'
-                else:            m['inputs']= ','.join( m['inputs'].split() )
+                m['inputs']= ','.join( m['inputs'].split() )
             if m.get('ranges',None):
-                if args.dbinput: m['ranges']= 'dbranges'
-                else:            m['ranges']= ','.join( m['ranges'].split() )
+                m['ranges']= ','.join( m['ranges'].split() )
+
             for k,v in m.items():
                 if k in str(submit_job):
                     d[k] = v
+                if args.dbinput: 
+                    d['inputs']= 'dbinput'            
+                    d['ranges']= 'dbranges'
+
             mymatching.append(d)        
             dispatched_runs.append( (d['run'],d['seg']) )
-
-            
-
                 
         run_submit_loop=30
         schedd_query = None
