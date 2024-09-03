@@ -397,7 +397,7 @@ def update_production_status( matching, setup, condor, state ):
 
     statusdbw.commit()
 
-def insert_production_status( matching, setup, condor, state ):
+def insert_production_status( matching, setup, condor=[], state='submitting' ):
 
     # Condor map contains a dictionary keyed on the "output" field of the job description.
     # The map contains the cluster ID, the process ID, the arguments, and the output log.
