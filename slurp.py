@@ -629,7 +629,9 @@ def submit( rule, maxjobs, **kwargs ):
                 
         run_submit_loop=30
         schedd_query = None
-
+        
+        INFO("... insert")
+        insert_production_status( matching, setup, [], state="submitting" ) 
 
         INFO("Submitting the jobs to the cluster")
         submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
@@ -643,8 +645,6 @@ def submit( rule, maxjobs, **kwargs ):
         INFO("Insert and update the production_status")
         if ( schedd_query ):
             
-            INFO("... insert")
-            insert_production_status( matching, setup, schedd_query, state="submitted" ) 
 
             INFO("... result")
             result = submit_result.cluster()
