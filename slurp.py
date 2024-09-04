@@ -330,7 +330,7 @@ def fetch_invalid_run_entry( dstname, run, seg ):
 def getLatestId( tablename, dstname, run, seg ):
 
     cache="cups.cache"
-
+    
     # We are limiting to the list of all productions for a given run,segment pair.
 
     result  = 0
@@ -638,8 +638,6 @@ def submit( rule, maxjobs, **kwargs ):
         cupsids = insert_production_status( matching, setup, [], state="submitting" ) 
         for i,m in zip(cupsids,mymatching):
             m['cupsid']=str(i)
-
-        pprint.pprint(mymatching)
 
         INFO("Submitting the jobs to the cluster")
         submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
