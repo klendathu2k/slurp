@@ -746,6 +746,8 @@ def matches( rule, kwargs={} ):
     setup from the DB.
     
     """
+    global args
+
     result = []
 
     name      = kwargs.get('name',      rule.name)
