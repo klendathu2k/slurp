@@ -553,6 +553,9 @@ def submit( rule, maxjobs, **kwargs ):
     INFO("Get the job dictionary")
     jobd = rule.job.dict()
 
+    # Append $(cupsid) as the last argument
+    jobd['arguments'] = jobd['arguments'] + ' $(cupsid)'
+
 
     #
     # Make target output directories.  We abuse the python string formatting facility
@@ -630,8 +633,13 @@ def submit( rule, maxjobs, **kwargs ):
         run_submit_loop=30
         schedd_query = None
         
+        # Insert jobs into the production status table and add the ID to the dictionary
         INFO("... insert")
-        insert_production_status( matching, setup, [], state="submitting" ) 
+        cupsids = insert_production_status( matching, setup, [], state="submitting" ) 
+        for i,m in zip(cupsids,mymatching):
+            m['cupsid']=str(i)
+
+        pprint.pprint(mymatching)
 
         INFO("Submitting the jobs to the cluster")
         submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
