@@ -181,7 +181,6 @@ def started(args):
          execution_node='{node}'
     where id={id_}
     """    
-    #where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
 
     if args.verbose:
         print(update)
