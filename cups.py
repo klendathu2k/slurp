@@ -134,6 +134,10 @@ def getLatestId( tablename, dstname, run, seg ):
 
     cache="cups.cache"
 
+    cupsid=os.getenv('cupsid')
+    if cupsid and tablename=='production_status':
+        return cupsid
+
     result  = 0
     query=f"""
     select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES};
