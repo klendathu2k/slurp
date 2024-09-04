@@ -540,6 +540,8 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
     argument( "--test",default=False,help=argparse.SUPPRESS,action="store_true"), # kaedama will be submitted in batch mode
     argument( "--experiment-mode", default=None, help="Sets experiment-mode for kaedama", dest="mode" ),
     argument( "--resubmit", default=False, action="store_true", help="Adds the -r option to kaedama" ),
+    argument( "--maxjobs", default=10000, help="Maximum number of jobs to submit in one cycle of the loop" ),
+    argument( "--dbinput", default=False, help="Sets the dbinput flag for kaedama",action="store_true"),
     argument( "SLURPFILE",   help="Specifies the slurpfile(s) containing the job definitions" )
 ])
 def submit(args):
@@ -551,7 +553,11 @@ def submit(args):
     timestart=str(args.timestart)
 
     kaedama  = sh.Command("kaedama.py" )    
-    kaedama = kaedama.bake( "submit", "--config", args.SLURPFILE, "--nevents", args.nevents )
+    if args.dbinput:
+        kaedama = kaedama.bake( "submit", "--config", args.SLURPFILE, "--nevents", args.nevents, "--maxjobs", int(args.maxjobs), "--dbinput" )
+    else:
+        kaedama = kaedama.bake( "submit", "--config", args.SLURPFILE, "--nevents", args.nevents, "--maxjobs", int(args.maxjobs) )
+
     if args.test:
         kaedama = kaedama.bake( "--batch" )
     if args.mode is not None:
