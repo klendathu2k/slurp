@@ -657,10 +657,10 @@ def submit( rule, maxjobs, **kwargs ):
             
 
             INFO("... result")
-            result = submit_result.cluster()
+            result = submit_result.cluster()            
 
-            #INFO("... update")
-            #update_production_status( matching, setup, schedd_query, state="submitted" )
+            INFO("... update")
+            update_production_status( matching, setup, schedd_query, state="submitted" )
 
 
     else:
