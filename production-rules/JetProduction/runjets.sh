@@ -15,6 +15,8 @@ logdir=${12:-.}
 histdir=${13:-.}
 subdir=${14}
 payload=(`echo ${15} | tr ","  " "`) # array of files to be rsynced
+#--
+export cupsid=${16}
 
 sighandler()
 {
@@ -92,23 +94,18 @@ for infile_ in ${inputs[@]}; do
     outhist=${out0/DST/HIST}
 
     echo ${infile} > input.list
+    echo root.exe -q -b Fun4All_JetProductionYear2.C\(${nevents},\"input.list\",\"${outfile}\",\"${outhist}\",\"${dbtag}\"\)
+         root.exe -q -b Fun4All_JetProductionYear2.C\(${nevents},\"input.list\",\"${outfile}\",\"${outhist}\",\"${dbtag}\"\);  status_f4a=$?
 
-    #root.exe -q -b Fun4All_Year2_Calib.C\(${nevents},\"${infile}\",\"${outfile}\",\"${outhist}\",\"${dbtag}\"\);  status_f4a=$?
+    nevents=${nevents_:--1}
+    echo Stageout ${outfile} to ${outdir}
+    ./stageout.sh ${outfile} ${outdir}
 
-    root.exe -q -b Fun4All_JetProductionYear2.C\(${nevents},\"input.list\",\"${outfile}\",\"${outhist}\",\"${dbtag}\"\);  status_f4a=$?
-
-    # Stageout the (single) DST created in the macro run
-    #for rfile in ${outfile}; do 
-    #    #nevents_=$( root.exe -q -b GetEntries.C\(\"${filename}\"\) | awk '/Number of Entries/{ print $4; }' )
-        nevents=${nevents_:--1}
-	echo Stageout ${outfile} to ${outdir}
-        ./stageout.sh ${outfile} ${outdir}
-    #done
     for hfile in `ls HIST_*.root`; do
 	echo Stageout ${hfile} to ${histdir}
         ./stageout.sh ${hfile} ${histdir}
-	#mv --verbose ${hfile} ${histdir}
     done
+
 done
 
 if [ "${status_f4a}" -eq 0 ]; then
