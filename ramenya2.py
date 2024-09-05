@@ -541,6 +541,7 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
     argument( "--experiment-mode", default=None, help="Sets experiment-mode for kaedama", dest="mode" ),
     argument( "--resubmit", default=False, action="store_true", help="Adds the -r option to kaedama" ),
     argument( "--maxjobs", default=10000, help="Maximum number of jobs to submit in one cycle of the loop" ),
+    argument( "--maxcondor",default=75000, help="Do not submit if more than maxcondor jobs are in the system.  Terminate the loop if we exceed 150% of this value.",type=int),
     argument( "--dbinput", default=False, help="Sets the dbinput flag for kaedama",action="store_true"),
     argument( "SLURPFILE",   help="Specifies the slurpfile(s) containing the job definitions" )
 ])
@@ -549,6 +550,7 @@ def submit(args):
     Submit a single set of jobs matching the specified rules in the specified definition files.
     """
     go = True
+
     global timestart
     timestart=str(args.timestart)
 
@@ -601,18 +603,37 @@ def submit(args):
             print( tabulate( [ tracebacks ], ['failures'], tablefmt=tablefmt ) )
             tracebacks = []
 
-        # Execute the specified rules
-        for r in list_of_active_rules:
-            print( f"Trying rule ... {r} {datetime.datetime.now().replace(microsecond=0)}" )
-            try:
-                kaedama( batch=True, rule=r, _out=sys.stdout )
-            except sh.ErrorReturnCode_1:
-                print(traceback.format_exc())
-                tracebacks.append( r )
+        # Verify that there is enough room on condor to submit
+        schedd = htcondor.Schedd() 
+        ncondor = 1E9
+        try:
+            condor_query = schedd.query(
+                projection=["ClusterId","ProcId","JobStatus"]
+            )
+            ncondor = len(condor_query)
+            if ncondor > 1.5 * args.maxcondor:
+                print(f"Exiting b/c there are too many jobs ({ncondor}) in the condor schedd.")
+                exit(0)
+
+        except htcondor.HTCondorIOError:
+            print("... could not query condor, aborting this submission ...")
+            del statusdbw_
+            del statusdbw                
+            
+        if ncondor > args.maxcondor:
+            print(f"Skipping b/c there are too many jobs ({ncondor}) in the condor schedd.")
+
+        else:
+
+            for r in list_of_active_rules:
+                print( f"Trying rule ... {r} {datetime.datetime.now().replace(microsecond=0)}" )
+                try:
+                    kaedama( batch=True, rule=r, _out=sys.stdout )
+                except sh.ErrorReturnCode_1:
+                    print(traceback.format_exc())
+                    tracebacks.append( r )
                 
-
-
-        query_pending_jobs()
+        # query_pending_jobs()
         # query_started_jobs()
         # query_jobs_by_cluster()
         # query_failed_jobs()
