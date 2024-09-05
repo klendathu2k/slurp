@@ -120,7 +120,10 @@ def main():
         args.mangle_dirpath = 'testbed'
         
 
-    mylogdir=f"/tmp/kaedama/kaedama/{args.rule}"; #{str(datetime.datetime.today().date())}.log",
+    if args.test_mode:
+        mylogdir=f"/tmp/testbed/kaedama/{args.rule}"; #{str(datetime.datetime.today().date())}.log",
+    else:
+        mylogdir=f"/tmp/kaedama/kaedama/{args.rule}"; #{str(datetime.datetime.today().date())}.log",
     pathlib.Path(mylogdir).mkdir( parents=True, exist_ok=True )            
 
     RotFileHandler = RotatingFileHandler(
