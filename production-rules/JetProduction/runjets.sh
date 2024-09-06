@@ -115,9 +115,6 @@ if [ "${status_f4a}" -eq 0 ]; then
        ./bachi.py --blame cups finalized ${dstname} ${runnumber} 
 fi
 
-# In principle, stageout should have moved the files to their final location
-#rm *.root
-
 ls -lah
 
 #______________________________________________________________________________________ finished __
