@@ -542,6 +542,8 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
     argument( "--resubmit", default=False, action="store_true", help="Adds the -r option to kaedama" ),
     argument( "--maxjobs", default=10000, help="Maximum number of jobs to submit in one cycle of the loop" ),
     argument( "--maxcondor",default=75000, help="Do not submit if more than maxcondor jobs are in the system.  Terminate the loop if we exceed 150% of this value.",type=int),
+    argument( "--watermark",default=1.5, help="Watermark expressed as a multiple of max condor.  When we exceed this value we exit or cycle the loop depending on the next option" ),
+    argument( "--watermark-action", dest="watermark_action",help="Action to take when we exceed the high watermark",default="cycle", choices=['cycle','exit'] ),
     argument( "--dbinput", default=False, help="Sets the dbinput flag for kaedama",action="store_true"),
     argument( "SLURPFILE",   help="Specifies the slurpfile(s) containing the job definitions" )
 ])
@@ -611,16 +613,22 @@ def submit(args):
                 projection=["ClusterId","ProcId","JobStatus"]
             )
             ncondor = len(condor_query)
-            if ncondor > 1.5 * args.maxcondor:
-                print(f"Exiting b/c there are too many jobs ({ncondor}) in the condor schedd.")
-                exit(0)
+            if ncondor > args.watermark * args.maxcondor:
+                if args.watermark_action=="exit":
+                    print(f"Exiting b/c there are too many jobs ({ncondor}) in the condor schedd.")
+                    exit(0)
+                else:
+                    continue
 
         except htcondor.HTCondorIOError:
             print("... could not query condor, aborting this submission ...")
             del statusdbw_
             del statusdbw                
             
-        if ncondor > args.maxcondor:
+        if ncondor == 1E9:
+            print("Could not connect to schedd... skipping")
+
+        elif ncondor > args.maxcondor:
             print(f"Skipping b/c there are too many jobs ({ncondor}) in the condor schedd.")
 
         else:
