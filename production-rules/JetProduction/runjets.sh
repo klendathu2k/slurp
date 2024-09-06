@@ -97,6 +97,8 @@ for infile_ in ${inputs[@]}; do
     echo root.exe -q -b Fun4All_JetProductionYear2.C\(${nevents},\"input.list\",\"${outfile}\",\"${outhist}\",\"${dbtag}\"\)
          root.exe -q -b Fun4All_JetProductionYear2.C\(${nevents},\"input.list\",\"${outfile}\",\"${outhist}\",\"${dbtag}\"\);  status_f4a=$?
 
+    ls -l
+
     nevents=${nevents_:--1}
     echo Stageout ${outfile} to ${outdir}
     ./stageout.sh ${outfile} ${outdir}
