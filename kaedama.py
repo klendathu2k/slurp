@@ -53,6 +53,9 @@ arg_parser.add_argument( '--maxjobs',dest="maxjobs",help="Maximum number of jobs
 
 arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query after parameter substitution and exit", action="store_true", default=False )
 
+arg_parser.add_argument( '--streamname', help="Name of the data stream for single-stream jobs" )
+arg_parser.add_argument( '--streamfile', help="Filename (not incl run number) for the data stream" )
+
 def sanity_checks( params, inputq ):
     result = True
 
@@ -189,6 +192,8 @@ def main():
     elif len(args.segments)>=3:
         seg_condition = "and segment in ( %s )" % ','.join( args.segments )
 
+    streamname = args.streamname
+    streamfile = args.streamfile
 
     RUNFMT = slurp.RUNFMT
     SEGFMT = slurp.SEGFMT
