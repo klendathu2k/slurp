@@ -18,6 +18,17 @@ def main():
         6:"Transferring Output",
         7:"Suspended", 
     }
+
+    colors=[ 
+        "blue",
+        "green+",
+        "grey",
+        "grey+",
+        "red+",
+        "green",
+        "red"        
+    ]
+
     try:
         condor_query = schedd.query(
             projection=["JobBatchName","JobStatus"]
@@ -25,8 +36,6 @@ def main():
     except htcondor.HTCondorIOError: 
         print("... could not query condor.  skipping report ...")
         return
-
-
 
     total_jobs       = {}
     idle_jobs        = {}
@@ -76,11 +85,9 @@ def main():
 
     statelabels = [ condor_job_status_map[i] for i in range(1,8) ]
     
-    plt.simple_stacked_bar( jobnames, statearray, labels=statelabels, width=200, title=f"Current production status {datetime.datetime.now()}" )
+    plt.simple_stacked_bar( jobnames, statearray, labels=statelabels, width=200, title=f"Current production status {datetime.datetime.now()}", colors=colors )
     plt.title("Job states per type")
     plt.show()    
-
-
 
 if __name__ == '__main__':    
     main()
