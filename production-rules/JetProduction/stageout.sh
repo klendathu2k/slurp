@@ -45,6 +45,8 @@ nevents_=$( root.exe -q -b GetEntries.C\(\"${filename}\"\) | awk '/Number of Ent
 nevents=${nevents_:--1}
 
 if [[ "${dsttype}" == "HIST_"* ]]; then
+    mv ${filename} ${destination} 
+
     # cleanup the file once it is staged so the condor's copy back does not get it
     rm ${filename}
 
