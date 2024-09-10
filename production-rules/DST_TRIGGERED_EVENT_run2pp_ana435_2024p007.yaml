@@ -228,3 +228,53 @@ DST_CALO_Y2_CALIB:
      logdir : "file:///sphenix/data/data02/sphnxpro/caloy2calib/$(build)_$(tag)/run_$(rungroup)"
      histdir :       "/sphenix/data/data02/sphnxpro/calohist/$(build)_$(tag)/run_$(rungroup)"
      condor :        "/tmp/caloy2calib/run_$(rungroup)"
+
+
+
+# Downstream products
+DST_CALO_Y2_JETS:
+   params:
+     name:       DST_JETS_run2pp
+     build:      ana.435
+     build_name: ana435
+     dbtag:      2024p007
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT})
+     outbase :   $(name)_$(build)_$(tag)
+     script  :   runjets.sh
+     payload :   ./production-rules/JetProduction/
+     mem     :   2096MB
+     neventsper: 50000
+     rsync  : "./production-rules/JetProduction/*,cups.py,bachi.py,odbc.ini"
+
+   input:
+     db: filecatalog
+     query: |-
+         select 
+                'filecatalog/datasets'                                  as source      , 
+                runnumber                                                              , 
+                segment                                                                ,
+                filename                                                as files       ,
+                'X'                   as fileranges 
+         from  
+                datasets
+         where 
+                filename like 'DST_CALO_run2pp_ana435_2024p007%'
+                {run_condition}
+           
+         {limit_condition}
+
+         ;
+   job:
+     executable            : "{payload}/runjets.sh"
+     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {histdir} {PWD} {rsync}"
+     output_destination    : '{logdir}'
+     log                   : '{condor}/{logbase}.condor'
+     accounting_group      : "group_sphenix.mdc2"
+     accounting_group_user : "sphnxpro"
+     priority : '3800'
+
+   filesystem:  
+     outdir : "/sphenix/lustre01/sphnxpro/physics/slurp/jetproduction/$(build)_$(tag)/run_$(rungroup)"
+     logdir : "file:///sphenix/data/data02/sphnxpro/jetlogs/$(build)_$(tag)/run_$(rungroup)"
+     histdir :       "/sphenix/data/data02/sphnxpro/jethistos/$(build)_$(tag)/run_$(rungroup)"
+     condor :        "/tmp/jetproduction/run_$(rungroup)"
