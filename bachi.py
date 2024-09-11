@@ -78,7 +78,7 @@ def getLatestId( tablename, dstname, run ):
 
     result  = 0
     query=f"""
-    select id,dstname from {tablename} where run={run} order by id desc limit 1;
+    select id,dstname from {tablename} where run={run} order by id desc;
     """
     results = list( statusdbr.execute(query).fetchall() )
 
@@ -88,7 +88,7 @@ def getLatestId( tablename, dstname, run ):
             result = r.id
             break
 
-    if result==0: print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
+    if result==0: print(f"Warning: could not find {dstname} with run={run} ... this may not end well.")
     return result
 
 
