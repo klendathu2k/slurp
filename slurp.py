@@ -609,8 +609,6 @@ def submit( rule, maxjobs, **kwargs ):
         run_submit_loop=30
         schedd_query = None
 
-#        for run_submit_loop in [120,180,300,600]:
-#            try:
 
         INFO("Submitting the jobs to the cluster")
         submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
@@ -620,17 +618,6 @@ def submit( rule, maxjobs, **kwargs ):
             projection=["ClusterId", "ProcId", "Out", "UserLog", "Args" ]
         )
 
-#                break # success... break past the else clause            
-#            except htcondor.HTCondorIOError:
-#
-#                WARN(f"Could not submit jobs to condor.  Retry in {run_submit_loop} seconds")
-#                time.sleep( run_submit_loop )
-#
-#        else:
-#            # Executes after final iteration
-#            ERROR(f"ERROR: could not submit jobs to condor after several retries")
-            
-            
  
         # Update DB IFF we have a valid submission
         INFO("Insert and update the production_status")
