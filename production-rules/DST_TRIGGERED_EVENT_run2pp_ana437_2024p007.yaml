@@ -1,0 +1,417 @@
+#
+# Testbed for file ranges
+#
+DST_TRIGGERED_EVENT_run2pp_ana437_2024p007:
+   params:
+     name:       DST_TRIGGERED_EVENT_run2pp
+     build:      ana.437
+     build_name: ana437
+     dbtag:      2024p007
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT})
+     outbase :   $(name)_$(build)_$(tag)
+     script  :   run.sh
+     payload :   ./production-rules/TriggerProduction/
+     mem     :   4096M
+     neventsper: 100000
+     noverflow:   20000
+     rsync  : "production-rules/TriggerProduction/*,cups.py,bachi.py,odbc.ini"
+
+
+   #
+   # input query:
+   #
+   # This builds a list of all runs known to the file catalog "datasets" table.
+   # The query should return:
+   # 1. The source of the information (formatted as database name/table name)
+   # 2. The run number
+   # 3. A sequence number (a placeholder fixed at zero for event builders)
+   # 4. And a space-separated list of logical filenames 
+   #
+   # The {*_condition} parameters (run, seg, limit) are substituted by kaedama
+   # based on (optional) command line options.
+   #
+   # For now, require GL1 files...
+   #
+   input:
+      db: daqdb
+      direct_path: /sphenix/lustre01/sphnxpro/{mode}/*/physics/
+      query: |-
+         with config as (
+            select 
+               100000 as nevents,
+                20000 as noverflow
+         ),
+
+         partialevents as (
+              select runnumber,max(lastevent)    as lastevent
+              from filelist, config
+              where (filename like '/bbox%/GL1_physics%-0000.evt'        and lastevent>2 )   {run_condition}
+
+              group by runnumber
+              having
+                     every(transferred_to_sdcc)   and
+                     max(lastevent)>1000          and
+                     sum( case when filename like '/bbox%/GL1_physics%' then 1 else 0 end )>0
+
+              order by runnumber
+         ),
+
+         partialjobs as (
+         select 
+                'daqdb/filelist'                                                                                    as source      , 
+                runnumber                                                                                                          , 
+                0                                                                                                   as segment     , 
+                string_agg( split_part(filename,'/',-1), ' ' order by filename )                                             as files       ,   
+                string_agg( firstevent::text || ':' || lastevent::text || ':' || split_part(filename,'/',-1), ' ' order by filename )                    as fileranges  
+         from  
+                filelist,config
+         where 
+           ( 
+             (filename  like '/bbox%/%emcal%physics%-0000.prdf'    and lastevent>2 ) or 
+             (filename  like '/bbox%/%HCal%physics%-0000.prdf'     and lastevent>2 ) or
+             (filename  like '/bbox%/%LL1%physics%-0000.prdf'      and lastevent>2 ) or
+             (filename  like '/bbox%/GL1_physics%-0000.evt'        and lastevent>2 ) or
+             (filename  like '/bbox%/%mbd%physics%-0000.prdf'      and lastevent>2 ) or
+             (filename  like '/bbox%/%ZDC%physics%-0000.prdf'      and lastevent>2 )
+           )
+
+           {run_condition}
+
+         group by runnumber
+
+         having
+                every(transferred_to_sdcc)   and
+                max(lastevent)>1000          and
+                sum( case when filename like '/bbox%/GL1_physics%' then 1 else 0 end )>0 and
+                (
+                   sum( case when filename like '/bbox%/%emcal%physics%'  then 1 else 0 end )>0 or
+                   sum( case when filename like '/bbox%/%HCal%physics%'   then 1 else 0 end )>0 
+                )
+
+         order by runnumber
+         ),
+
+         partialrun as (
+
+             select partialjobs.*,partialevents.lastevent from partialjobs join partialevents on partialjobs.runnumber=partialevents.runnumber
+
+         ),
+
+         fullevents as (
+              select runnumber,max(lastevent)    as lastevent
+              from filelist, config
+              where (filename like '/bbox%/GL1_physics%.evt'        and lastevent>2 )
+
+                 {run_condition}
+
+              group by runnumber
+              having
+                     every(transferred_to_sdcc)   and
+                     max(lastevent)>1000          and
+                     sum( case when filename like '/bbox%/GL1_physics%' then 1 else 0 end )>0
+
+              order by runnumber
+         ),
+
+         fulljobs as (
+         select 
+                'daqdb/filelist'                                                                                    as source      , 
+                runnumber                                                                                                          , 
+                0                                                                                                   as segment     , 
+                string_agg( split_part(filename,'/',-1), ' ' order by filename)                                             as files       ,   
+                string_agg( firstevent::text || ':' || lastevent::text || ':' || split_part(filename,'/',-1), ' ' order by filename )                    as fileranges  
+
+         from  
+                filelist,config
+         where 
+           ( 
+             (filename  like '/bbox%/%emcal%physics%.prdf'    and lastevent>2 ) or 
+             (filename  like '/bbox%/%HCal%physics%.prdf'     and lastevent>2 ) or
+             (filename  like '/bbox%/%LL1%physics%.prdf'      and lastevent>2 ) or
+             (filename  like '/bbox%/GL1_physics%.evt'       and lastevent>2 ) or
+             (filename  like '/bbox%/%mbd%physics%.prdf'      and lastevent>2 ) or
+             (filename  like '/bbox%/%ZDC%physics%.prdf'      and lastevent>2 )
+           )
+
+           {run_condition}
+
+         group by runnumber
+
+         having
+                every(transferred_to_sdcc)   and
+                max(lastevent)>1000          and
+                sum( case when filename like '/bbox%/GL1_physics%' then 1 else 0 end )>0 and
+                (
+                   sum( case when filename like '/bbox%/%emcal%physics%'  then 1 else 0 end )>0 or
+                   sum( case when filename like '/bbox%/%HCal%physics%'   then 1 else 0 end )>0 
+                )
+
+         order by runnumber
+         ),
+
+         fullrun as (
+
+             select fulljobs.*,fullevents.lastevent from fulljobs join fullevents on fulljobs.runnumber=fullevents.runnumber
+
+         ),
+
+         unsegmented as ( 
+             select *,'partial run' as runtype from partialrun where partialrun.runnumber not in ( select fullrun.runnumber from fullrun ) 
+                  union all 
+             select *,'full run' as runtype from fullrun where true 
+         ),
+
+         segmented as (
+
+            select source, 
+                   runnumber,
+                   generate_series(0,unsegmented.lastevent/config.nevents) as segment,
+                   files,
+                   fileranges,
+                   lastevent,
+                   nevents
+
+             from unsegmented,config
+
+         ),
+
+         segmentedA as ( 
+
+         select source,
+                runnumber,
+                segment,
+                files,
+                fileranges,
+                lastevent, 
+                segment*config.nevents as myfirstevent,
+                least( (segment+1)*config.nevents - 1, lastevent ) as mylastevent,
+                config.nevents 
+ 
+                from segmented,config
+
+          ),
+
+
+          segmentedB as (
+
+               select *,
+                      mylastevent-myfirstevent as nprocessing,
+                      lastevent-mylastevent-1  as nremaining from segmentedA,config  -- b/c we count from zero
+       
+          ),
+
+          segmentedC as (
+
+
+               select source, runnumber,
+                      segment,
+                      files,
+                      fileranges,
+                      myfirstevent,
+                      (
+                          select 
+                             case
+                                when nprocessing<config.noverflow  then -1
+                                when nremaining>=config.nevents    then mylastevent
+                                when nremaining>=config.noverflow  then mylastevent
+                                when nremaining<config.noverflow   then lastevent
+                                else                                    -2             -- unhandled, should be an error condition
+                             end
+                      ) as mylastevent,
+                      lastevent,
+                      nprocessing,
+                      nremaining
+
+                      from segmentedB,config
+
+          )
+
+
+          select 
+               source,
+                 runnumber,
+                 segment,
+                 files,
+                 fileranges,
+                 
+                 (select count(*) from regexp_matches( files,      ' ', 'g' ))::integer =
+                 (select count(*) from regexp_matches( fileranges, ' ', 'g' ))::integer as sanity,
+                 myfirstevent as firstevent,
+                 mylastevent  as lastevent,
+                 lastevent    as runs_last_event
+
+                 from segmentedC
+
+          order by runnumber desc, segment desc;
+                 
+
+   # TODO:  Need to add error checking to make sure that outdir, logdir, etc... are quoted properly.  Else, this will cause problems with argument substitution
+   filesystem:  
+     outdir : "/sphenix/lustre01/sphnxpro/physics/slurp/calophysics/$(build)_$(tag)/run_$(rungroup)"
+     logdir : "file:///sphenix/data/data02/sphnxpro/calologs/$(build)_$(tag)/run_$(rungroup)"
+     histdir :       "/sphenix/data/data02/sphnxpro/calohist/$(build)_$(tag)/run_$(rungroup)"
+     condor :        "/tmp/calologs/$(build)_$(tag)/run_$(rungroup)"
+
+   #
+   # Again I note the need to ensure that the arguments are properly specified given the
+   # definition of the payload script.
+   #
+   job:
+     executable            : "{payload}/run.sh"
+     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {histdir} {PWD} {rsync} $(firstevent) $(lastevent) $(runs_last_event)"
+     output_destination    : '{logdir}'
+     log                   : '{condor}/{logbase}.condor'
+     accounting_group      : "group_sphenix.mdc2"
+     accounting_group_user : "sphnxpro"
+     priority : '3890'
+     request_xferslots: '1'
+
+
+
+# Downstream products
+DST_CALO_Y2_FITTING:
+   params:
+     name:       DST_CALOFITTING_run2pp
+     build:      ana.435
+     build_name: ana435
+     dbtag:      2024p007
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT})
+     outbase :   $(name)_$(build)_$(tag)
+     script  :   runy2fitting.sh
+     payload :   ./slurp-examples/sPHENIX/CaloProduction/
+     mem     :   4096MB
+     neventsper: 50000
+     rsync  : "./slurp-examples/sPHENIX/CaloProduction/*,cups.py,bachi.py,odbc.ini"
+
+   input:
+     db: filecatalog
+     query: |-
+         select 
+                'filecatalog/datasets'                                  as source      , 
+                runnumber                                                              , 
+                segment                                                                ,
+                filename                                                as files       ,
+                filename || ':' || 0 || ':' || events                   as fileranges 
+         from  
+                datasets
+         where 
+                filename like 'DST_TRIGGERED_EVENT_run2pp%2024p007%'
+                {run_condition}
+           
+         {limit_condition}
+
+         ;
+   job:
+     executable            : "{payload}/runy2fitting.sh"
+     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {histdir} {PWD} {rsync}"
+     output_destination    : '{logdir}'
+     log                   : '{condor}/{logbase}.condor'
+     accounting_group      : "group_sphenix.mdc2"
+     accounting_group_user : "sphnxpro"
+     priority : '3810'
+
+
+   filesystem:  
+     outdir : "/sphenix/lustre01/sphnxpro/physics/slurp/caloy2fitting/$(build)_$(tag)/run_$(rungroup)"
+     logdir : "file:///sphenix/data/data02/sphnxpro/caloy2fitting/$(build)_$(tag)/run_$(rungroup)"
+     histdir :       "/sphenix/data/data02/sphnxpro/calohist/$(build)_$(tag)/run_$(rungroup)"
+     condor :        "/tmp/caloy2fitting/run_$(rungroup)"
+
+
+# Downstream products
+DST_CALO_Y2_CALIB:
+   params:
+     name:       DST_CALO_run2pp
+     build:      ana.435
+     build_name: ana435
+     dbtag:      2024p007
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT})
+     outbase :   $(name)_$(build)_$(tag)
+     script  :   runy2calib.sh
+     payload :   ./slurp-examples/sPHENIX/CaloProduction/
+     mem     :   4096MB
+     neventsper: 50000
+     rsync  : "./slurp-examples/sPHENIX/CaloProduction/*,cups.py,bachi.py,odbc.ini"
+
+   input:
+     db: filecatalog
+     query: |-
+         select 
+                'filecatalog/datasets'                                  as source      , 
+                runnumber                                                              , 
+                segment                                                                ,
+                filename                                                as files       ,
+                filename || ':' || 0 || ':' || events                   as fileranges 
+         from  
+                datasets
+         where 
+                filename like 'DST_CALOFITTING_run2pp_ana435_2024p007%'
+                {run_condition}
+           
+         {limit_condition}
+
+         ;
+   job:
+     executable            : "{payload}/runy2calib.sh"
+     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {histdir} {PWD} {rsync}"
+     output_destination    : '{logdir}'
+     log                   : '{condor}/{logbase}.condor'
+     accounting_group      : "group_sphenix.mdc2"
+     accounting_group_user : "sphnxpro"
+     priority : '3800'
+
+   filesystem:  
+     outdir : "/sphenix/lustre01/sphnxpro/physics/slurp/caloy2calib/$(build)_$(tag)/run_$(rungroup)"
+     logdir : "file:///sphenix/data/data02/sphnxpro/caloy2calib/$(build)_$(tag)/run_$(rungroup)"
+     histdir :       "/sphenix/data/data02/sphnxpro/calohist/$(build)_$(tag)/run_$(rungroup)"
+     condor :        "/tmp/caloy2calib/run_$(rungroup)"
+
+
+
+# Downstream products
+DST_CALO_Y2_JETS:
+   params:
+     name:       DST_JETS_run2pp
+     build:      ana.435
+     build_name: ana435
+     dbtag:      2024p007
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT})
+     outbase :   $(name)_$(build)_$(tag)
+     script  :   runjets.sh
+     payload :   ./production-rules/JetProduction/
+     mem     :   2096MB
+     neventsper: 50000
+     rsync  : "./production-rules/JetProduction/*,cups.py,bachi.py,odbc.ini"
+
+   input:
+     db: filecatalog
+     query: |-
+         select 
+                'filecatalog/datasets'                                  as source      , 
+                runnumber                                                              , 
+                segment                                                                ,
+                filename                                                as files       ,
+                'X'                   as fileranges 
+         from  
+                datasets
+         where 
+                filename like 'DST_CALO_run2pp_ana435_2024p007%'
+                {run_condition}
+           
+         {limit_condition}
+
+         ;
+   job:
+     executable            : "{payload}/runjets.sh"
+     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {histdir} {PWD} {rsync}"
+     output_destination    : '{logdir}'
+     log                   : '{condor}/{logbase}.condor'
+     accounting_group      : "group_sphenix.mdc2"
+     accounting_group_user : "sphnxpro"
+     priority : '3800'
+
+   filesystem:  
+     outdir : "/sphenix/lustre01/sphnxpro/physics/slurp/jetproduction/$(build)_$(tag)/run_$(rungroup)"
+     logdir : "file:///sphenix/data/data02/sphnxpro/jetlogs/$(build)_$(tag)/run_$(rungroup)"
+     histdir :       "/sphenix/data/data02/sphnxpro/jethistos/$(build)_$(tag)/run_$(rungroup)"
+     condor :        "/tmp/jetproduction/run_$(rungroup)"
