@@ -219,6 +219,9 @@ class SPhnxMatch:
     inputs:   str = None;
     ranges:   str = None;
     rungroup: str = None;
+    firstevent: str = None;
+    lastevent: str = None;
+    runs_last_event: str = None;
     #intputfile: str = None;
     #outputfile: str = None;
 
@@ -906,7 +909,18 @@ def matches( rule, kwargs={} ):
     #
     list_of_runs = []
     INFO("Building matches")
-    for ((lfn,run,seg,*fc_rest),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
+    #for ((lfn,run,seg,*fc_rest),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
+    for (fc,dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
+
+        lfn = fc.source
+        run = fc.runnumber
+        seg = fc.segment
+        firstevent = getattr(fc,'firstevent',None)
+        lastevent  = getattr(fc,'lastevent',None)
+        runs_last_event = getattr(fc,'runs_last_event',None)
+        if firstevent: firstevent=str(firstevent)
+        if lastevent: lastevent=str(lastevent)
+        if runs_last_event: runs_last_event=str(runs_last_event)
                 
         #
         # Get the production status from the proposed output name
@@ -915,6 +929,8 @@ def matches( rule, kwargs={} ):
         #
         x    = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
+
+        #pprint.pprint( fc_rest )
 
 
         #
@@ -1020,6 +1036,9 @@ def matches( rule, kwargs={} ):
                 payload,                # payload directory
                 inputs=myinputs,        # space-separated list of input files
                 ranges=myranges,        # space-separated list of input files with first and last event separated by :
+                firstevent=firstevent,
+                lastevent=lastevent,
+                runs_last_event=runs_last_event,
                 )
 
             match = match.dict()
