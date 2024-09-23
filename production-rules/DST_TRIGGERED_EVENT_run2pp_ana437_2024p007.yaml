@@ -42,61 +42,6 @@ DST_TRIGGERED_EVENT_run2pp_ana437_2024p007:
                 20000 as noverflow
          ),
 
-         partialevents as (
-              select runnumber,max(lastevent)    as lastevent
-              from filelist, config
-              where (filename like '/bbox%/GL1_physics%-0000.evt'        and lastevent>2 )   {run_condition}
-
-              group by runnumber
-              having
-                     every(transferred_to_sdcc)   and
-                     max(lastevent)>1000          and
-                     sum( case when filename like '/bbox%/GL1_physics%' then 1 else 0 end )>0
-
-              order by runnumber
-         ),
-
-         partialjobs as (
-         select 
-                'daqdb/filelist'                                                                                    as source      , 
-                runnumber                                                                                                          , 
-                0                                                                                                   as segment     , 
-                string_agg( split_part(filename,'/',-1), ' ' order by filename )                                             as files       ,   
-                string_agg( firstevent::text || ':' || lastevent::text || ':' || split_part(filename,'/',-1), ' ' order by filename )                    as fileranges  
-         from  
-                filelist,config
-         where 
-           ( 
-             (filename  like '/bbox%/%emcal%physics%-0000.prdf'    and lastevent>2 ) or 
-             (filename  like '/bbox%/%HCal%physics%-0000.prdf'     and lastevent>2 ) or
-             (filename  like '/bbox%/%LL1%physics%-0000.prdf'      and lastevent>2 ) or
-             (filename  like '/bbox%/GL1_physics%-0000.evt'        and lastevent>2 ) or
-             (filename  like '/bbox%/%mbd%physics%-0000.prdf'      and lastevent>2 ) or
-             (filename  like '/bbox%/%ZDC%physics%-0000.prdf'      and lastevent>2 )
-           )
-
-           {run_condition}
-
-         group by runnumber
-
-         having
-                every(transferred_to_sdcc)   and
-                max(lastevent)>1000          and
-                sum( case when filename like '/bbox%/GL1_physics%' then 1 else 0 end )>0 and
-                (
-                   sum( case when filename like '/bbox%/%emcal%physics%'  then 1 else 0 end )>0 or
-                   sum( case when filename like '/bbox%/%HCal%physics%'   then 1 else 0 end )>0 
-                )
-
-         order by runnumber
-         ),
-
-         partialrun as (
-
-             select partialjobs.*,partialevents.lastevent from partialjobs join partialevents on partialjobs.runnumber=partialevents.runnumber
-
-         ),
-
          fullevents as (
               select runnumber,max(lastevent)    as lastevent
               from filelist, config
@@ -156,8 +101,7 @@ DST_TRIGGERED_EVENT_run2pp_ana437_2024p007:
          ),
 
          unsegmented as ( 
-             select *,'partial run' as runtype from partialrun where partialrun.runnumber not in ( select fullrun.runnumber from fullrun ) 
-                  union all 
+
              select *,'full run' as runtype from fullrun where true 
          ),
 
