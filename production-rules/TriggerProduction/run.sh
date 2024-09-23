@@ -46,7 +46,6 @@ done
 # Set state to started
 ./cups.py -r ${runnumber} -s ${segment} -d ${outbase} started
 
-
 echo ..............................................................................................
 echo $@
 echo .............................................................................................. 
@@ -88,13 +87,24 @@ for events in ${ranges[@]}; do
    fname=${e[2]}
    first=${e[0]}
    last=${e[1]}
-   FE["${fname}"]=$first
-   LE["${fname}"]=$last
+
+   # TODO:  Detect SEB file and reduce the first and last event number so that we
+   #  are counting from 0 like the GL1 files.
+
+   if [[ $string == *"GL1"* ]]; then
+      FE["${fname}"]=$first
+      LE["${fname}"]=$last
+   else
+      FE["${fname}"]=$(( first - 1 ))
+      LE["${fname}"]=$(( last  - 1 ))
+   fi
+
 done
 
 echo "Filling the input file lists"
 echo firstevent: $firstevent
 echo lastevent: $lastevent
+
 inputlist=""
 #for f in "${inputs[@]}"; do
 for (( i=0; i<${leni}; i++ )); do
@@ -155,6 +165,8 @@ for (( i=0; i<${leni}; i++ )); do
        echo Add ${f}  ${e[@]} to gl1daq.list
        inputlist="${f} ${inputlist}"
     fi
+
+    # TODO: GL1 files count from 1.  SEB files count from zero.
     
     if [[ $b =~ seb(00|01|02|03|04|05|06|07|08|09|10|11|12|13|14|15|16|17|18|19|20) ]]; then
        nn=${BASH_REMATCH[1]}
