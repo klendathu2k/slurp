@@ -82,6 +82,7 @@ fi
 echo "Build associative arrays holding the min and max event in each file, keyed on file"
 declare -A FE
 declare -A LE
+
 for events in ${ranges[@]}; do
    e=( `echo ${events} | tr ":" " "` ) # first and last event in the file
    fname=${e[2]}
@@ -90,8 +91,6 @@ for events in ${ranges[@]}; do
    FE["${fname}"]=$first
    LE["${fname}"]=$last
 done
-#echo ${FE[@]} ${!FE[@]}
-#echo ${LE[@]} ${!LE[@]}
 
 echo "Filling the input file lists"
 echo firstevent: $firstevent
