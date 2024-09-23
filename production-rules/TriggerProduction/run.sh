@@ -88,9 +88,6 @@ for events in ${ranges[@]}; do
    first=${e[0]}
    last=${e[1]}
 
-   # TODO:  Detect SEB file and reduce the first and last event number so that we
-   #  are counting from 0 like the GL1 files.
-
    if [[ $string == *"GL1"* ]]; then
       FE["${fname}"]=$first
       LE["${fname}"]=$last
@@ -106,7 +103,6 @@ echo firstevent: $firstevent
 echo lastevent: $lastevent
 
 inputlist=""
-#for f in "${inputs[@]}"; do
 for (( i=0; i<${leni}; i++ )); do
 
     f=${inputs[$i]} # file to consider
@@ -114,9 +110,9 @@ for (( i=0; i<${leni}; i++ )); do
     fe=${FE["${fbase}"]}
     le=${LE["${fbase}"]}
 
-    #echo "File $f $fe $le $firstevent $lastevent"
     e=( $fe $le )
 
+    #
     # The file should be included in this run IF
     #
     #   The first event in the file is in the range firstevent,lastevent
@@ -124,21 +120,6 @@ for (( i=0; i<${leni}; i++ )); do
     #   or
     #   The file encompasses the full range of the job
     #
-
-    # First event of the file is inside of the job range
-    #if [[ (${e[0]} -ge $firstevent) && (${e[0]} -le $lastevent) ]]; then
-    #   echo "accept 1"
-    #fi
-
-    # Last event is inside of the job range
-    #if [[ (${e[1]} -ge $firstevent) && (${e[1]} -le $lastevent) ]]; then
-    #   echo "accept 2"
-    #fi
-
-    # Job range is a subset of the file range
-    #if [[ (${e[0]} -le $firstevent) && (${e[1]} -ge $lastevent) ]]; then
-    #   echo "accept 3"
-    #fi
 
     if [[ ((${e[0]} -ge $firstevent) && (${e[0]} -le $lastevent)) ||  \
           ((${e[1]} -ge $firstevent) && (${e[1]} -le $lastevent)) ||  \
@@ -166,8 +147,6 @@ for (( i=0; i<${leni}; i++ )); do
        inputlist="${f} ${inputlist}"
     fi
 
-    # TODO: GL1 files count from 1.  SEB files count from zero.
-    
     if [[ $b =~ seb(00|01|02|03|04|05|06|07|08|09|10|11|12|13|14|15|16|17|18|19|20) ]]; then
        nn=${BASH_REMATCH[1]}
        echo ${f} >> seb${nn}.list
@@ -179,8 +158,6 @@ for (( i=0; i<${leni}; i++ )); do
 
 done
 
-#echo ${inputlist}
-
 echo "ls -l *.list"
 ls -l *.list
 
@@ -191,12 +168,9 @@ if [[ $nlist -lt 21 ]]; then
     exit 2
 fi
 
-
-
 # Register the input list and set state to running
 ./cups.py -r ${runnumber} -s ${segment} -d ${outbase} inputs --files ${inputlist}
 ./cups.py -r ${runnumber} -s ${segment} -d ${outbase} running
-
 
 # Flag the creation of a new dataset in dataset_status
 dstname=${logbase%%-*}
@@ -232,13 +206,4 @@ echo "script done"
 
 exit ${status_f4a}
 
-#>& ${logdir#file:/}/${logbase}.out 
-
-# Direct stageout
-#mv ${logbase}.out ${logdir#file:/}
-#mv ${logbase}.err ${logdir#file:/}
-
-# Write only first 25MB to output logfiles
-#dd if=stdout.log of=${logbase}.out seek=1 bs=25M
-#dd if=stderr.log of=${logbase}.err seek=1 bs=25M
 
