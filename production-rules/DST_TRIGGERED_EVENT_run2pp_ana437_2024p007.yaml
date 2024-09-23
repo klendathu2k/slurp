@@ -208,7 +208,7 @@ DST_TRIGGERED_EVENT_run2pp_ana437_2024p007:
      accounting_group      : "group_sphenix.mdc2"
      accounting_group_user : "sphnxpro"
      priority : '3890'
-     request_xferslots: '1'
+     #request_xferslots: '1'
 
 
 
