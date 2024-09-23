@@ -120,10 +120,15 @@ for (( i=0; i<${leni}; i++ )); do
     #   or
     #   The file encompasses the full range of the job
     #
+    #   IF the first event is < the last event in the job range, and the
+    #      last event of the file is unknown, we add the file to the list
+    #
 
     if [[ ((${e[0]} -ge $firstevent) && (${e[0]} -le $lastevent)) ||  \
           ((${e[1]} -ge $firstevent) && (${e[1]} -le $lastevent)) ||  \
-          ((${e[0]} -le $firstevent) && (${e[1]} -ge $lastevent)) ]]; then
+          ((${e[0]} -le $firstevent) && (${e[1]} -ge $lastevent)) ||  \
+          ((${e[0]} -lt $lastevent ) && (${e[1]} -le 0 ))
+       ]]; then
 
     b=$( basename $f )
     if [[ $b =~ "GL1_cosmics" ]]; then
