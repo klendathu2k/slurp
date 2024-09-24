@@ -11,7 +11,7 @@ DST_TRIGGERED_EVENT_run2pp_ana437_2024p007:
      outbase :   $(name)_$(build)_$(tag)
      script  :   run.sh
      payload :   ./production-rules/TriggerProduction/
-     mem     :   4096M
+     mem     :   2048M
      neventsper: 100000
      noverflow:   20000
      rsync  : "production-rules/TriggerProduction/*,cups.py,bachi.py,odbc.ini"
