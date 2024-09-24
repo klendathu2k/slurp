@@ -126,14 +126,16 @@ for (( i=0; i<${leni}; i++ )); do
     #      last event of the file is unknown, we add the file to the list
     #
 
-    if [[ ( (${e[0]} -ge $firstevent)  &&  (${e[0]} -le $lastsafety) ) ||  \  # First event in the file is w/in the job's event range + a safety margin that will incorporate the next file
-          ( (${e[1]} -ge $firstevent)  &&  (${e[1]} -le $lastsafety) ) ||  \  # Last  event in the file is w/in the job's event range + ...
-          ( (${e[0]} -le $firstevent)  &&  (${e[1]} -ge $lastsafety) ) ||  \  # Job's event range is contained w/in the file's event range + ...
-          ( (${e[0]} -eq $firstevent)  ||  (${e[0]} -eq  $lastevent) ) ||  \  # The first event in the file is equal to the first or last event in the job range 
-          ( (${e[1]} -eq $firstevent)  ||  (${e[1]} -eq  $lastevent) ) ||  \  # The last  event in the file is equal to the first or last event in the job range	  
-          ( (${e[0]} -lt $lastsafety)  &&  (${e[1]} -le           0) )     \  # If the end of the file is unknown... we will always add
+    if [[ ((${e[0]} -ge $firstevent) && (${e[0]} -le $lastsafety))||  \
+          ((${e[1]} -ge $firstevent) && (${e[1]} -le $lastsafety))||  \
+          ((${e[0]} -le $firstevent) && (${e[1]} -ge $lastsafety))||  \
+          ((${e[0]} -eq $firstevent) || (${e[0]} -eq  $lastevent))||  \
+          ((${e[1]} -eq $firstevent) || (${e[1]} -eq  $lastevent))||  \
+          ((${e[0]} -lt $lastsafety) && (${e[1]} -le           0))    \
        ]]; then
 
+
+ 
     b=$( basename $f )
     if [[ $b =~ "GL1_cosmics" ]]; then
        echo ${f} >> gl1daq.list
