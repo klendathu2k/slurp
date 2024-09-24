@@ -102,6 +102,8 @@ echo "Filling the input file lists"
 echo firstevent: $firstevent
 echo lastevent: $lastevent
 
+lastsafety=$(( lastevent+19999 ))
+
 inputlist=""
 for (( i=0; i<${leni}; i++ )); do
 
@@ -124,10 +126,12 @@ for (( i=0; i<${leni}; i++ )); do
     #      last event of the file is unknown, we add the file to the list
     #
 
-    if [[ ((${e[0]} -ge $firstevent) && (${e[0]} -le $lastevent)) ||  \
-          ((${e[1]} -ge $firstevent) && (${e[1]} -le $lastevent)) ||  \
-          ((${e[0]} -le $firstevent) && (${e[1]} -ge $lastevent)) ||  \
-          ((${e[0]} -lt $lastevent ) && (${e[1]} -le 0 ))
+    if [[ ( (${e[0]} -ge $firstevent)  &&  (${e[0]} -le $lastsafety) ) ||  \  # First event in the file is w/in the job's event range + a safety margin that will incorporate the next file
+          ( (${e[1]} -ge $firstevent)  &&  (${e[1]} -le $lastsafety) ) ||  \  # Last  event in the file is w/in the job's event range + ...
+          ( (${e[0]} -le $firstevent)  &&  (${e[1]} -ge $lastsafety) ) ||  \  # Job's event range is contained w/in the file's event range + ...
+          ( (${e[0]} -eq $firstevent)  ||  (${e[0]} -eq  $lastevent) ) ||  \  # The first event in the file is equal to the first or last event in the job range 
+          ( (${e[1]} -eq $firstevent)  ||  (${e[1]} -eq  $lastevent) ) ||  \  # The last  event in the file is equal to the first or last event in the job range	  
+          ( (${e[0]} -lt $lastsafety)  &&  (${e[1]} -le           0) )     \  # If the end of the file is unknown... we will always add
        ]]; then
 
     b=$( basename $f )
