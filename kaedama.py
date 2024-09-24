@@ -206,6 +206,9 @@ def main():
 
     logging.info( f"Executing rule {args.rule} where ... {run_condition} {seg_condition} {limit_condition}" )
 
+    #
+    params        = config.get('params',None)
+
     # Input query specifies the source of the input files
     input_         = config.get('input')
     input_query    = input_.get('query','').format(**locals())
@@ -216,7 +219,7 @@ def main():
 
 
     runlist_query = config.get('runlist_query','').format(**locals())
-    params        = config.get('params',None)
+
     if params:
 
         if args.mangle_dstname:
