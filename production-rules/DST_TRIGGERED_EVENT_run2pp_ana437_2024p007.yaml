@@ -223,7 +223,7 @@ DST_CALO_Y2_FITTING:
      outbase :   $(name)_$(build)_$(tag)
      script  :   runy2fitting.sh
      payload :   ./slurp-examples/sPHENIX/CaloProduction/
-     mem     :   4096MB
+     mem     :   1024MB
      neventsper: 50000
      rsync  : "./slurp-examples/sPHENIX/CaloProduction/*,cups.py,bachi.py,odbc.ini"
 
