@@ -358,10 +358,22 @@ def getinputs(args):
     query = f"""
     select inputs from {tablename} where id={id_} limit 1
     """
-    result = statusdbr.execute( query ).fetchone()    
-    flist = str(result[0]).split(',')
-    for f in flist:
-        print(f)
+
+    ntries=0
+    result = None
+    while ntries<12:
+        ntries=ntries+1
+        with  pyodbc.connect("DSN=ProductionStatus") as prodstat:
+            cursor = prodstat.cursor() 
+            try:
+                result = cursor.execute( query ).fetchone()
+                flist = str(result[0]).split(',')
+                for f in flist:
+                    print(f)
+                break
+
+            except pyodbc.Error:
+                time.sleep(ntries*5) # delay for ntries x 5 seconds
 
 
 
