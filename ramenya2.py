@@ -613,7 +613,7 @@ def submit(args):
                 projection=["ClusterId","ProcId","JobStatus"]
             )
             ncondor = len(condor_query)
-            if ncondor > args.watermark * args.maxcondor:
+            if ncondor > float(args.watermark) * int(args.maxcondor):
                 if args.watermark_action=="exit":
                     print(f"Exiting b/c there are too many jobs ({ncondor}) in the condor schedd.")
                     exit(0)
