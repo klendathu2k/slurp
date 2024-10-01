@@ -37,6 +37,7 @@ PHYS_DST_STREAMING_EVENT_run2pp:
              (filename  like '/bbox%/physics_mvtx%.evt'  and lastevent>2 )
            )
            {run_condition}
+                 and runnumber<=53880
 
          group by runnumber
          having
@@ -49,6 +50,7 @@ PHYS_DST_STREAMING_EVENT_run2pp:
                    sum( case when filename like '/bbox%/physics%intt%' then 1 else 0 end )>0 or
                    sum( case when filename like '/bbox%/physics_mvtx%.evt' then 1 else 0 end )>0 
                 )
+
          order by runnumber
                 {limit_condition}
               ;
@@ -117,6 +119,7 @@ PHYS_DST_STREAMING_EVENT_cosmics:
              (filename  like '/bbox%/cosmics_mvtx%.evt'  and lastevent>2 )
            )
            {run_condition}
+                 and runnumber<=53880
 
          group by runnumber
          having

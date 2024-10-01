@@ -80,6 +80,8 @@ DST_TRIGGERED_EVENT_run2pp_ana437_2024p007:
 
            {run_condition}
 
+                 and runnumber<=53880
+
          group by runnumber
 
          having
@@ -186,6 +188,8 @@ DST_TRIGGERED_EVENT_run2pp_ana437_2024p007:
 
                  from segmentedC
 
+                 where runnumber<=53880
+
           order by runnumber desc, segment desc;
                  
 
@@ -241,6 +245,8 @@ DST_CALO_Y2_FITTING:
          where 
                 filename like 'DST_TRIGGERED_EVENT_run2pp_ana437_2024p007%'
                 {run_condition}
+
+                 and runnumber<=53880
            
          {limit_condition}
 
@@ -291,6 +297,8 @@ DST_CALO_Y2_CALIB:
          where 
                 filename like 'DST_CALOFITTING_run2pp_ana437_2024p007%'
                 {run_condition}
+
+                 and runnumber<=53880
            
          {limit_condition}
 
@@ -341,6 +349,8 @@ DST_CALO_Y2_JETS:
          where 
                 filename like 'DST_CALO_run2pp_ana437_2024p007%'
                 {run_condition}
+
+                 and runnumber<=53880
            
          {limit_condition}
 

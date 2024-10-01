@@ -102,9 +102,9 @@ DST_TRIGGERED_EVENT_run2pp_ana435_2024p007:
          order by runnumber
          )
 
-         select *,'partial run' as runtype from partialrun where runnumber not in ( select runnumber from fullrun ) 
+         select *,'partial run' as runtype from partialrun where runnumber not in ( select runnumber from fullrun )                  and runnumber<=53880
               union all 
-         select *,'full run' as runtype from fullrun where true 
+         select *,'full run' as runtype from fullrun where true                   and runnumber<=53880
 
          ;              
 
@@ -160,6 +160,7 @@ DST_CALO_Y2_FITTING:
          where 
                 filename like 'DST_TRIGGERED_EVENT_run2pp%2024p007%'
                 {run_condition}
+                 and runnumber<=53880
            
          {limit_condition}
 
@@ -210,6 +211,7 @@ DST_CALO_Y2_CALIB:
          where 
                 filename like 'DST_CALOFITTING_run2pp_ana435_2024p007%'
                 {run_condition}
+                 and runnumber<=53880
            
          {limit_condition}
 
@@ -260,6 +262,7 @@ DST_CALO_Y2_JETS:
          where 
                 filename like 'DST_CALO_run2pp_ana435_2024p007%'
                 {run_condition}
+                 and runnumber<=53880
            
          {limit_condition}
 
