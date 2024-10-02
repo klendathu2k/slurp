@@ -51,6 +51,8 @@ arg_parser.add_argument( '--mangle-dirpath',dest='mangle_dirpath',help="Inserts 
 
 arg_parser.add_argument( '--maxjobs',dest="maxjobs",help="Maximum number of jobs to pass to condor", default=None )
 
+arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query after parameter substitution and exit", action="store_true", default=False )
+
 def sanity_checks( params, inputq ):
     result = True
 
@@ -211,11 +213,16 @@ def main():
 
     # Input query specifies the source of the input files
     input_         = config.get('input')
-    input_query    = input_.get('query','').format(**locals())
+    input_query    = input_.get('query','').format(**locals(),**params)
     input_query_db = input_.get('db',None)
     input_query_direct = input_.get('direct_path',None)
     if input_query_direct is not None:
         input_query_direct = input_query_direct.format( **vars( args ) )
+
+
+    if args.printquery:
+        print(input_query)
+        return
 
 
     runlist_query = config.get('runlist_query','').format(**locals())
