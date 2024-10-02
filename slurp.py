@@ -222,10 +222,10 @@ class SPhnxMatch:
     firstevent: str = None;
     lastevent: str = None;
     runs_last_event: str = None;
+    neventsper : str = None
     #intputfile: str = None;
     #outputfile: str = None;
 
-    
 
     def __eq__( self, that ):
         return self.run==that.run and self.seg==that.seg
@@ -921,6 +921,8 @@ def matches( rule, kwargs={} ):
         if firstevent: firstevent=str(firstevent)
         if lastevent: lastevent=str(lastevent)
         if runs_last_event: runs_last_event=str(runs_last_event)
+
+        neventsper = getattr(fc,'neventsper',None)
                 
         #
         # Get the production status from the proposed output name
@@ -1039,6 +1041,7 @@ def matches( rule, kwargs={} ):
                 firstevent=firstevent,
                 lastevent=lastevent,
                 runs_last_event=runs_last_event,
+                neventsper=neventsper,
                 )
 
             match = match.dict()
