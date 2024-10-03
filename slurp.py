@@ -85,8 +85,12 @@ except pyodbc.Error as e:
 fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
 fccro = fcro.cursor()
 
-daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;READONLY=True");
-daqc = daqdb.cursor()
+try:
+    daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;READONLY=True");
+    daqc = daqdb.cursor()
+except:
+    daqdb = None
+    daqc = None
 
 #print(f"ProductionStatus [RO]: timeout {statusdbr_.timeout}s")
 #print(f"ProductionStatus [Wr]: timeout {statusdbw_.timeout}s")
