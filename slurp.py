@@ -768,11 +768,21 @@ def matches( rule, kwargs={} ):
     INFO("Building candidate inputs")
     if rule.files:
         curs      = cursors[ rule.filesdb ]
-        fc_result = list( curs.execute( rule.files ).fetchall() )
+        #fc_result = list( curs.execute( rule.files ).fetchall() )
+
+        # Execute the query
+        curs.execute( rule.files )
+
+        # Candidate outputs
+        outputs = []
+
         INFO(f"... {len(fc_result)} inputs")
-        for f in fc_result:
+        for f in curs:
+            fc_result.append(f) # cache the query
             run     = f.runnumber
             segment = f.segment
+            outputs.append( DSTFMT %(name,build,tag,int(run),int(segment)) )
+
             if run>runMax: runMax=run
             if run<runMin: runMin=run
             if lfn_lists.get(run,None) == None:
@@ -785,6 +795,11 @@ def matches( rule, kwargs={} ):
                 ERROR(rule.files)
                 exit(1)
 
+
+
+
+            
+
     # These are not the droids you are looking for.  Move along.
     if len(lfn_lists)==0: return [], None, []
             
@@ -793,9 +808,9 @@ def matches( rule, kwargs={} ):
     # N.b. Output file naming convention is fixed as DST_TYPE_system-run#-seg#.ext... so something having a run
     # range may end up outside of the schema.
     #
-    INFO("Building candidate outputs")
-    outputs = [ DSTFMT %(name,build,tag,int(x.runnumber),int(x.segment)) for x in fc_result ]
-    INFO(f"... {len(outputs)} candidate outputs")
+    #INFO("Building candidate outputs")
+    #outputs = [ DSTFMT %(name,build,tag,int(x.runnumber),int(x.segment)) for x in fc_result ]
+    #INFO(f"... {len(outputs)} candidate outputs")
 
     #
     # We cannot prune outputs alone here.  It must be the same length as fc_result
@@ -814,8 +829,18 @@ def matches( rule, kwargs={} ):
 
 
 
-    
-    
+    # IF we are on a direct (disk) lookup for PFN lists, we will build a map of
+    # LFN to PFN here...
+    lfn2pfn = {}
+    if rule.direct:
+        INFO("Building lfn2pfn map")
+        lfn2pfn = { pfn.split("/")[-1] : pfn for pfn in glob(rule.direct+'/*') }
+        #for pfn in glob(rule.direct+'/*'):
+        #    lfn = pfn.split("/")[-1]
+        #    if os.path.isfile( pfn ):
+        #        lfn2pfn[lfn]=pfn
+        INFO("done")
+                    
     # Build lists of PFNs available for each run
     INFO("Building PFN lists")
     for runseg,lfns in lfn_lists.items():
@@ -839,10 +864,17 @@ def matches( rule, kwargs={} ):
         #    pth_lists[runseg]={}
 
         # Build list of PFNs via direct lookup and append the results
+        #INFO(f"... build pfn list for run {runnumber} seg {segment} ...")
         if rule.direct:
-            for direct in glob(rule.direct):
-                for p in [ direct+'/'+f for f in lfns if os.path.isfile(os.path.join(direct, f)) ]:
-                    pfn_lists[ runseg ].append( p )
+            pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns] 
+
+            #for direct in glob(rule.direct):
+                #if pth_lists[runseg].get(direct,None)==None:                    
+                #    pth_lists[runseg][direct] = []
+                #for p in [ direct+'/'+f for f in lfns if os.path.isfile(os.path.join(direct, f)) ]:
+                #    pfn_lists[ runseg ].append( p )
+                #for p in [ f for f in lfns if os.path.isfile(os.path.join(direct, f)) ]:
+                #    pth_lists[ runseg ][ direct ].append( p )
 
         # Build list of PFNs via filecatalog lookup if direct path has not been specified
         if rule.direct==None:            
