@@ -44,21 +44,21 @@ fi
 nevents_=$( root.exe -q -b GetEntries.C\(\"${filename}\"\) | awk '/Number of Entries/{ print $4; }' )
 nevents=${nevents_:--1}
 
-if [[ "${dsttype}" == "HIST_"* ]]; then
-    mv --verbose ${filename} ${destination} 
-
-    # cleanup the file once it is staged so the condor's copy back does not get it
-    rm ${filename}
-
-    echo stageout ${filename} ${destination} finish `date`
-    exit 0
-fi
+#if [[ "${dsttype}" == "HIST_"* ]]; then
+#    mv --verbose ${filename} ${destination} 
+#
+#    # cleanup the file once it is staged so the condor's copy back does not get it
+#    rm ${filename}
+#
+#    echo stageout ${filename} ${destination} finish `date`
+#    exit 0
+#fi
 
 # prodtype is required... specifies whether the production status entry manages a single output file (only) or many output files (many).
 echo ./cups.py -r ${runnumber} -s ${segment} -d ${dstname}  stageout ${filename} ${destination} --dsttype ${dsttype} --dataset ${build}_${dbtag} --nevents ${nevents} --inc --prodtype only
      ./cups.py -r ${runnumber} -s ${segment} -d ${dstname}  stageout ${filename} ${destination} --dsttype ${dsttype} --dataset ${build}_${dbtag} --nevents ${nevents} --inc --prodtype only
 
-mv ${filename} ${destination} 
+mv --verbose ${filename} ${destination} 
 
 # cleanup the file once it is staged so the condor's copy back does not get it
 rm ${filename}
