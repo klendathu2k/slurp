@@ -837,13 +837,32 @@ def matches( rule, kwargs={} ):
     # LFN to PFN here...
     lfn2pfn = {}
     if rule.direct:
-        INFO("Building lfn2pfn map")
+        INFO("Building lfn2pfn map from filesystem")
         lfn2pfn = { pfn.split("/")[-1] : pfn for pfn in glob(rule.direct+'/*') }
         #for pfn in glob(rule.direct+'/*'):
         #    lfn = pfn.split("/")[-1]
         #    if os.path.isfile( pfn ):
         #        lfn2pfn[lfn]=pfn
         INFO("done")
+
+    else:
+        INFO("Building lfn2pfn map from filecatalog")
+        fcquery=f"""
+
+        with lfnlist as (
+   
+            select filename from datasets where runnumber>={runMin} and runnumber<={runMax} and dataset='{build}_{tag}'
+
+        )
+
+        select lfn,full_file_path as pfn from 
+
+            lfnlist join files
+
+        on lfnlist.filename=files.lfn;        
+        """
+        lfn2pfn = { r.lfn : r.pfn for r in fccro.execute( fcquery ) }
+
                     
     # Build lists of PFNs available for each run
     INFO("Building PFN lists")
@@ -870,6 +889,7 @@ def matches( rule, kwargs={} ):
         # Build list of PFNs via direct lookup and append the results
         #INFO(f"... build pfn list for run {runnumber} seg {segment} ...")
         if rule.direct:
+
             pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns] 
 
             #for direct in glob(rule.direct):
@@ -883,18 +903,17 @@ def matches( rule, kwargs={} ):
         # Build list of PFNs via filecatalog lookup if direct path has not been specified
         if rule.direct==None:            
 
-            number_of_lfns = len(list_of_lfns.split(','))
+            #number_of_lfns = len(list_of_lfns.split(','))
+            #condition=f"lfn in ( {list_of_lfns} )"
+            #if number_of_lfns==1:
+            #    condition=f"lfn={list_of_lfns}";
+            #pfnquery=f"""
+            #select full_file_path from files where {condition} limit {number_of_lfns};
+            #"""        
+            #for pfnresult in fccro.execute( pfnquery ):
+            #    pfn_lists[ runseg ].append( pfnresult.full_file_path )
 
-            condition=f"lfn in ( {list_of_lfns} )"
-            if number_of_lfns==1:
-                condition=f"lfn={list_of_lfns}";
-
-            pfnquery=f"""
-            select full_file_path from files where {condition} limit {number_of_lfns};
-            """        
-
-            for pfnresult in fccro.execute( pfnquery ):
-                pfn_lists[ runseg ].append( pfnresult.full_file_path )
+            pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns]
 
     INFO(f"... {len(pfn_lists.keys())} pfn lists")
 
