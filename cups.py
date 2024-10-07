@@ -132,32 +132,31 @@ def argument(*name_or_flags, **kwargs):
 
 def getLatestId( tablename, dstname, run, seg ):
 
-    ntries=0   
-    result = 0
-    while ntries<10:
-        with pyodbc.connect("DSN=ProductionStatus") as db:
-            curs=db.cursor()
-                
-            cache="cups.cache"
-            result  = 0
-            query=f"""
-            select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES};
-            """
-            
-            try:
-                for r in curs.execute(query):
-                    if r.dstname == dstname:
-                        result = r.id
-                        return result
+    cache="cups.cache"
 
-            except pyodbc.Error:
-                ntries=ntries + 1
-                time.sleep( int(30.0 * ntries * random.random()) ) # 
-                continue
+    result  = 0
+    query=f"""
+    select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES};
+    """
+    results = list( statusdbr.execute(query).fetchall() )
+
+    # Find the most recent ID with the given dstname
+    for r in results:
+        if r.dstname == dstname:
+            result = r.id
+            break
+
+    if result==0:
+        query=f"""
+        select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES*10};
+        """
+        for r in list( statusdbc.execute(query).fetchall() ):
+            if r.dstname == dstname:
+                result = r.id
+                break
 
     if result==0: 
         print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
-        exit(2)
 
     return result
 
