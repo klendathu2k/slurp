@@ -483,10 +483,6 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
 
         values.append( f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" )
         
-
-        #statusdbw.execute(insert)
-        #statusdbw.commit()
-
     insvals = ','.join(values)
 
     insert = f"""
