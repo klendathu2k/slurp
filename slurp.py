@@ -494,7 +494,7 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
     returning id
     """
     statusdbw.execute(insert)
-    statusdbw.commit()
+    # ... defer until we succeed ... statusdbw.commit()
 
     result=[ int(x.id) for x in statusdbw.fetchall() ]
 
@@ -645,8 +645,18 @@ def submit( rule, maxjobs, **kwargs ):
         for i,m in zip(cupsids,mymatching):
             m['cupsid']=str(i)
 
+        
         INFO("Submitting the jobs to the cluster")
-        submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
+        try:
+            # submits the job to condor
+            submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
+            # commits the insert done above
+            statusdbw.commit()
+        except:
+            # if condor did not accept the jobs, rollback to the previous state and 
+            statusdbw.rollback()
+            raise
+            
         INFO("Getting back the cluster and process IDs")
         schedd_query = schedd.query(
             constraint=f"ClusterId == {submit_result.cluster()}",
