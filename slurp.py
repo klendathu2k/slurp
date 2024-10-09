@@ -586,15 +586,26 @@ def submit( rule, maxjobs, **kwargs ):
         
         schedd = htcondor.Schedd()    
 
+        runtypes = {}
+
         # Strip out unused $(...) condor macros
         INFO("Converting matches to list of dictionaries for schedd...")
         mymatching = []
         for m in iter(matching):
             d = {}
 
+            runttype='none'
+
             # massage the inputs from space to comma separated
             if m.get('inputs',None): 
                 m['inputs']= ','.join( m['inputs'].split() )
+                if '/physics/' in m['inputs']:
+                    runtype = 'physics'
+                if '/beam/' in m['inputs']:
+                    runtype = 'beam'
+                
+            runtypes[runtype]=1 # register the runtype for directory creation below
+
             if m.get('ranges',None):
                 m['ranges']= ','.join( m['ranges'].split() )
 
