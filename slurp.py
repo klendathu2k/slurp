@@ -610,11 +610,17 @@ def submit( rule, maxjobs, **kwargs ):
                 m['ranges']= ','.join( m['ranges'].split() )
 
             for k,v in m.items():
+
+                if k in ['outdir','logdir','histdir','condor']:
+                    m[k] = v.format( **locals() )
+
                 if k in str(submit_job):
-                    d[k] = v
+                    d[k] = m[k]
+               
                 if args.dbinput: 
                     d['inputs']= 'dbinput'            
                     d['ranges']= 'dbranges'
+
 
             mymatching.append(d)        
             dispatched_runs.append( (d['run'],d['seg']) )
@@ -658,6 +664,7 @@ def submit( rule, maxjobs, **kwargs ):
             submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
             # commits the insert done above
             statusdbw.commit()
+
         except:
             # if condor did not accept the jobs, rollback to the previous state and 
             statusdbw.rollback()
