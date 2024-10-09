@@ -650,7 +650,8 @@ def submit( rule, maxjobs, **kwargs ):
                 mnrun = 100 * ( math.floor(run/100) )
                 mxrun = mnrun+100
                 rungroup=f'{mnrun:08d}_{mxrun:08d}'
-                pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
+                for runtype in runtypes.keys():
+                    pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
 
             # submits the job to condor
             INFO("... submitting to condor")
