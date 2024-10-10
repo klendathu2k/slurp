@@ -85,7 +85,7 @@ def main():
 
     statelabels = [ condor_job_status_map[i] for i in range(1,8) ]
     
-    plt.simple_stacked_bar( jobnames, statearray, labels=statelabels, width=200, title=f"Current production status {datetime.datetime.now()}", colors=colors )
+    plt.simple_stacked_bar( jobnames, statearray, labels=statelabels, width=200, title=f"Condor status {datetime.datetime.now()}", colors=colors )
     plt.title("Job states per type")
     plt.show()    
 
