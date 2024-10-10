@@ -605,6 +605,8 @@ def submit( rule, maxjobs, **kwargs ):
                     runtype = 'beam'
                 if '/cosmics/' in m['inputs']: # beam supercedes...
                     runtype = 'cosmics'
+                if '/calib/' in m['inputs']: # beam supercedes...
+                    runtype = 'calib'
                 
             runtypes[runtype]=1 # register the runtype for directory creation below
 
