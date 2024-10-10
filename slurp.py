@@ -559,34 +559,6 @@ def submit( rule, maxjobs, **kwargs ):
     # Append $(cupsid) as the last argument
     jobd['arguments'] = jobd['arguments'] + ' $(cupsid)'
 
-
-    #
-    # Make target output directories.  We abuse the python string formatting facility
-    # in order to parameterize the directory path(s) we will be creating.  We want to
-    # substitute in the build argument, the dbtag, etc...    The path will utilize the
-    # condor macro substitutions... so we translate these into local variables, which
-    # are then replaced in the 'eval' of the oiutput directory below.
-    #
-    INFO("Creating directories if they do not exist")
-    for outname in [ 'outdir', 'logdir', 'condor', 'histdir' ]:
-
-        outdir=kwargs.get(outname,None)
-        if outdir==None: continue
-        outdir = outdir.replace('file:/','')
-        outdir = outdir.replace('//','/')
-
-        outdir = outdir.replace( '$(rungroup)', '{rungroup}')
-        outdir = outdir.replace( '$(build)',    '{rule.build}' )
-        outdir = outdir.replace( '$(tag)',      '{rule.tag}' )
-                                 
-        outdir = f'f"{outdir}"'
-
-        for run in runlist:
-            mnrun = 100 * ( math.floor(run/100) )
-            mxrun = mnrun+100
-            rungroup=f'{mnrun:08d}_{mxrun:08d}'
-            pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
-    
     INFO("Passing job to htcondor.Submit")
     submit_job = htcondor.Submit( jobd )
     if verbose>0:
@@ -614,24 +586,41 @@ def submit( rule, maxjobs, **kwargs ):
         
         schedd = htcondor.Schedd()    
 
+        runtypes = {}
+
         # Strip out unused $(...) condor macros
         INFO("Converting matches to list of dictionaries for schedd...")
         mymatching = []
         for m in iter(matching):
             d = {}
 
+            runttype='none'
+
             # massage the inputs from space to comma separated
             if m.get('inputs',None): 
                 m['inputs']= ','.join( m['inputs'].split() )
+                if '/physics/' in m['inputs']:
+                    runtype = 'physics'
+                if '/beam/' in m['inputs']:
+                    runtype = 'beam'
+                
+            runtypes[runtype]=1 # register the runtype for directory creation below
+
             if m.get('ranges',None):
                 m['ranges']= ','.join( m['ranges'].split() )
 
             for k,v in m.items():
+
+                if k in ['outdir','logdir','histdir','condor']:
+                    m[k] = v.format( **locals() )
+
                 if k in str(submit_job):
-                    d[k] = v
+                    d[k] = m[k]
+               
                 if args.dbinput: 
                     d['inputs']= 'dbinput'            
                     d['ranges']= 'dbranges'
+
 
             mymatching.append(d)        
             dispatched_runs.append( (d['run'],d['seg']) )
@@ -646,12 +635,40 @@ def submit( rule, maxjobs, **kwargs ):
             m['cupsid']=str(i)
 
         
-        INFO("Submitting the jobs to the cluster")
+        INFO("Preparing to submitting the jobs to condor")
         try:
+
+            INFO("... creating directories if they do not exist")
+            for outname in [ 'outdir', 'logdir', 'condor', 'histdir' ]:
+
+                outdir=kwargs.get(outname,None)
+                if outdir==None: continue
+                outdir = outdir.replace('file:/','')
+                outdir = outdir.replace('//','/')
+
+                outdir = outdir.replace( '$(rungroup)', '{rungroup}')
+                outdir = outdir.replace( '$(build)',    '{rule.build}' )
+                outdir = outdir.replace( '$(tag)',      '{rule.tag}' )
+                                 
+                outdir = f'f"{outdir}"'
+
+                rungroups = {}
+                for run in runlist:
+                    mnrun = 100 * ( math.floor(run/100) )
+                    mxrun = mnrun+100
+                    rungroup=f'{mnrun:08d}_{mxrun:08d}'                
+                    rungroups[rungroup]=1
+
+                for rungroup in rungroups.keys():    # rungroup is a possible KW in the yaml file that can be substituted
+                    for runtype in runtypes.keys():  # runtype is a possible KW in the yaml file that can be substituted
+                        pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
+
             # submits the job to condor
+            INFO("... submitting to condor")
             submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
             # commits the insert done above
             statusdbw.commit()
+
         except:
             # if condor did not accept the jobs, rollback to the previous state and 
             statusdbw.rollback()
