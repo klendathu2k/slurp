@@ -587,22 +587,24 @@ def submit( rule, maxjobs, **kwargs ):
         schedd = htcondor.Schedd()    
 
         runtypes = {}
-
         # Strip out unused $(...) condor macros
         INFO("Converting matches to list of dictionaries for schedd...")
         mymatching = []
         for m in iter(matching):
             d = {}
 
-            runttype='none'
+            # TODO:  This should be accessed from the run table / daqdb
+            runtype='none'
 
             # massage the inputs from space to comma separated
             if m.get('inputs',None): 
                 m['inputs']= ','.join( m['inputs'].split() )
-                if '/physics/' in m['inputs']:
+                if '/physics/' in m['inputs']: # physics can appear twice by mistake...
                     runtype = 'physics'
-                if '/beam/' in m['inputs']:
+                if '/beam/' in m['inputs']: # beam supercedes...
                     runtype = 'beam'
+                if '/cosmics/' in m['inputs']: # beam supercedes...
+                    runtype = 'cosmics'
                 
             runtypes[runtype]=1 # register the runtype for directory creation below
 
@@ -657,9 +659,6 @@ def submit( rule, maxjobs, **kwargs ):
                     mnrun = 100 * ( math.floor(run/100) )
                     mxrun = mnrun+100
                     rungroup=f'{mnrun:08d}_{mxrun:08d}'                
-                    rungroups[rungroup]=1
-
-                for rungroup in rungroups.keys():    # rungroup is a possible KW in the yaml file that can be substituted
                     for runtype in runtypes.keys():  # runtype is a possible KW in the yaml file that can be substituted
                         pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
 
