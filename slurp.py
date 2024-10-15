@@ -227,6 +227,8 @@ class SPhnxMatch:
     lastevent: str = None;
     runs_last_event: str = None;
     neventsper : str = None
+    streamname : str = None
+    streamfile : str = None
     #intputfile: str = None;
     #outputfile: str = None;
 
@@ -1020,9 +1022,13 @@ def matches( rule, kwargs={} ):
         firstevent = getattr(fc,'firstevent',None)
         lastevent  = getattr(fc,'lastevent',None)
         runs_last_event = getattr(fc,'runs_last_event',None)
+        streamname = getattr(fc,'streamname',None)
+        streamfile = getattr(fc,'streamfile',None)
         if firstevent: firstevent=str(firstevent)
         if lastevent: lastevent=str(lastevent)
         if runs_last_event: runs_last_event=str(runs_last_event)
+        if streamname: streamname=str(streamname)
+        if streamfile: streamfile=str(streamfile)
 
         neventsper = getattr(fc,'neventsper',None)
                 
@@ -1144,6 +1150,8 @@ def matches( rule, kwargs={} ):
                 lastevent=lastevent,
                 runs_last_event=runs_last_event,
                 neventsper=neventsper,
+                streamname=streamname,
+                streamfile=streamfile
                 )
 
             match = match.dict()
