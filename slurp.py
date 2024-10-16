@@ -984,6 +984,7 @@ def matches( rule, kwargs={} ):
         runs_last_event = getattr(fc,'runs_last_event',None)
         streamname = getattr(fc,'streamname',None)
         streamfile = getattr(fc,'streamfile',None)
+
         if firstevent: firstevent=str(firstevent)
         if lastevent: lastevent=str(lastevent)
         if runs_last_event: runs_last_event=str(runs_last_event)
@@ -999,9 +1000,6 @@ def matches( rule, kwargs={} ):
         #
         x    = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
-
-        #pprint.pprint( fc_rest )
-
 
         #
         # There is a master list of states which result in a DST producion job being blocked.  By default
@@ -1034,8 +1032,6 @@ def matches( rule, kwargs={} ):
                 sanity = False
                 break
 
-        # TODO: Add MD5 check
-
         #
         # If there are more LFNs requested than exist on disk, OR if the lfn list does
         # not match the pfn list, then reject.
@@ -1045,11 +1041,8 @@ def matches( rule, kwargs={} ):
             WARN( f"{num_lfn} {num_pfn} {sanity}" )
             for i in itertools.zip_longest( lfn_lists[f"'{run}-{seg}'"], pfn_lists[f"'{run}-{seg}'"] ):
                 print(i)
-            #WARN( lfn_lists )
-            #WARN( pfn_lists )
             continue
 
-        #inputs_ = lfn_lists[f"'{run}-{seg}'"]
         inputs_ = pfn_lists[f"'{run}-{seg}'"]
         ranges_ = rng_lists[f"'{run}-{seg}'"]
         
@@ -1061,9 +1054,6 @@ def matches( rule, kwargs={} ):
         if test and resubmit:
             WARN("%s exists and will be overwritten"%dst)
 
-        #
-        #
-        #
         if True:
 
             if verbose>10:
@@ -1074,15 +1064,6 @@ def matches( rule, kwargs={} ):
 
             if inputs_:
                 myinputs = ' '.join(inputs_) ### ??????
-
-            # Direct lookup used in event builder jobs and implies we should obtain our
-            # inputs from the database
-            #
-            #if inputs_ and rule.direct:
-            #    myinputs = "dbinputs"
-            #
-
-
 
             if ranges_:
                 myranges = ' '.join(ranges_)
