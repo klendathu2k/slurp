@@ -367,8 +367,18 @@ def update_production_status( matching, setup, condor, state ):
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
+        name    = str(m['name'])
 
-        key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
+        streamname = m.get( 'streamname', None )
+        name_ = name
+        if streamname:
+            name_ = name.replace("$(streamname)",streamname)
+
+        dsttype = name_
+        dstname = dsttype +'_'+setup.build.replace(".","")+'_'+setup.dbtag
+        dstfile = ( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)                
+
+        key     = dstfile
 
         try:
             cluster = condor_map[ key.lower() ][ 'ClusterId' ]
@@ -381,13 +391,9 @@ def update_production_status( matching, setup, condor, state ):
             cluster=0
             process=0
         
-        dsttype=setup.name
-        dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
-        dstfile=( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
 
         # 1s time resolution
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
-
         id_ = getLatestId( 'production_status', dstname, run, segment )
 
         update=f"""
