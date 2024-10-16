@@ -964,11 +964,8 @@ def matches( rule, kwargs={} ):
     prod_status_map = {}
     INFO("Building production status map")    
     for stat in prod_status:
-        # replace with sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
-        file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        # Not even sure how this was working???  This is the filename of the proposed job
         fbn = stat.dstfile
-        prod_status_map[fbn] = stat.status  # supposed to be the map of the jobs which are in the production database to the filename of that job
-        #INFO(f"{fbn} : {stat.status}")
+        prod_status_map[fbn] = stat.status 
 
 
 
