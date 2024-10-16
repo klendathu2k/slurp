@@ -852,19 +852,6 @@ def matches( rule, kwargs={} ):
     # These are not the droids you are looking for.  Move along.
     if len(lfn_lists)==0: return [], None, []
             
-    #
-    # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
-    # N.b. Output file naming convention is fixed as DST_TYPE_system-run#-seg#.ext... so something having a run
-    # range may end up outside of the schema.
-    #
-    #INFO("Building candidate outputs")
-    #outputs = [ DSTFMT %(name,build,tag,int(x.runnumber),int(x.segment)) for x in fc_result ]
-    #INFO(f"... {len(outputs)} candidate outputs")
-
-    #
-    # We cannot prune outputs alone here.  It must be the same length as fc_result
-    #
-
 
     # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
     # we know that we do not have to produce it if it appears w/in the outputs list.
@@ -974,6 +961,7 @@ def matches( rule, kwargs={} ):
     #
     list_of_runs = []
     INFO("Building matches")
+    assert( len(outputs) == len(fc_result ) )
     for (fc,dst) in zip(fc_result,outputs): 
 
         lfn = fc.source
