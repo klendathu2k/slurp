@@ -428,16 +428,24 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
+        name    = m['name']
+        streamname = m.get( 'streamname', None )
+        name_ = name
+        if streamname:
+            name_ = name.replace("$(streamname)",streamname)
+
         dstfileinput = m['lfn'].split('.')[0]
 
         # If the match contains a list of inputs... we will set it in the production status...
         if m['inputs']:
             dstfileinput=m['inputs']
-        key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
         
-        dsttype=setup.name
-        dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
-        dstfile=( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
+        #dsttype=setup.name
+        dsttype = name_
+        dstname = dsttype +'_'+setup.build.replace(".","")+'_'+setup.dbtag
+        dstfile = ( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)        
+
+        key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
         
         prod_id = setup.id
         try:
@@ -454,7 +462,11 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         # TODO: Handle conflict
         node=platform.node().split('.')[0]
 
-        values.append( f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" )
+        value = f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" 
+        #print(value)
+
+        values.append( value )
+
         
     insvals = ','.join(values)
 
@@ -466,6 +478,8 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
 
     returning id
     """
+
+
     statusdbw.execute(insert)
     # ... defer until we succeed ... statusdbw.commit()
 
