@@ -294,14 +294,6 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True, dstname=" " 
         # Transform the list of tuples from the db query to a list of prouction status dataclass objects
         result = [ SPhnxProductionStatus( *db ) for db in dbresult if dstname in db.dstfile ]
 
-    elif update==True: # note: we should never reach this state ...  tables ought to exist already ... but it is protected with create table if not exists...
-
-        create = sphnx_production_status_table_def( setup.name, setup.build, setup.dbtag )
-
-        statusdbw.execute(create) # 
-        statusdbw.commit()
-        
-
     return result
 
 def fetch_invalid_run_entry( dstname, run, seg ):
