@@ -402,9 +402,7 @@ def update_production_status( matching, setup, condor, state ):
 
 def insert_production_status( matching, setup, condor=[], state='submitting' ):
 
-    # Condor map contains a dictionary keyed on the "output" field of the job description.
-    # The map contains the cluster ID, the process ID, the arguments, and the output log.
-    # (This is the condor.stdout log...)
+    # Build the map of submitted jobs so that we can pull in the cluster and process id
     condor_map = {}
     for ad in condor:
         clusterId = ad['ClusterId']
@@ -416,13 +414,7 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
 
 
-# select * from status_dst_calor_auau23_ana387_2023p003;
-# id | run | segment | nsegments | inputs | prod_id | cluster | process | status | flags | exit_code 
-#----+-----+---------+-----------+--------+---------+---------+---------+--------+-------+-----------
-
-    # replace with sphenix_dstname( setup.name, setup.build, setup.dbtag )
-    name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
-
+    # Prepare the insert for all matches that we are submitting to condor
     values = []
 
     for m in matching:
@@ -436,11 +428,9 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
 
         dstfileinput = m['lfn'].split('.')[0]
 
-        # If the match contains a list of inputs... we will set it in the production status...
         if m['inputs']:
             dstfileinput=m['inputs']
-        
-        #dsttype=setup.name
+
         dsttype = name_
         dstname = dsttype +'_'+setup.build.replace(".","")+'_'+setup.dbtag
         dstfile = ( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)        
@@ -463,13 +453,12 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         node=platform.node().split('.')[0]
 
         value = f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" 
-        #print(value)
 
         values.append( value )
-
-        
+       
     insvals = ','.join(values)
 
+    # Inserts the production status lines for each match, returning the list of IDs associated with each match.
     insert = f"""
     insert into production_status
            (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents, submission_host )
@@ -479,9 +468,8 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
     returning id
     """
 
-
+    # Execute but don't commit the insert.  We will commit after condor successfully accepts the jobs.
     statusdbw.execute(insert)
-    # ... defer until we succeed ... statusdbw.commit()
 
     result=[ int(x.id) for x in statusdbw.fetchall() ]
 
@@ -598,6 +586,7 @@ def submit( rule, maxjobs, **kwargs ):
             if m.get('ranges',None):
                 m['ranges']= ','.join( m['ranges'].split() )
 
+            #pprint.pprint(m)
             for k,v in m.items():
 
                 if k in ['outdir','logdir','histdir','condor']:
@@ -651,6 +640,9 @@ def submit( rule, maxjobs, **kwargs ):
 
             # submits the job to condor
             INFO("... submitting to condor")
+            #pprint.pprint(mymatching)            
+            #raise
+
             submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
             # commits the insert done above
             statusdbw.commit()
@@ -839,6 +831,8 @@ def matches( rule, kwargs={} ):
             name_ = name
             if streamname:
                 name_ = name.replace( '$(streamname)',streamname ) # hack in condor replacement
+
+
 
             output_ = DSTFMT %(name_,build,tag,int(run),int(segment)) 
 
