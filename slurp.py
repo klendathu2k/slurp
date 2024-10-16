@@ -287,9 +287,6 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True, dstname=" " 
         else              : 
             query = query + f" and run>={runmn} and run<={runmx}"
 
-        #if dstname is not None:
-        #    query = query + f" and dstfile like '{dstname}%'"
-
         query=query+";"
 
         dbresult = statusdbw.execute( query ).fetchall();
