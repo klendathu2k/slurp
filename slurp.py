@@ -691,13 +691,17 @@ def submit( rule, maxjobs, **kwargs ):
 
     return dispatched_runs
 
-def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
+def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_ ):
     """
     Fetches the production setup from the database for the given (name,build,dbtag,hash).
     If it doesn't exist in the DB it is created.  Queries the git repository to verify 
     that the local repo is clean and up to date with the remote.  Returns production setup
     object.
     """
+
+    name=name_
+    if '$(streamname)' in name:
+        name = name.replace('$(streamname)','_X_')
 
     result = None # SPhnxProductionSetup
 
@@ -719,8 +723,12 @@ def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
                values('%s','%s','%s','%s','%s','%s');
         """%(name,build,dbtag,repo,dir_,hash_)
 
-        statusdbw.execute( insert )
-        statusdbw.commit()
+        try:
+            statusdbw.execute( insert )            
+            statusdbw.commit()
+        except Exception as e:
+            print(f"Could not execute: {insert}")
+            raise
 
         result = fetch_production_setup(name, build, dbtag, repo, dir_, hash_)
 
