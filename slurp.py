@@ -964,8 +964,7 @@ def matches( rule, kwargs={} ):
     prod_status_map = {}
     INFO("Building production status map")    
     for stat in prod_status:
-        fbn = stat.dstfile
-        prod_status_map[fbn] = stat.status 
+        prod_status_map[stat.dstfile] = stat.status 
 
 
 
