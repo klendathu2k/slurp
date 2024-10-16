@@ -797,7 +797,7 @@ def matches( rule, kwargs={} ):
 
     result = []
 
-    name      = kwargs.get('name',      rule.name)
+    name      = kwargs.get('name',      rule.name)       # Can we handle multiple names (eg DST_STREAMING_EVENT_TPCnn_run2pp) in a single submission?
     build     = kwargs.get('build',     rule.build)      # TODO... correct handling from submit.  build=ana.xyz --> build=anaxyz buildarg=ana.xyz
     buildarg  = kwargs.get('buildarg',  rule.buildarg)
     tag       = kwargs.get('tag',       rule.tag)
@@ -838,10 +838,17 @@ def matches( rule, kwargs={} ):
             fc_result.append(f) # cache the query
             run     = f.runnumber
             segment = f.segment
+
+            streamname = getattr( f, 'streamname', None )
+            name_ = name
+            if streamname:
+                name_ = name.replace( '$(streamname)',streamname ) # hack in condor replacement
+
             outputs.append( DSTFMT %(name,build,tag,int(run),int(segment)) )
 
             if run>runMax: runMax=run
             if run<runMin: runMin=run
+
             if lfn_lists.get(run,None) == None:
                 lfn_lists[ f"'{run}-{segment}'" ] = f.files.split()
                 rng_lists[ f"'{run}-{segment}'" ] = getattr( f, 'fileranges', '' ).split()
