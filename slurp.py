@@ -937,9 +937,6 @@ def matches( rule, kwargs={} ):
     INFO("Building PFN lists")
     for runseg,lfns in lfn_lists.items():
 
-        runnumber, segment = runseg.strip("'").split('-')        
-        output = DSTFMT %(name,build,tag,int(runnumber),int(segment))
-        
         lfns_ = [ f"'{x}'" for x in lfns ]
         list_of_lfns = ','.join(lfns_)
 
