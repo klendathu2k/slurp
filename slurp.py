@@ -277,22 +277,18 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True, dstname=" " 
     """
     result = [] # of SPhnxProductionStatus
 
-    name = "PRODUCTION_STATUS"
-    
-    if table_exists( name ):
+    query = f"select * from production_status where true"
+    if ( runmn>runmx ): 
+        query = query + f" and run>={runmn}"
+    else              : 
+        query = query + f" and run>={runmn} and run<={runmx}"
 
-        query = f"select * from {name} where true"
-        if ( runmn>runmx ): 
-            query = query + f" and run>={runmn}"
-        else              : 
-            query = query + f" and run>={runmn} and run<={runmx}"
+    query=query+";"
 
-        query=query+";"
+    dbresult = statusdbw.execute( query ).fetchall();
 
-        dbresult = statusdbw.execute( query ).fetchall();
-
-        # Transform the list of tuples from the db query to a list of prouction status dataclass objects
-        result = [ SPhnxProductionStatus( *db ) for db in dbresult if dstname in db.dstfile ]
+    # Transform the list of tuples from the db query to a list of prouction status dataclass objects
+    result = [ SPhnxProductionStatus( *db ) for db in dbresult if dstname in db.dstfile ]
 
     return result
 
