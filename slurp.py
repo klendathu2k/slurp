@@ -285,7 +285,7 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True, dstname=" " 
 
     query=query+";"
 
-    dbresult = statusdbw.execute( query ).fetchall();
+    dbresult = statusdbw.execute( query )
 
     # Transform the list of tuples from the db query to a list of prouction status dataclass objects
     result = [ SPhnxProductionStatus( *db ) for db in dbresult if dstname in db.dstfile ]
