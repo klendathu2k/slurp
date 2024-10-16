@@ -454,13 +454,6 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         # TODO: Handle conflict
         node=platform.node().split('.')[0]
 
-        insert=f"""
-        insert into production_status
-               (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents, submission_host )
-
-        values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )
-        """
-
         values.append( f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" )
         
     insvals = ','.join(values)
