@@ -410,13 +410,11 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         out       = ad['Out'].split('/')[-1]   # discard anything that looks like a filepath
         ulog      = ad['UserLog'].split('/')[-1] 
         key       = ulog.split('.')[0].lower()  # lowercase b/c referenced by file basename
-
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
 
 
     # Prepare the insert for all matches that we are submitting to condor
     values = []
-
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
@@ -826,11 +824,13 @@ def matches( rule, kwargs={} ):
             fc_result.append(f) # cache the query
             run     = f.runnumber
             segment = f.segment
+            runsegkey = f"{run}-{segment}"
 
             streamname = getattr( f, 'streamname', None )
             name_ = name
             if streamname:
                 name_ = name.replace( '$(streamname)',streamname ) # hack in condor replacement
+                runsegkey = f"{run}-{segment}-{streamname}"
 
 
 
@@ -844,12 +844,12 @@ def matches( rule, kwargs={} ):
             if run<runMin: runMin=run
 
             if lfn_lists.get(run,None) == None:
-                lfn_lists[ f"'{run}-{segment}'" ] = f.files.split()
-                rng_lists[ f"'{run}-{segment}'" ] = getattr( f, 'fileranges', '' ).split()
+                lfn_lists[ runsegkey ] = f.files.split()
+                rng_lists[ runsegkey ] = getattr( f, 'fileranges', '' ).split()
             else:
                 # If we hit this result, then the db query has resulted in two rows with identical
                 # run numbers.  Violating the implicit submission schema.
-                ERROR(f"Run number {run}-{segment} reached twice in this query...")
+                ERROR(f"Run number {runsegkey} reached twice in this query...")
                 ERROR(rule.files)
                 exit(1)
 
@@ -962,7 +962,7 @@ def matches( rule, kwargs={} ):
     for stat in prod_status:
         prod_status_map[stat.dstfile] = stat.status 
 
-
+    INFO("Production status map")
 
     #
     # Build the list of matches.  We iterate over the fc_result zipped with the set of proposed outputs
@@ -989,6 +989,10 @@ def matches( rule, kwargs={} ):
         if streamfile: streamfile=str(streamfile)
 
         neventsper = getattr(fc,'neventsper',None)
+
+        runsegkey = f"{run}-{seg}"
+        if streamname:
+            runsegkey = f"{run}-{seg}-{streamname}"
                 
         #
         # Get the production status from the proposed output name
@@ -1020,12 +1024,12 @@ def matches( rule, kwargs={} ):
         # Check consistentcy between the LFN list (from input query) and PFN list (from file catalog query) 
         # for the current run.  Verify that the two lists are consistent.
         #
-        num_lfn = len( lfn_lists[f"'{run}-{seg}'"] )
-        num_pfn = len( pfn_lists[f"'{run}-{seg}'"] )
+        num_lfn = len( lfn_lists[ runsegkey ] )
+        num_pfn = len( pfn_lists[ runsegkey ] )
         sanity = True
-        pfn_check = [ x.split('/')[-1] for x in pfn_lists[f"'{run}-{seg}'"] ]
+        pfn_check = [ x.split('/')[-1] for x in pfn_lists[runsegkey] ]
         for x in pfn_check:
-            if x not in lfn_lists[f"'{run}-{seg}'"]:
+            if x not in lfn_lists[ runsegkey ]:
                 sanity = False
                 break
 
@@ -1034,14 +1038,14 @@ def matches( rule, kwargs={} ):
         # not match the pfn list, then reject.
         #
         if num_lfn > num_pfn or sanity==False:
-            WARN(f"LFN list and PFN list are different.  Skipping this run {run} {seg}")
+            WARN(f"LFN list and PFN list are different.  Skipping this run {runsegkey}")
             WARN( f"{num_lfn} {num_pfn} {sanity}" )
-            for i in itertools.zip_longest( lfn_lists[f"'{run}-{seg}'"], pfn_lists[f"'{run}-{seg}'"] ):
+            for i in itertools.zip_longest( lfn_lists[runsegkey], pfn_lists[runsegkey] ):
                 print(i)
             continue
 
-        inputs_ = pfn_lists[f"'{run}-{seg}'"]
-        ranges_ = rng_lists[f"'{run}-{seg}'"]
+        inputs_ = pfn_lists[ runsegkey ]
+        ranges_ = rng_lists[ runsegkey ]
         
 
         #
