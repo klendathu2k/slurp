@@ -897,7 +897,7 @@ def matches( rule, kwargs={} ):
     INFO("Building list of existing outputs")
     for output_, tuple_ in dstnames.items():
         dt, ds = tuple_
-        exits[ c.filename : ( c.runnumber, c.segment ) for c in fccro.execute( f"select filename, runnumber, segment from datesets where runnumber>={runMin} and runnumber<={runMax} and dsttype='{dt}' and dataset='{ds}'" ) ]
+        exists = { c.filename : ( c.runnumber, c.segment ) for c in fccro.execute( f"select filename, runnumber, segment from datesets where runnumber>={runMin} and runnumber<={runMax} and dsttype='{dt}' and dataset='{ds}'" ) }
     INFO(f"... {len(exists.keys())} existing outputs")
 
 
