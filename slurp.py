@@ -471,7 +471,7 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
     # Execute but don't commit the insert.  We will commit after condor successfully accepts the jobs.
     statusdbw.execute(insert)
 
-    result=[ int(x.id) for x in statusdbw.fetchall() ]
+    result=[ int(x.id) for x in statusdbw ]
 
     return result
     
