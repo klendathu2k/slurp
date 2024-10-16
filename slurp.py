@@ -974,8 +974,7 @@ def matches( rule, kwargs={} ):
     #
     list_of_runs = []
     INFO("Building matches")
-    #for ((lfn,run,seg,*fc_rest),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
-    for (fc,dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
+    for (fc,dst) in zip(fc_result,outputs): 
 
         lfn = fc.source
         run = fc.runnumber
