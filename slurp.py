@@ -16,6 +16,7 @@ import itertools
 from  glob import glob
 import math
 import platform
+from collections import defaultdict
 
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
@@ -823,6 +824,9 @@ def matches( rule, kwargs={} ):
     runMin=999999
     runMax=0
     INFO("Building candidate inputs")
+
+    dstnames = {}
+
     if rule.files:
         curs      = cursors[ rule.filesdb ]
         #fc_result = list( curs.execute( rule.files ).fetchall() )
@@ -844,7 +848,11 @@ def matches( rule, kwargs={} ):
             if streamname:
                 name_ = name.replace( '$(streamname)',streamname ) # hack in condor replacement
 
-            outputs.append( DSTFMT %(name,build,tag,int(run),int(segment)) )
+            output_ = DSTFMT %(name_,build,tag,int(run),int(segment)) 
+
+            outputs.append( output_ )
+
+            dstnames[ output_ ] = (f'{name_}',f'{build}_{tag}')
 
             if run>runMax: runMax=run
             if run<runMin: runMin=run
@@ -887,8 +895,9 @@ def matches( rule, kwargs={} ):
     
     exists = {}
     INFO("Building list of existing outputs")
-    for check in fccro.execute(f"select filename,runnumber,segment from datasets where runnumber>={runMin} and runnumber<={runMax} and filename like'"+dsttype+"%';"):
-        exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
+    for output_, tuple_ in dstnames.items():
+        dt, ds = tuple_
+        exits[ c.filename : ( c.runnumber, c.segment ) for c in fccro.execute( f"select filename, runnumber, segment from datesets where runnumber>={runMin} and runnumber<={runMax} and dsttype='{dt}' and dataset='{ds}'" ) ]
     INFO(f"... {len(exists.keys())} existing outputs")
 
 
