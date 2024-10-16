@@ -596,7 +596,7 @@ def submit( rule, maxjobs, **kwargs ):
                 if k in ['outdir','logdir','histdir','condor']:
                     m[k] = v.format( **locals() )
 
-                if k in str(submit_job):
+                if k in str(submit_job) or k=='streamname': # b/c it may not be declared in the arglist
                     d[k] = m[k]
                
                 if args.dbinput: 
