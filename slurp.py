@@ -271,7 +271,7 @@ def table_exists( tablename ):
 
 
 
-def fetch_production_status( setup, runmn=0, runmx=-1, update=True, dstname=" " ):
+def fetch_production_status( setup, runmn=0, runmx=-1 ):
     """
     Given a production setup, returns the production status table....
     """
