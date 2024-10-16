@@ -960,7 +960,7 @@ def matches( rule, kwargs={} ):
     # The production setup will be unique based on (1) the specified analysis build, (2) the specified DB tag,
     # and (3) the hash of the local github repository where the payload scripts/macros are found.
     #
-    repo_dir  = payload #'/'.join(payload.split('/')[1:]) 
+    repo_dir  = payload 
     repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
     repo_url  = sh.git('config','--get','remote.origin.url',_cwd=payload ).rstrip()  # TODO: fix hardcoded directory
 
