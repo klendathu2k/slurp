@@ -314,14 +314,6 @@ def fetch_invalid_run_entry( dstname, run, seg ):
                statusdbr.execute( query ).fetchall() 
     ]
 
-
-#def getLatestId( tablename, dstname, run, seg ):  # limited to status db
-#    query=f"""
-#    select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
-#    """
-#    result = statusdbw.execute(query).fetchone()[0]
-#    return result
-
 def getLatestId( tablename, dstname, run, seg ):
 
     cache="cups.cache"
