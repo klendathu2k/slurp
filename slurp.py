@@ -964,6 +964,8 @@ def matches( rule, kwargs={} ):
     repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
     repo_url  = sh.git('config','--get','remote.origin.url',_cwd=payload ).rstrip()  # TODO: fix hardcoded directory
 
+    # Question is whether the production setup can / should have name replacement with the input stream.  
+    # Perhaps a placeholder substitution in the fetch / update / create methods.
     INFO("Fetching production setup")
     setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
     
