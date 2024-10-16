@@ -940,11 +940,6 @@ def matches( rule, kwargs={} ):
         runnumber, segment = runseg.strip("'").split('-')        
         output = DSTFMT %(name,build,tag,int(runnumber),int(segment))
         
-        # If the output does not exist on disk OR the resubmit option is present we may need to build the job.  
-        # Otherwise we can szve time by skipping.
-        #if ( (resubmit==False) and (exists.get(output,None) == None) ):
-        #    continue
-
         lfns_ = [ f"'{x}'" for x in lfns ]
         list_of_lfns = ','.join(lfns_)
 
@@ -952,35 +947,13 @@ def matches( rule, kwargs={} ):
         if pfn_lists.get(runseg,None)==None:
             pfn_lists[runseg]=[]
 
-        #if pth_lists.get(runseg,None)==None:
-        #    pth_lists[runseg]={}
-
         # Build list of PFNs via direct lookup and append the results
-        #INFO(f"... build pfn list for run {runnumber} seg {segment} ...")
         if rule.direct:
 
             pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns] 
 
-            #for direct in glob(rule.direct):
-                #if pth_lists[runseg].get(direct,None)==None:                    
-                #    pth_lists[runseg][direct] = []
-                #for p in [ direct+'/'+f for f in lfns if os.path.isfile(os.path.join(direct, f)) ]:
-                #    pfn_lists[ runseg ].append( p )
-                #for p in [ f for f in lfns if os.path.isfile(os.path.join(direct, f)) ]:
-                #    pth_lists[ runseg ][ direct ].append( p )
-
         # Build list of PFNs via filecatalog lookup if direct path has not been specified
         if rule.direct==None:            
-
-            #number_of_lfns = len(list_of_lfns.split(','))
-            #condition=f"lfn in ( {list_of_lfns} )"
-            #if number_of_lfns==1:
-            #    condition=f"lfn={list_of_lfns}";
-            #pfnquery=f"""
-            #select full_file_path from files where {condition} limit {number_of_lfns};
-            #"""        
-            #for pfnresult in fccro.execute( pfnquery ):
-            #    pfn_lists[ runseg ].append( pfnresult.full_file_path )
 
             pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns]
 
