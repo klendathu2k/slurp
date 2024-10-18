@@ -917,6 +917,7 @@ def matches( rule, kwargs={} ):
                     
     # Build lists of PFNs available for each run
     INFO("Building PFN lists")
+    missing_pfns = []
     for runseg,lfns in lfn_lists.items():
 
         runnumber, segment = runseg.strip("'").split('-')        
@@ -940,9 +941,16 @@ def matches( rule, kwargs={} ):
         # Build list of PFNs via direct lookup and append the results
         #INFO(f"... build pfn list for run {runnumber} seg {segment} ...")
         if rule.direct:
+            
+            # This will build the lfn2pfn mapping regardless of whether the file is on disk
+            pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns if lfn2pfn.get(lfn,False) ] 
 
-            pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns] 
-
+            # This will add the current run/seg to the missing_pfns array if we have a missing pfn
+            for lfn in lfns:
+                if lfn2pfn.get(lfn,False)==False: 
+                    missing_pfns.append( runseg )
+                    continue
+                      
             #for direct in glob(rule.direct):
                 #if pth_lists[runseg].get(direct,None)==None:                    
                 #    pth_lists[runseg][direct] = []
@@ -966,7 +974,14 @@ def matches( rule, kwargs={} ):
 
             pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns]
 
+
     INFO(f"... {len(pfn_lists.keys())} pfn lists")
+
+    if len(missing_pfns)>0:
+        INFO("We are missing one or more PFNs in one or more of the segments being submitted.  Please exclude these from the input query")
+        pprint.pprint(missing_pfns)
+        exit(1)
+
 
     # 
     # The production setup will be unique based on (1) the specified analysis build, (2) the specified DB tag,
