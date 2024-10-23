@@ -505,6 +505,66 @@ def message(args):
 
 #_______________________________________________________________________________________________________
 @subcommand([
+    argument( "DATASET",help="Name of the dataset" ),
+    argument( "--dataset", help="sets the name of the dataset", default="test" ),
+    argument( "--dsttype", help="sets the sphenix dsttype", default=None ),
+])
+def closeout(args):
+    """
+    Adds a dataset entry indicating closeout of a dataset.
+    """
+    count=0
+    while (count<10):
+
+        time.sleep( random.random() * 10.0 )
+        with pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc") as fc:
+            fcc = fc.cursor()
+
+            run      = int(args.run)
+            seg      = int(args.segment)
+
+            # n.b. not the slurp convention for dsttype
+            dstname  = args.dstname
+            dsttype='_'.join( dstname.split('_')[-2:] )
+
+            if args.dsttype != None:
+                dsttype = args.dsttype   
+
+            dataset = args.DATASET
+
+            # Insert into datasets primary key: (filename,dataset)
+            if args.verbose:
+                print("Insert into datasets")
+
+            insert=f"""
+                insert into datasets (dataset,run,0,size,dataset,dsttype,events)
+                values ('{filename}',{run},{seg},0,'{args.dataset}','{dsttype}',0)
+                on conflict
+                on constraint datasets_pkey
+                do update set
+                runnumber= EXCLUDED.runnumber ,
+                segment  = EXCLUDED.segment   ,
+                size     = datasets.size - 1  ,
+                dsttype  = EXCLUDED.dsttype   ,
+                events   = EXCLUDED.events
+                ;
+            """
+            if args.verbose:
+                print(insert)
+
+            try:
+                fcc.execute(insert)
+                fcc.commit()
+                return
+            except:
+                pass
+
+    print("*** cups failed to close the dataset **")
+
+
+
+#_______________________________________________________________________________________________________
+@subcommand([
     argument( "filename", help="Name of the file to be staged out"),
     argument( "outdir",   help="Output directory" ),
     argument( "--retries", help="Number of retries before silent failure", type=int, default=1 ),
