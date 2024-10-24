@@ -128,9 +128,6 @@ echo ./cups.py -v -r ${runnumber} -s ${segment} -d ${outbase} finished -e ${stat
 
 
 echo "bdee bdee bdee, That's All Folks!"
-} > ${logbase}.out 2>${logbase}.err
-
-mv ${logbase}.out ${logdir#file:/}
-mv ${logbase}.err ${logdir#file:/}
+} > ${logdir#file:/}/${logbase}.out 2>${logdir#file:/}/${logbase}.err
 
 exit $status_f4a
