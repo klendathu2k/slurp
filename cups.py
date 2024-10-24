@@ -126,7 +126,7 @@ def update_production_status( update_query, retries=10, delay=10.0 ):
                 curs.execute(update_query)
                 curs.commit()
                 print(f"Applied after {itry+1} attempts")
-                break
+                return
         except:
             print(f"Failed {itry+1} attempts...")
 
