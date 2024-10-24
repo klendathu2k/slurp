@@ -154,16 +154,8 @@ def started(args):
          execution_node='{node}'
     where id={id_}
     """    
-    if args.verbose:
-        print(update)
+    if args.noupdate==False: update_production_status( update )
 
-    if args.noupdate:
-        pass
-    else:
-        with pyodbc.connect("DSN=ProductionStatusWrite") as statusdb:
-            curs = statusdb.cursor()
-            curs.execute(update)
-            curs.commit()
 
 @subcommand([
     argument(     "--nsegments",help="Number of segments produced",dest="nsegments",default=1),
@@ -185,17 +177,8 @@ def running(args):
     set status='running',running='{timestamp}',nsegments={nsegments}
     where id={id_}
     """
-#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
+    if args.noupdate==False: update_production_status( update )
 
-    if args.noupdate:
-        pass
-    else:
-        with pyodbc.connect("DSN=ProductionStatusWrite") as statusdb:
-            curs = statusdb.cursor()
-            curs.execute(update)
-            curs.commit()
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -221,30 +204,20 @@ def finished(args):
     state='finished'
     if ec>0:
         state='failed'
+    update = None
     if args.inc:
         update = f"""
         update {tablename}
         set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents=nevents+{ne}
         where id={id_}
         """
-#        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     else:
         update = f"""
         update {tablename}
         set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
         where id={id_}
         """
-#        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
-
-    if args.noupdate:
-        pass
-    else:
-        with pyodbc.connect("DSN=ProductionStatusWrite") as statusdb:
-            curs = statusdb.cursor()
-            curs.execute( update )
-            curs.commit()
+    if args.noupdate==False: update_production_status( update )
 
 
 #_______________________________________________________________________________________________________
@@ -270,17 +243,7 @@ def exitcode(args):
     set status='{state}',exit_code={ec}
     where id={id_}
     """
-#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
-
-    if args.noupdate:
-        pass
-    else:
-        with pyodbc.connect("DSN=ProductionStatusWrite") as statusdb:
-            curs = statusdb.cursor()
-            curs.execute( update )
-            curs.commit()
+    if args.noupdate==False: update_production_status( update )
 
 
 #_______________________________________________________________________________________________________
@@ -305,24 +268,14 @@ def nevents(args):
         set nevents=nevents+{ne}
         where id={id_}
         """
-#       where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     else:
         update = f"""
         update {tablename}
         set nevents={ne}
         where id={id_}
         """
-#       where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
+    if args.noupdate==False: update_production_status( update )
 
-    if args.noupdate:
-        pass
-    else:
-        with pyodbc.connect("DSN=ProductionStatusWrite") as statusdb:
-            curs=statusdb.cursor()
-            curs.execute( update )
-            curs.commit()
 
 #
 @subcommand([
@@ -381,16 +334,8 @@ def inputs(args):
     set inputs='{inputs}'
     where id={id_}
     """
-#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
-    if args.noupdate:
-        pass
-    else:
-        with pyodbc.connect("DSN=ProductionStatusWrite") as statusdb:
-            curs=statusdb.cursor()
-            curs.execute( update )
-            curs.commit()
+    if args.noupdate==False: update_production_status( update )
+
 
 #_______________________________________________________________________________________________________
 # DEPRECATED
@@ -475,10 +420,7 @@ def message(args):
     flaginc=int(args.flag)
     id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
     update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};"
-    with pyodbc.connect("DSN=ProductionStatusWrite") as statusdb:
-        curs=statusdb.cursor()
-        curs.execute( update )
-        curs.commit()
+    if args.noupdate==False: update_production_status( update )
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -611,12 +553,7 @@ def stageout(args):
             set nevents={args.nevents},nsegments=nsegments+1,message='last stageout {filename}'
             where id={id_}
             """
-
-
-        with pyodbc.connect("DSN=ProductionStatusWrite") as statusdb:
-            curs=statusdb.cursor()
-            curs.execute( update )
-            curs.commit()
+        if args.noupdate==False: update_production_status( update )
 
         # and remove the file
         if args.verbose:
