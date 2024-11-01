@@ -134,6 +134,31 @@ def update_production_status( update_query, retries=10, delay=10.0 ):
 
     print("Update failed")
     return (-1,ex)
+
+
+def update_file_catalog( update_query1, update_query2, retries=10, delay=10.0 ):
+    print(update_query1)    
+    print(update_query2)    
+    ex = None
+    for itry in range(0,retries):
+        time.sleep( delay * (itry + 1 ) * random.random() )
+        try:
+            with pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc") as fc:
+                curs=dv.cursor()
+
+                curs.execute(update_query1)
+                curs.execute(update_query2)
+                curs.commit()
+
+                print(f"Applied after {itry+1} attempts")
+                return (itry, None)
+
+        except Exception as E:
+            print(f"Failed {itry+1} attempts...")
+            ex = repr(E)
+
+    print("Update failed")
+    return (-1,ex)
     
 
 
