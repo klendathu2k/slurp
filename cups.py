@@ -189,7 +189,11 @@ def started(args):
          execution_node='{node}'
     where id={id_}
     """    
-    if args.noupdate==False: update_production_status( update )
+
+    time0=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    ntry, e = update_production_status( update )
+    time1=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    cupsstat(run,seg,dstname,'started',time0,time1,ntry,e)
 
 
 @subcommand([
@@ -212,7 +216,10 @@ def running(args):
     set status='running',running='{timestamp}',nsegments={nsegments}
     where id={id_}
     """
-    if args.noupdate==False: update_production_status( update )
+    time0=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    ntry, e = update_production_status( update )
+    time1=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    cupsstat(run,seg,dstname,'running',time0,time1,ntry,e)
 
 
 #_______________________________________________________________________________________________________
@@ -252,7 +259,12 @@ def finished(args):
         set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
         where id={id_}
         """
-    if args.noupdate==False: update_production_status( update )
+    
+    time0=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    ntry, e = update_production_status( update )
+    time1=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    cupsstat(run,seg,dstname,'finished',time0,time1,ntry,e)
+
 
 
 #_______________________________________________________________________________________________________
@@ -278,7 +290,12 @@ def exitcode(args):
     set status='{state}',exit_code={ec}
     where id={id_}
     """
-    if args.noupdate==False: update_production_status( update )
+
+    time0=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    ntry, e = update_production_status( update )
+    time1=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    cupsstat(run,seg,dstname,'exitcode',time0,time1,ntry,e)
+
 
 
 #_______________________________________________________________________________________________________
@@ -309,7 +326,11 @@ def nevents(args):
         set nevents={ne}
         where id={id_}
         """
-    if args.noupdate==False: update_production_status( update )
+
+    time0=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    ntry, e = update_production_status( update )
+    time1=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    cupsstat(run,seg,dstname,'nevents',time0,time1,ntry,e)
 
 
 #
@@ -368,8 +389,11 @@ def inputs(args):
     update {tablename}
     set inputs='{inputs}'
     where id={id_}
-    """
-    if args.noupdate==False: update_production_status( update )
+    """    
+    time0=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    ntry, e = update_production_status( update )
+    time1=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    cupsstat(run,seg,dstname,'put_inputs',time0,time1,ntry,e)
 
 
 #_______________________________________________________________________________________________________
@@ -455,7 +479,13 @@ def message(args):
     flaginc=int(args.flag)
     id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
     update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};"
-    if args.noupdate==False: update_production_status( update )
+
+
+    time0=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    ntry, e = update_production_status( update )
+    time1=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    cupsstat(int(args.run),int(args.segment),args.dstname,'message',time0,time1,ntry,e)
+
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -588,7 +618,10 @@ def stageout(args):
             set nevents={args.nevents},nsegments=nsegments+1,message='last stageout {filename}'
             where id={id_}
             """
-        if args.noupdate==False: update_production_status( update )
+        time0=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+        ntry, e = update_production_status( update )
+        time1=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+        cupsstat(run,seg,dstname,'nevents',time0,time1,ntry,e)
 
         # and remove the file
         if args.verbose:
