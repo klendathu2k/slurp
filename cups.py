@@ -544,15 +544,8 @@ def stageout(args):
         filename=args.filename.split('/')[-1]
 
 
-        # Copy succeeded.  Connect to file catalog and add to it
-        with pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc") as fc:
-            fcc = fc.cursor()
-        
-            # Insert into files primary key: (lfn,full_host_name,full_file_path)
-            if args.verbose:
-                print("Insert into files")
-
-            insert=f"""
+        # Copy succeeded.  Insert into the file catalog
+        insert1=f"""
             insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
                values ('{filename}','{host}','{args.outdir}/{filename}','now',{sz},'{md5}')
             on conflict
@@ -562,16 +555,8 @@ def stageout(args):
                size=EXCLUDED.size,
                md5=EXCLUDED.md5
             ;
-            """
-            if args.verbose:
-                print(insert)
-
-            fcc.execute(insert)
-
-            # Insert into datasets primary key: (filename,dataset)
-            if args.verbose:
-                print("Insert into datasets")
-            insert=f"""
+        """
+        insert2=f"""
             insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
                values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
             on conflict
@@ -583,20 +568,14 @@ def stageout(args):
                dsttype=EXCLUDED.dsttype,
                events=EXCLUDED.events
             ;
-            """
-            if args.verbose:
-                print(insert)
-
-            fcc.execute(insert)
-            
-            # Only commit once both have been executed
-            fcc.commit()
+        """
+        time0=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+        ntry, e = update_file_catalog( insert1, insert2 )
+        time1=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+        cupsstat(run,seg,dstname,'insertfile',time0,time1,ntry,e)
 
 
         # Add to nevents in the production status
-        if args.verbose:
-            print("Update nevents")
-
         tablename=args.table
         dstname=args.dstname
         run=int(args.run)
@@ -706,9 +685,7 @@ def quality(args):
 
 
 def main():
-
     args=parser.parse_args()
-
     if args.subcommand is None:
         parser.print_help()
     else:
