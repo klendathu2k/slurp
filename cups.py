@@ -117,7 +117,8 @@ def getLatestId( tablename, dstname, run, seg ):
 
 
 def update_production_status( update_query, retries=10, delay=10.0 ):
-    print(update_query)
+    print(update_query)    
+    ex = None
     for itry in range(0,retries):
         time.sleep( delay * (itry + 1 ) * random.random() )
         try:
@@ -126,11 +127,13 @@ def update_production_status( update_query, retries=10, delay=10.0 ):
                 curs.execute(update_query)
                 curs.commit()
                 print(f"Applied after {itry+1} attempts")
-                return
-        except:
+                return (itry, None)
+        except Exception as E:
             print(f"Failed {itry+1} attempts...")
+            ex = repr(E)
 
     print("Update failed")
+    return (-1,ex)
     
 
 
