@@ -220,6 +220,38 @@ def running(args):
     time1=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
     cupsstat(run,seg,dstname,'running',time0,time1,ntry,e)
 
+#_______________________________________________________________________________________________________
+@subcommand([])
+def logcups(args):
+    cupsstatfile="cups.stat"
+    query = None
+    with open(cupsstatfile,"r") as stat:
+        lines = [line.rstrip() for line in stat]
+        query="""
+        INSERT into cups_stats (run,segment,dstname,updated,started,ended,nattempts,exception) values \n
+        """
+        values = []
+        for line in lines:
+            array = line.split(',')
+            run     = int(array[0])
+            seg     = int(array[1])
+            dstname = str(array[2])
+            update  = str(array[3])
+            upstart = str(array[4])
+            upend   = str(array[5])
+            ntries  = int(array[6])
+            exc     = str(array[7]).replace( "'","*" )
+
+            values.append( f"( {run},{seg},'{dstname}','{update}','{upstart}','{upend}',{ntries},'{exc}' )" )
+        
+        query = query + ','.join( values )
+
+    update_production_status(query)
+
+    
+
+        
+
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -263,6 +295,9 @@ def finished(args):
     ntry, e = update_production_status( update )
     time1=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
     cupsstat(run,seg,dstname,'finished',time0,time1,ntry,e)
+
+
+    logcups( args )
 
 
 
