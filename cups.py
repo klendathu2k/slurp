@@ -150,7 +150,7 @@ def update_file_catalog( update_query1, update_query2, retries=10, delay=10.0 ):
         time.sleep( delay * (itry + 1 ) * random.random() )
         try:
             with pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc") as fc:
-                curs=dv.cursor()
+                curs=fc.cursor()
 
                 curs.execute(update_query1)
                 curs.execute(update_query2)
