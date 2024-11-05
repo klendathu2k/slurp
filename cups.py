@@ -59,8 +59,7 @@ parser.add_argument( "--timestamp"   , dest="timestamp" , default=str( datetime.
 def cupsstat(run,seg,dstname,update,upstart,upend,nattempts,exception=None):
     cupsstatfile="cups.stat"
     with open(cupsstatfile,"a") as stat:
-        stat.write(f"{run},{seg},{dstname},{update},{upstart},{upend},{nattempts},{exception}")
-                   
+        stat.write(f"{run},{seg},{dstname},{update},{upstart},{upend},{nattempts},{exception}\n")
 
 def handler( signum, frame ):
     from sh import uname
