@@ -46,9 +46,16 @@ __rules__  = []
 #fc = pyodbc.connect("DSN=FileCatalog")
 #fcc = fc.cursor()
 
+def printDbInfo( cnxn, title ):
+    name=cnxn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
+    serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
+    print(f"Connected {name} from {serv} as {title}")
+
 try:
-    statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
+    statusdbr_ = pyodbc.connect("DSN=ProductionStatus")    
     statusdbr = statusdbr_.cursor()
+    printDbInfo( statusdbr_, "Production Status Table [reads]" )
+
 except pyodbc.InterfaceError:
     for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
         print(f"Could not connect to DB... retry in {s}s")
@@ -66,6 +73,8 @@ except pyodbc.Error as e:
 try:
     statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
     statusdbw = statusdbw_.cursor()
+    printDbInfo( statusdbw_, "Production Status Table [writes]" )
+
 except (pyodbc.InterfaceError) as e:
     for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
         print(f"Could not connect to DB... retry in {s}s")
@@ -84,10 +93,13 @@ except pyodbc.Error as e:
 
 fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
 fccro = fcro.cursor()
+printDbInfo( fcro, "File Catalog [reads]" )
 
 try:
     daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;READONLY=True");
     daqc = daqdb.cursor()
+    printDbInfo( daqdb, "DAQ database [reads]" )
+
 except:
     daqdb = None
     daqc = None
