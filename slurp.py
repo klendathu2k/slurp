@@ -104,6 +104,13 @@ except:
     daqdb = None
     daqc = None
 
+
+
+rawdr_ = pyodbc.connect("DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True")
+rawdr  = rawdr_.cursor()
+printDbInfo( rawdr_, "RAW database [reads]" )
+
+
 #print(f"ProductionStatus [RO]: timeout {statusdbr_.timeout}s")
 #print(f"ProductionStatus [Wr]: timeout {statusdbw_.timeout}s")
 #print(f"FileCatalog [RO]:      timeout {fcro.timeout}s")
