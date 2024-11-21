@@ -544,7 +544,8 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
     argument( "--maxcondor",default=94000, help="Do not submit if more than maxcondor jobs are in the system.  Terminate the loop if we exceed 150% of this value.",type=int),
     argument( "--watermark",default=1.05,help="Watermark expressed as a multiple of max condor.  When we exceed this value we exit or cycle the loop depending on the next option" ),
     argument( "--watermark-action", dest="watermark_action",help="Action to take when we exceed the high watermark",default="cycle", choices=['cycle','exit'] ),
-    argument( "--dbinput", default=False, help="Sets the dbinput flag for kaedama",action="store_true"),
+    argument( "--dbinput", default=True, help="Sets the dbinput flag for kaedama [defaults to true]",action="store_true"),
+    argument( "--no-dbinput", dest="dbinput", help="Unsets the dbinput flag for kaedama",action="store_false"),
     argument( "SLURPFILE",   help="Specifies the slurpfile(s) containing the job definitions" )
 ])
 def submit(args):
