@@ -123,6 +123,7 @@ cursors = {
     'filecatalog': fccro,
     'status' : statusdbr,
     'raw':rawdr,
+    'rawdr':rawdr,
 }
 
 verbose=0
