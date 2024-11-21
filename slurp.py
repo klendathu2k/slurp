@@ -121,7 +121,8 @@ cursors = {
     'fc':fccro,
     'daqdb':daqc,
     'filecatalog': fccro,
-    'status' : statusdbr
+    'status' : statusdbr,
+    'raw':rawdr,
 }
 
 verbose=0
