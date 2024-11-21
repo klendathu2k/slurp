@@ -1197,7 +1197,9 @@ arg_parser.add_argument( "--batch", default=False, action="store_true",help="Bat
 arg_parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=["submitting","submitted","started","running","evicted","failed","finished"] )
 arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, action='store_true', 
                          help='Existing filecatalog entry does not block a job')
-arg_parser.add_argument( "--dbinput", default=False, action="store_true",help="Passes input filelist through the production status db rather than the argument list of the production script." )
+
+arg_parser.add_argument( "--dbinput", default=True, action="store_true",help="Passes input filelist through the production status db rather than the argument list of the production script." )
+arg_parser.add_argument( "--no-dbinput", dest="dbinput", action="store_false",help="Unsets dbinput flag." )
 
 def parse_command_line():
     global blocking
