@@ -40,6 +40,7 @@ arg_parser.add_argument( '--limit', help="Maximum number of jobs to submit", def
 arg_parser.add_argument( '--submit',help="Job will be submitted", dest="submit", default="True", action="store_true")
 arg_parser.add_argument( '--no-submit', help="Job will not be submitted... print things", dest="submit", action="store_false")
 arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=['26022'] )
+arg_parser.add_argument( '--runlist', default=None, help="Flat text file containing list of runs to process, separated by whitespace / newlines." )
 arg_parser.add_argument( '--segments', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[] )
 arg_parser.add_argument( '--config',help="Specifies the yaml configuration file")
 arg_parser.add_argument( '--docstring',default=None,help="Appends a documentation string to the log entry")
@@ -178,8 +179,16 @@ def main():
         run_condition = f"and runnumber={args.runs[0]}"
     elif len(args.runs)==2:
         run_condition = f"and runnumber>={args.runs[0]} and runnumber<={args.runs[1]}"
-    elif len(args.runs)>=3:
+    elif len(args.runs)>=3 and args.runlist==None:
         run_condition = "and runnumber in ( %s )" % ','.join( args.runs )
+    elif args.runlist:
+        runs = []
+        with open( args.runlist, "r" ) as rl:
+            lines = [line.rstrip() for line in file]
+            for line in lines:
+                for run in lines.split():
+                    runs.append(run)
+        run_condition = "and runnumber in ( %s )" % ','.join( runs )
 
     seg_condition = ""
     if len(args.segments)==1:
