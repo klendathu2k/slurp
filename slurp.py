@@ -117,9 +117,9 @@ printDbInfo( rawdr_, "RAW database [reads]" )
 #print(f"DaqDB [RO]:            timeout {daqdb.timeout}s")
 
 cursors = { 
-    'daq':daqc,
+    'daq':rawdr,
     'fc':fccro,
-    'daqdb':daqc,
+    'daqdb':rawdr,
     'filecatalog': fccro,
     'status' : statusdbr,
     'raw':rawdr,
