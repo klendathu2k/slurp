@@ -151,8 +151,8 @@ def dbQuery( cnxn_string, query, ntries=10 ):
             with pyodbc.connect( cnxn_string ) as conn:
                 printDbInfo( conn, f"Connected {cnxn_string}" )
                 curs = conn.cursor()
-                result = curs.execute( query )
-                return result
+                curs.execute( query )
+                return curs
                 
         except Exception as E:
             lastException = E
