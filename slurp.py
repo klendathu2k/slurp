@@ -144,11 +144,19 @@ def dbQuery( cnxn_string, query, ntries=10 ):
 
     print(f"dbQuery {cnxn_string}")
 
+    # Some guard rails
+    assert( 'delete' not in query.lower() )    
+    assert( 'insert' not in query.lower() )    
+    assert( 'update' not in query.lower() )    
+    assert( 'select'     in query.lower() )
+
     lastException = None
     
+    # Attempt to connect up to ntries
     for itry in range(0,ntries):
         try:
-            with pyodbc.connect( cnxn_string ) as conn:
+            conn = pyodbc.connect( cnxn_string )
+            with conn:
                 printDbInfo( conn, f"Connected {cnxn_string}" )
                 curs = conn.cursor()
                 curs.execute( query )
