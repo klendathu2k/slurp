@@ -16,6 +16,7 @@ import itertools
 from  glob import glob
 import math
 import platform
+import random
 
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
@@ -119,12 +120,50 @@ printDbInfo( rawdr_, "RAW database [reads]" )
 cursors = { 
     'daq':rawdr,
     'fc':fccro,
+    'fccro':fccro,
     'daqdb':rawdr,
     'filecatalog': fccro,
     'status' : statusdbr,
     'raw':rawdr,
     'rawdr':rawdr,
 }
+
+cnxn_string_map = {
+    'daq'         : 'DSN=daq;UID=phnxrc;READONLY=True',
+    'daqdb'       : 'DSN=daq;UID=phnxrc;READONLY=True',
+    'fc'          : 'DSN=FileCatalog;READONLY=True',
+    'fccro'       : 'DSN=FileCatalog;READONLY=True',
+    'filecatalog' : 'DSN=FileCatalog;READONLY=True',
+    'status'      : 'DSN=ProductionStatus',
+    'statusw'     : 'DSN=ProductionStatusWrite',
+    'raw'         : 'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
+    'rawdr'       : 'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
+}
+
+def dbQuery( cnxn_string, query, ntries=10 ):
+
+    print(f"dbQuery {cnxn_string}")
+
+    lastException = None
+    
+    for itry in range(0,ntries):
+        try:
+            with pyodbc.connect( cnxn_string ) as conn:
+                printDbInfo( conn, f"Connected {cnxn_string}" )
+                curs = conn.cursor()
+                result = curs.execute( query )
+                return result
+                
+        except Exception as E:
+            lastException = E
+            delay = (itry + 1 ) * random.random()
+            time.sleep(delay)
+
+    print(lastException)
+    exit(0)
+            
+
+    
 
 verbose=0
 
@@ -310,7 +349,7 @@ def fetch_production_status( setup, runmn=0, runmx=-1, update=True, dstname=" " 
 
         query=query+";"
 
-        dbresult = statusdbw.execute( query ).fetchall();
+        dbresult = dbQuery( cnxn_string_map['statusw'], query )
 
         # Transform the list of tuples from the db query to a list of prouction status dataclass objects
         result = [ SPhnxProductionStatus( *db ) for db in dbresult if dstname in db.dstfile ]
@@ -367,18 +406,17 @@ def getLatestId( tablename, dstname, run, seg ):
     """
     # Find the most recent ID with the given dstname
 
-    for r in list( statusdbw.execute(query).fetchall() ):
+    for r in dbQuery( cnxn_string_map[ 'statusw' ], query ):
         if r.dstname == dstname:
             result = r.id
             break
 
-    # Possible that there may have been multiple jobs launched that pushes our entry below the limit... Try again w/ 10x higher limit.
-
-    if result==0: 
+    # Widen the search if needed...
+    if result==0:
         query=f"""
         select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES*10};
         """
-        for r in list( statusdbw.execute(query).fetchall() ):
+        for r in dbQuery( cnxn_string_map[ 'statusw' ], query ):
             if r.dstname == dstname:
                 result = r.id
                 break
@@ -751,7 +789,8 @@ def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
                  limit 1;
     """%( name, build, dbtag, hash_ )
     
-    array = list( statusdbw.execute( query ).fetchall() )
+    #array = list( statusdbw.execute( query ).fetchall() )
+    array = [ x for x in dbQuery( cnxn_string_map['statusw'], query ) ]
     assert( len(array)<2 )
 
     if   len(array)==0:
@@ -847,13 +886,15 @@ def matches( rule, kwargs={} ):
         #fc_result = list( curs.execute( rule.files ).fetchall() )
 
         # Execute the query
-        curs.execute( rule.files )
+        # curs.execute( rule.files )
+
+        inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
 
         # Candidate outputs
         outputs = []
 
         INFO(f"... {len(fc_result)} inputs")
-        for f in curs:
+        for f in inputquery:
             fc_result.append(f) # cache the query
             run     = f.runnumber
             segment = f.segment
@@ -899,7 +940,8 @@ def matches( rule, kwargs={} ):
     
     exists = {}
     INFO("Building list of existing outputs")
-    for check in fccro.execute(f"select filename,runnumber,segment from datasets where runnumber>={runMin} and runnumber<={runMax} and filename like'"+dsttype+"%';"):
+    chkq = f"select filename,runnumber,segment from datasets where runnumber>={runMin} and runnumber<={runMax} and filename like'"+dsttype+"%';"
+    for check in dbQuery( cnxn_string_map['fccro'], chkq ):
         exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
     INFO(f"... {len(exists.keys())} existing outputs")
 
@@ -933,7 +975,8 @@ def matches( rule, kwargs={} ):
 
         on lfnlist.filename=files.lfn;        
         """
-        lfn2pfn = { r.lfn : r.pfn for r in fccro.execute( fcquery ) }
+        #lfn2pfn = { r.lfn : r.pfn for r in fccro.execute( fcquery ) }
+        lfn2pfn = { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) }
 
                     
     # Build lists of PFNs available for each run
