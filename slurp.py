@@ -718,6 +718,7 @@ def submit( rule, maxjobs, **kwargs ):
                 outdir = outdir.replace( '$(rungroup)', '{rungroup}')
                 outdir = outdir.replace( '$(build)',    '{rule.build}' )
                 outdir = outdir.replace( '$(tag)',      '{rule.tag}' )
+                outdir = outdir.replace( '$(name)',     '{rule.name}' )
                                  
                 outdir = f'f"{outdir}"'
 
