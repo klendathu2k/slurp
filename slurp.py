@@ -245,6 +245,7 @@ class SPhnxRule:
     buildarg:          str  = ""      # The build tag passed as an argument (leaves the "." in place).
     payload:           str = "";      # Payload directory (condor transfers inputs from)
     limit:    int = 0                 # maximum number of matches to return 0=all
+    runname:           str = None     # eg run2pp, extracted from name or ...
 
     def __eq__(self, that ):
         return self.name == that.name
@@ -262,6 +263,9 @@ class SPhnxRule:
         b = self.build
         b = b.replace(".","")
         object.__setattr__(self, 'build', b)        
+
+        if self.runname==None:
+            self.runname=self.name.split('_')[-1]
 
         # Add to the global list of rules
         __rules__.append(self)
@@ -719,6 +723,7 @@ def submit( rule, maxjobs, **kwargs ):
                 outdir = outdir.replace( '$(build)',    '{rule.build}' )
                 outdir = outdir.replace( '$(tag)',      '{rule.tag}' )
                 outdir = outdir.replace( '$(name)',     '{rule.name}' )
+                outdir = outdir.replace( '$(runname)',  '{rule.runname}' )
                                  
                 outdir = f'f"{outdir}"'
 
