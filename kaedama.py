@@ -54,6 +54,15 @@ arg_parser.add_argument( '--maxjobs',dest="maxjobs",help="Maximum number of jobs
 
 arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query after parameter substitution and exit", action="store_true", default=False )
 
+
+_default_filesystem = {
+        outdir  :           "/sphenix/lustre01/sphnxpro/production/{runtype}/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+    ,   logdir  : "file:///sphenix/data/data02/sphnxpro/production/{runtype}/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+    ,   histdir :       "/sphenix/data/data02/sphnxpro/production/{runtype}/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+    ,   condor  :                                 "/tmp/production/{runtype}/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+}
+
+
 def sanity_checks( params, inputq ):
     result = True
 
@@ -253,11 +262,10 @@ def main():
                 
                 
 
-    filesystem    = config.get('filesystem',None)                         
+    filesystem    = config.get('filesystem',_default_filesystem) 
     if filesystem and args.mangle_dirpath:
         for key,val in filesystem.items():
-            filesystem[key]=filesystem[key].replace("sphnxpro","sphnxpro/"+args.mangle_dirpath)
-            filesystem[key]=filesystem[key].replace("tmp","tmp/"+args.mangle_dirpath)
+            filesystem[key]=filesystem[key].replace("production","production/"+args.mangle_dirpath)
 
     job_          = config.get('job',None) #config['job']
     presubmit     = config.get('presubmit',None)
