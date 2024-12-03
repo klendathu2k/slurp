@@ -259,7 +259,10 @@ def main():
                 print(params[key])
                 pprint.pprint(locals())
                 params[key]=params[key].format(**locals())
-                
+
+    if args.test_mode:
+        print("[TESTMODE: print parameter block]")
+        pprint.pprint(params)
                 
 
     # Default filesystem.  Override with vaules specified in the workflow.
@@ -267,12 +270,22 @@ def main():
     filesystem_  = config.get('filesystem',{} )
     for k,v in filesystem_.items():
         filesystem[k] = v
+
+    # Mangle directory path is specified.  Production is replaced with...
     if filesystem and args.mangle_dirpath:
         for key,val in filesystem.items():
             filesystem[key]=filesystem[key].replace("production",args.mangle_dirpath)
 
-    job_          = config.get('job',None) #config['job']
+    if args.test_mode:
+        print("[TESTMODE: print filesystem block]")
+        pprint.pprint(filesystem)
+
+    job_          = config.get('job',None)
     presubmit     = config.get('presubmit',None)
+
+    if args.test_mode:
+        print("[TESTMODE: print job block]")
+        pprint.pprint(job_)
 
 
     # Do not submit if we fail sanity check on definition file
@@ -338,6 +351,11 @@ def main():
                          limit             = args.limit
                      )
 
+
+        if args.test_mode:
+            print("[TESTMODE: print constructe rule]")
+            pprint.pprint(dst_rule)
+
         #
         # Extract the subset of parameters that we need to pass to submit.  Note that (most) submitkw
         # arguments will be passed down to the matches function in the kwargs dictionary.
@@ -352,15 +370,6 @@ def main():
         if args.docstring:
             batch=batch + " " + args.docstring
 
-        #ndispatched=len(dispatched)
-        #runs={}
-        #runslist=[]
-        #for k,v in dispatched.items():
-        #    try:
-        #        runs[k].append( v )
-        #    except KeyError:
-        #        runs[k] = []
-        #        runslist.append(k)
         runcount = {}
         ndisp=0
         if type(dispatched) == type([]):
