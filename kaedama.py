@@ -129,7 +129,7 @@ def main():
         logging.info("Running in testbed mode.")
 
     if args.test_mode:
-        args.mangle_dirpath = 'testbed'
+        args.mangle_dirpath = 'production-testbed'
         
 
     if args.test_mode:
@@ -265,7 +265,7 @@ def main():
     filesystem    = config.get('filesystem',_default_filesystem) 
     if filesystem and args.mangle_dirpath:
         for key,val in filesystem.items():
-            filesystem[key]=filesystem[key].replace("production","production/"+args.mangle_dirpath)
+            filesystem[key]=filesystem[key].replace("production",args.mangle_dirpath)
 
     job_          = config.get('job',None) #config['job']
     presubmit     = config.get('presubmit',None)
