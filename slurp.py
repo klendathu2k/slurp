@@ -265,7 +265,7 @@ class SPhnxRule:
         object.__setattr__(self, 'build', b)        
 
         if self.runname==None:
-            self.runname=self.name.split('_')[-1]
+            object.__setattr__(self, 'runname', self.name.split('_')[-1])
 
         # Add to the global list of rules
         __rules__.append(self)
