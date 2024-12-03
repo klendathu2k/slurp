@@ -262,7 +262,11 @@ def main():
                 
                 
 
-    filesystem    = config.get('filesystem',_default_filesystem) 
+    # Default filesystem.  Override with vaules specified in the workflow.
+    filesystem   = _default_filesystem
+    filesystem_  = config.get('filesystem',{} )
+    for k,v in filesystem_.items():
+        filesystem[k] = v
     if filesystem and args.mangle_dirpath:
         for key,val in filesystem.items():
             filesystem[key]=filesystem[key].replace("production",args.mangle_dirpath)
