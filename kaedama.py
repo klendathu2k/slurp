@@ -56,10 +56,10 @@ arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query
 
 
 _default_filesystem = {
-        outdir  :           "/sphenix/lustre01/sphnxpro/production/{runtype}/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
-    ,   logdir  : "file:///sphenix/data/data02/sphnxpro/production/{runtype}/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
-    ,   histdir :       "/sphenix/data/data02/sphnxpro/production/{runtype}/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
-    ,   condor  :                                 "/tmp/production/{runtype}/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/{runtype}/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/{runtype}/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+    ,   'histdir' :       "/sphenix/data/data02/sphnxpro/production/{runtype}/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+    ,   'condor'  :                                 "/tmp/production/{runtype}/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
 }
 
 
