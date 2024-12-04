@@ -199,6 +199,8 @@ def main():
                     runs.append(run)
         run_condition = "and runnumber in ( %s )" % ','.join( runs )
 
+    print(f"run selection: {run_condition}")
+
     seg_condition = ""
     if len(args.segments)==1:
         seg_condition = f"and segment={args.segments[0]}"
@@ -360,9 +362,9 @@ def main():
         # Extract the subset of parameters that we need to pass to submit.  Note that (most) submitkw
         # arguments will be passed down to the matches function in the kwargs dictionary.
         #
-        submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump", "neventsper"] }
+        submitkw = { kw : val for kw,val in params.items() if kw in ["mem","disk","dump", "neventsper" ] }
 
-        dispatched = submit (dst_rule, args.maxjobs, nevents=args.nevents, **submitkw, **filesystem ) 
+        dispatched = submit (dst_rule, args.maxjobs, params, nevents=args.nevents, **submitkw, **filesystem ) 
 
         batch="batch"
         if args.batch==False:

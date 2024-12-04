@@ -571,7 +571,7 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         
 
 
-def submit( rule, maxjobs, **kwargs ):
+def submit( rule, maxjobs, params, **kwargs ):
 
     # Will return cluster ID
     result = 0
@@ -668,15 +668,18 @@ def submit( rule, maxjobs, **kwargs ):
             # massage the inputs from space to comma separated
             if m.get('inputs',None): 
                 m['inputs']= ','.join( m['inputs'].split() )
+
                 if '/physics/' in m['inputs']: # physics can appear twice by mistake...
                     runtype = 'physics'
-                    d['runtype']=runtype
                 if '/beam/' in m['inputs']: # beam supercedes...
                     runtype = 'beam'
-                    d['runtype']=runtype
                 if '/cosmics/' in m['inputs']: # beam supercedes...
                     runtype = 'cosmics'
-                    d['runtype']=runtype
+
+                runtype = getattr( params, 'runtype', runtype )   # if specified in the kwords we override whatever was on the path
+                d['runtype']=runtype
+
+                print(f"runtype={runtype}")
                 
             runtypes[runtype]=1 # register the runtype for directory creation below
 
@@ -725,6 +728,8 @@ def submit( rule, maxjobs, **kwargs ):
                 outdir = outdir.replace( '$(tag)',      '{rule.tag}' )
                 outdir = outdir.replace( '$(name)',     '{rule.name}' )
                 outdir = outdir.replace( '$(runname)',  '{rule.runname}' )
+                outdir = outdir.replace( '$(runtype)',  '{runtype}' )
+
                                  
                 outdir = f'f"{outdir}"'
 
@@ -735,6 +740,7 @@ def submit( rule, maxjobs, **kwargs ):
                     rungroup=f'{mnrun:08d}_{mxrun:08d}'                
                     for runtype in runtypes.keys():  # runtype is a possible KW in the yaml file that can be substituted
                         pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
+                        INFO(f"Created {eval(outdir)} if missing")
 
             # submits the job to condor
             INFO("... submitting to condor")
@@ -944,7 +950,7 @@ def matches( rule, kwargs={} ):
     # LFN to PFN here...
     lfn2pfn = {}
     if rule.direct:
-        INFO("Building lfn2pfn map from filesystem")
+        INFO(f"Building lfn2pfn map from filesystem glob({rule.direct}+'/*')")
         lfn2pfn = { pfn.split("/")[-1] : pfn for pfn in glob(rule.direct+'/*') }
         INFO("done")
 
@@ -966,6 +972,11 @@ def matches( rule, kwargs={} ):
         """
         lfn2pfn = { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) }
 
+
+
+    if args.test_mode:
+        INFO("[TESTMODE: print lfn2pfn map]")
+        pprint.pprint(lfn2pfn)
                     
     # Build lists of PFNs available for each run
     INFO("Building PFN lists")
@@ -980,16 +991,9 @@ def matches( rule, kwargs={} ):
         # Add a new entry in the pfn_lists lookup table
         if pfn_lists.get(runseg,None)==None:
             pfn_lists[runseg]=[]
+        
+        pfn_lists[runseg] = [ lfn2pfn[lfn] for lfn in lfns ] 
 
-        # Build list of PFNs via direct lookup and append the results
-        if rule.direct:
-
-            pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns] 
-
-        # Build list of PFNs via filecatalog lookup if direct path has not been specified
-        if rule.direct==None:            
-
-            pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns]
 
     INFO(f"... {len(pfn_lists.keys())} pfn lists")
 
