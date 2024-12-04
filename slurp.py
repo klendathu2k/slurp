@@ -469,7 +469,6 @@ def update_production_status( matching, setup, condor, state ):
         except KeyError:
             ERROR("Key Error getting cluster and/or process number from the class ads map.")
             ERROR(f"  key={key}")
-            #pprint.pprint( condor_map )
             ERROR("Assuming this is an issue with condor, setting cluster=0, process=0 and trying to continue...")
             cluster=0
             process=0
@@ -507,11 +506,6 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         key       = ulog.split('.')[0].lower()  # lowercase b/c referenced by file basename
 
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
-
-
-# select * from status_dst_calor_auau23_ana387_2023p003;
-# id | run | segment | nsegments | inputs | prod_id | cluster | process | status | flags | exit_code 
-#----+-----+---------+-----------+--------+---------+---------+---------+--------+-------+-----------
 
     # replace with sphenix_dstname( setup.name, setup.build, setup.dbtag )
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
@@ -567,7 +561,7 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
     returning id
     """
     statusdbw.execute(insert)
-    # ... defer until we succeed ... statusdbw.commit()
+    # commit is deferred until the update succeeds
 
     result=[ int(x.id) for x in statusdbw.fetchall() ]
 
