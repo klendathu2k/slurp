@@ -952,10 +952,6 @@ def matches( rule, kwargs={} ):
     if rule.direct:
         INFO("Building lfn2pfn map from filesystem")
         lfn2pfn = { pfn.split("/")[-1] : pfn for pfn in glob(rule.direct+'/*') }
-        #for pfn in glob(rule.direct+'/*'):
-        #    lfn = pfn.split("/")[-1]
-        #    if os.path.isfile( pfn ):
-        #        lfn2pfn[lfn]=pfn
         INFO("done")
 
     else:
@@ -974,7 +970,6 @@ def matches( rule, kwargs={} ):
 
         on lfnlist.filename=files.lfn;        
         """
-        #lfn2pfn = { r.lfn : r.pfn for r in fccro.execute( fcquery ) }
         lfn2pfn = { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) }
 
                     
@@ -985,11 +980,6 @@ def matches( rule, kwargs={} ):
         runnumber, segment = runseg.strip("'").split('-')        
         output = DSTFMT %(name,build,tag,int(runnumber),int(segment))
         
-        # If the output does not exist on disk OR the resubmit option is present we may need to build the job.  
-        # Otherwise we can szve time by skipping.
-        #if ( (resubmit==False) and (exists.get(output,None) == None) ):
-        #    continue
-
         lfns_ = [ f"'{x}'" for x in lfns ]
         list_of_lfns = ','.join(lfns_)
 
@@ -997,35 +987,13 @@ def matches( rule, kwargs={} ):
         if pfn_lists.get(runseg,None)==None:
             pfn_lists[runseg]=[]
 
-        #if pth_lists.get(runseg,None)==None:
-        #    pth_lists[runseg]={}
-
         # Build list of PFNs via direct lookup and append the results
-        #INFO(f"... build pfn list for run {runnumber} seg {segment} ...")
         if rule.direct:
 
             pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns] 
 
-            #for direct in glob(rule.direct):
-                #if pth_lists[runseg].get(direct,None)==None:                    
-                #    pth_lists[runseg][direct] = []
-                #for p in [ direct+'/'+f for f in lfns if os.path.isfile(os.path.join(direct, f)) ]:
-                #    pfn_lists[ runseg ].append( p )
-                #for p in [ f for f in lfns if os.path.isfile(os.path.join(direct, f)) ]:
-                #    pth_lists[ runseg ][ direct ].append( p )
-
         # Build list of PFNs via filecatalog lookup if direct path has not been specified
         if rule.direct==None:            
-
-            #number_of_lfns = len(list_of_lfns.split(','))
-            #condition=f"lfn in ( {list_of_lfns} )"
-            #if number_of_lfns==1:
-            #    condition=f"lfn={list_of_lfns}";
-            #pfnquery=f"""
-            #select full_file_path from files where {condition} limit {number_of_lfns};
-            #"""        
-            #for pfnresult in fccro.execute( pfnquery ):
-            #    pfn_lists[ runseg ].append( pfnresult.full_file_path )
 
             pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns]
 
@@ -1064,8 +1032,6 @@ def matches( rule, kwargs={} ):
         file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        # Not even sure how this was working???  This is the filename of the proposed job
         fbn = stat.dstfile
         prod_status_map[fbn] = stat.status  # supposed to be the map of the jobs which are in the production database to the filename of that job
-        #INFO(f"{fbn} : {stat.status}")
-
 
 
     #
@@ -1074,7 +1040,6 @@ def matches( rule, kwargs={} ):
     #
     list_of_runs = []
     INFO("Building matches")
-    #for ((lfn,run,seg,*fc_rest),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
 
     assert( len(fc_result)==len(outputs) ) 
 
@@ -1099,9 +1064,6 @@ def matches( rule, kwargs={} ):
         #
         x    = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
-
-        #pprint.pprint( fc_rest )
-
 
         #
         # There is a master list of states which result in a DST producion job being blocked.  By default
@@ -1145,11 +1107,9 @@ def matches( rule, kwargs={} ):
             WARN( f"{num_lfn} {num_pfn} {sanity}" )
             for i in itertools.zip_longest( lfn_lists[f"'{run}-{seg}'"], pfn_lists[f"'{run}-{seg}'"] ):
                 print(i)
-            #WARN( lfn_lists )
-            #WARN( pfn_lists )
             continue
 
-        #inputs_ = lfn_lists[f"'{run}-{seg}'"]
+
         inputs_ = pfn_lists[f"'{run}-{seg}'"]
         ranges_ = rng_lists[f"'{run}-{seg}'"]
         
