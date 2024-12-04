@@ -228,7 +228,9 @@ class SPhnxCondorJob:
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
     def __post_init__(self):
-        pass
+
+        if args:
+            object.__setattr__( self, 'batch_name', args.batch_name )
 
 @dataclass( frozen= __frozen__ )
 class SPhnxRule:
@@ -666,16 +668,21 @@ def submit( rule, maxjobs, **kwargs ):
 
             # TODO:  This should be accessed from the run table / daqdb
             runtype='none'
+            d['runtype']='unset'
+            d['runname']=rule.runname
 
             # massage the inputs from space to comma separated
             if m.get('inputs',None): 
                 m['inputs']= ','.join( m['inputs'].split() )
                 if '/physics/' in m['inputs']: # physics can appear twice by mistake...
                     runtype = 'physics'
+                    d['runtype']=runtype
                 if '/beam/' in m['inputs']: # beam supercedes...
                     runtype = 'beam'
+                    d['runtype']=runtype
                 if '/cosmics/' in m['inputs']: # beam supercedes...
                     runtype = 'cosmics'
+                    d['runtype']=runtype
                 
             runtypes[runtype]=1 # register the runtype for directory creation below
 
@@ -737,6 +744,9 @@ def submit( rule, maxjobs, **kwargs ):
 
             # submits the job to condor
             INFO("... submitting to condor")
+
+            pprint.pprint(mymatching)
+
             submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
             # commits the insert done above
             statusdbw.commit()
@@ -889,7 +899,6 @@ def matches( rule, kwargs={} ):
 
     lfn_lists  = {}  # LFN lists per run requested in the input query
     pfn_lists  = {}  # PFN lists per run existing on disk
-    #pth_lists  = {}  # PFN list in format DIR:file1,file2,...,fileN
     rng_lists  = {}  # LFN:firstevent:lastevent
 
     runMin=999999
@@ -1257,6 +1266,8 @@ arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, act
 
 arg_parser.add_argument( "--dbinput", default=True, action="store_true",help="Passes input filelist through the production status db rather than the argument list of the production script." )
 arg_parser.add_argument( "--no-dbinput", dest="dbinput", action="store_false",help="Unsets dbinput flag." )
+
+arg_parser.add_argument( "--batch-name", dest="batch_name", default="$(name)_$(build)_$(tag)" )
 
 def parse_command_line():
     global blocking
