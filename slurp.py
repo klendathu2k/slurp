@@ -906,21 +906,17 @@ def matches( rule, kwargs={} ):
     INFO("Building candidate inputs")
     if rule.files:
         curs      = cursors[ rule.filesdb ]
-        #fc_result = list( curs.execute( rule.files ).fetchall() )
-
-        # Execute the query
-        # curs.execute( rule.files )
 
         inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
 
-        # Candidate outputs
-        outputs = []
+        outputs = [] # WARNING: len(outputs) and len(fc_result) must be equal
 
         INFO(f"... {len(fc_result)} inputs")
         for f in inputquery:
             fc_result.append(f) # cache the query
             run     = f.runnumber
             segment = f.segment
+
             outputs.append( DSTFMT %(name,build,tag,int(run),int(segment)) )
 
             if run>runMax: runMax=run
@@ -934,28 +930,11 @@ def matches( rule, kwargs={} ):
                 ERROR(f"Run number {run}-{segment} reached twice in this query...")
                 ERROR(rule.files)
                 exit(1)
+    
+    if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
 
-
-
-
+    assert( len(fc_result)==len(outputs) )
             
-
-    # These are not the droids you are looking for.  Move along.
-    if len(lfn_lists)==0: return [], None, []
-            
-    #
-    # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
-    # N.b. Output file naming convention is fixed as DST_TYPE_system-run#-seg#.ext... so something having a run
-    # range may end up outside of the schema.
-    #
-    #INFO("Building candidate outputs")
-    #outputs = [ DSTFMT %(name,build,tag,int(x.runnumber),int(x.segment)) for x in fc_result ]
-    #INFO(f"... {len(outputs)} candidate outputs")
-
-    #
-    # We cannot prune outputs alone here.  It must be the same length as fc_result
-    #
-
 
     # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
     # we know that we do not have to produce it if it appears w/in the outputs list.
