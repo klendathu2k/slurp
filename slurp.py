@@ -228,7 +228,9 @@ class SPhnxCondorJob:
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
     def __post_init__(self):
-        pass
+
+        if args:
+            object.__setattr__( self, 'batch_name', args.batch_name )
 
 @dataclass( frozen= __frozen__ )
 class SPhnxRule:
@@ -265,7 +267,7 @@ class SPhnxRule:
         object.__setattr__(self, 'build', b)        
 
         if self.runname==None:
-            self.runname=self.name.split('_')[-1]
+            object.__setattr__(self, 'runname', self.name.split('_')[-1])
 
         # Add to the global list of rules
         __rules__.append(self)
@@ -467,7 +469,6 @@ def update_production_status( matching, setup, condor, state ):
         except KeyError:
             ERROR("Key Error getting cluster and/or process number from the class ads map.")
             ERROR(f"  key={key}")
-            #pprint.pprint( condor_map )
             ERROR("Assuming this is an issue with condor, setting cluster=0, process=0 and trying to continue...")
             cluster=0
             process=0
@@ -505,11 +506,6 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         key       = ulog.split('.')[0].lower()  # lowercase b/c referenced by file basename
 
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
-
-
-# select * from status_dst_calor_auau23_ana387_2023p003;
-# id | run | segment | nsegments | inputs | prod_id | cluster | process | status | flags | exit_code 
-#----+-----+---------+-----------+--------+---------+---------+---------+--------+-------+-----------
 
     # replace with sphenix_dstname( setup.name, setup.build, setup.dbtag )
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
@@ -565,7 +561,7 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
     returning id
     """
     statusdbw.execute(insert)
-    # ... defer until we succeed ... statusdbw.commit()
+    # commit is deferred until the update succeeds
 
     result=[ int(x.id) for x in statusdbw.fetchall() ]
 
@@ -666,16 +662,21 @@ def submit( rule, maxjobs, **kwargs ):
 
             # TODO:  This should be accessed from the run table / daqdb
             runtype='none'
+            d['runtype']='unset'
+            d['runname']=rule.runname
 
             # massage the inputs from space to comma separated
             if m.get('inputs',None): 
                 m['inputs']= ','.join( m['inputs'].split() )
                 if '/physics/' in m['inputs']: # physics can appear twice by mistake...
                     runtype = 'physics'
+                    d['runtype']=runtype
                 if '/beam/' in m['inputs']: # beam supercedes...
                     runtype = 'beam'
+                    d['runtype']=runtype
                 if '/cosmics/' in m['inputs']: # beam supercedes...
                     runtype = 'cosmics'
+                    d['runtype']=runtype
                 
             runtypes[runtype]=1 # register the runtype for directory creation below
 
@@ -737,6 +738,9 @@ def submit( rule, maxjobs, **kwargs ):
 
             # submits the job to condor
             INFO("... submitting to condor")
+
+            pprint.pprint(mymatching)
+
             submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
             # commits the insert done above
             statusdbw.commit()
@@ -889,7 +893,6 @@ def matches( rule, kwargs={} ):
 
     lfn_lists  = {}  # LFN lists per run requested in the input query
     pfn_lists  = {}  # PFN lists per run existing on disk
-    #pth_lists  = {}  # PFN list in format DIR:file1,file2,...,fileN
     rng_lists  = {}  # LFN:firstevent:lastevent
 
     runMin=999999
@@ -897,21 +900,17 @@ def matches( rule, kwargs={} ):
     INFO("Building candidate inputs")
     if rule.files:
         curs      = cursors[ rule.filesdb ]
-        #fc_result = list( curs.execute( rule.files ).fetchall() )
-
-        # Execute the query
-        # curs.execute( rule.files )
 
         inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
 
-        # Candidate outputs
-        outputs = []
+        outputs = [] # WARNING: len(outputs) and len(fc_result) must be equal
 
         INFO(f"... {len(fc_result)} inputs")
         for f in inputquery:
             fc_result.append(f) # cache the query
             run     = f.runnumber
             segment = f.segment
+
             outputs.append( DSTFMT %(name,build,tag,int(run),int(segment)) )
 
             if run>runMax: runMax=run
@@ -925,29 +924,9 @@ def matches( rule, kwargs={} ):
                 ERROR(f"Run number {run}-{segment} reached twice in this query...")
                 ERROR(rule.files)
                 exit(1)
-
-
-
-
-            
-
-    # These are not the droids you are looking for.  Move along.
-    if len(lfn_lists)==0: return [], None, []
-            
-    #
-    # Build the list of output files for the transformation from the run and segment number in the filecatalog query.
-    # N.b. Output file naming convention is fixed as DST_TYPE_system-run#-seg#.ext... so something having a run
-    # range may end up outside of the schema.
-    #
-    #INFO("Building candidate outputs")
-    #outputs = [ DSTFMT %(name,build,tag,int(x.runnumber),int(x.segment)) for x in fc_result ]
-    #INFO(f"... {len(outputs)} candidate outputs")
-
-    #
-    # We cannot prune outputs alone here.  It must be the same length as fc_result
-    #
-
-
+    
+    if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
+    
     # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
     # we know that we do not have to produce it if it appears w/in the outputs list.
     dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
@@ -967,10 +946,6 @@ def matches( rule, kwargs={} ):
     if rule.direct:
         INFO("Building lfn2pfn map from filesystem")
         lfn2pfn = { pfn.split("/")[-1] : pfn for pfn in glob(rule.direct+'/*') }
-        #for pfn in glob(rule.direct+'/*'):
-        #    lfn = pfn.split("/")[-1]
-        #    if os.path.isfile( pfn ):
-        #        lfn2pfn[lfn]=pfn
         INFO("done")
 
     else:
@@ -989,7 +964,6 @@ def matches( rule, kwargs={} ):
 
         on lfnlist.filename=files.lfn;        
         """
-        #lfn2pfn = { r.lfn : r.pfn for r in fccro.execute( fcquery ) }
         lfn2pfn = { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) }
 
                     
@@ -1000,11 +974,6 @@ def matches( rule, kwargs={} ):
         runnumber, segment = runseg.strip("'").split('-')        
         output = DSTFMT %(name,build,tag,int(runnumber),int(segment))
         
-        # If the output does not exist on disk OR the resubmit option is present we may need to build the job.  
-        # Otherwise we can szve time by skipping.
-        #if ( (resubmit==False) and (exists.get(output,None) == None) ):
-        #    continue
-
         lfns_ = [ f"'{x}'" for x in lfns ]
         list_of_lfns = ','.join(lfns_)
 
@@ -1012,35 +981,13 @@ def matches( rule, kwargs={} ):
         if pfn_lists.get(runseg,None)==None:
             pfn_lists[runseg]=[]
 
-        #if pth_lists.get(runseg,None)==None:
-        #    pth_lists[runseg]={}
-
         # Build list of PFNs via direct lookup and append the results
-        #INFO(f"... build pfn list for run {runnumber} seg {segment} ...")
         if rule.direct:
 
             pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns] 
 
-            #for direct in glob(rule.direct):
-                #if pth_lists[runseg].get(direct,None)==None:                    
-                #    pth_lists[runseg][direct] = []
-                #for p in [ direct+'/'+f for f in lfns if os.path.isfile(os.path.join(direct, f)) ]:
-                #    pfn_lists[ runseg ].append( p )
-                #for p in [ f for f in lfns if os.path.isfile(os.path.join(direct, f)) ]:
-                #    pth_lists[ runseg ][ direct ].append( p )
-
         # Build list of PFNs via filecatalog lookup if direct path has not been specified
         if rule.direct==None:            
-
-            #number_of_lfns = len(list_of_lfns.split(','))
-            #condition=f"lfn in ( {list_of_lfns} )"
-            #if number_of_lfns==1:
-            #    condition=f"lfn={list_of_lfns}";
-            #pfnquery=f"""
-            #select full_file_path from files where {condition} limit {number_of_lfns};
-            #"""        
-            #for pfnresult in fccro.execute( pfnquery ):
-            #    pfn_lists[ runseg ].append( pfnresult.full_file_path )
 
             pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns]
 
@@ -1079,8 +1026,6 @@ def matches( rule, kwargs={} ):
         file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        # Not even sure how this was working???  This is the filename of the proposed job
         fbn = stat.dstfile
         prod_status_map[fbn] = stat.status  # supposed to be the map of the jobs which are in the production database to the filename of that job
-        #INFO(f"{fbn} : {stat.status}")
-
 
 
     #
@@ -1089,7 +1034,9 @@ def matches( rule, kwargs={} ):
     #
     list_of_runs = []
     INFO("Building matches")
-    #for ((lfn,run,seg,*fc_rest),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
+
+    assert( len(fc_result)==len(outputs) ) 
+
     for (fc,dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
 
         lfn = fc.source
@@ -1111,9 +1058,6 @@ def matches( rule, kwargs={} ):
         #
         x    = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
-
-        #pprint.pprint( fc_rest )
-
 
         #
         # There is a master list of states which result in a DST producion job being blocked.  By default
@@ -1157,11 +1101,9 @@ def matches( rule, kwargs={} ):
             WARN( f"{num_lfn} {num_pfn} {sanity}" )
             for i in itertools.zip_longest( lfn_lists[f"'{run}-{seg}'"], pfn_lists[f"'{run}-{seg}'"] ):
                 print(i)
-            #WARN( lfn_lists )
-            #WARN( pfn_lists )
             continue
 
-        #inputs_ = lfn_lists[f"'{run}-{seg}'"]
+
         inputs_ = pfn_lists[f"'{run}-{seg}'"]
         ranges_ = rng_lists[f"'{run}-{seg}'"]
         
@@ -1257,6 +1199,8 @@ arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, act
 
 arg_parser.add_argument( "--dbinput", default=True, action="store_true",help="Passes input filelist through the production status db rather than the argument list of the production script." )
 arg_parser.add_argument( "--no-dbinput", dest="dbinput", action="store_false",help="Unsets dbinput flag." )
+
+arg_parser.add_argument( "--batch-name", dest="batch_name", default="$(name)_$(build)_$(tag)" )
 
 def parse_command_line():
     global blocking

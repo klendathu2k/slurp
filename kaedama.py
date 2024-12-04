@@ -54,6 +54,15 @@ arg_parser.add_argument( '--maxjobs',dest="maxjobs",help="Maximum number of jobs
 
 arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query after parameter substitution and exit", action="store_true", default=False )
 
+
+_default_filesystem = {
+        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+    ,   'histdir' :       "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+    ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+}
+
+
 def sanity_checks( params, inputq ):
     result = True
 
@@ -120,7 +129,7 @@ def main():
         logging.info("Running in testbed mode.")
 
     if args.test_mode:
-        args.mangle_dirpath = 'testbed'
+        args.mangle_dirpath = 'production-testbed'
         
 
     if args.test_mode:
@@ -250,17 +259,33 @@ def main():
                 print(params[key])
                 pprint.pprint(locals())
                 params[key]=params[key].format(**locals())
-                
+
+    if args.test_mode:
+        print("[TESTMODE: print parameter block]")
+        pprint.pprint(params)
                 
 
-    filesystem    = config.get('filesystem',None)                         
+    # Default filesystem.  Override with vaules specified in the workflow.
+    filesystem   = _default_filesystem
+    filesystem_  = config.get('filesystem',{} )
+    for k,v in filesystem_.items():
+        filesystem[k] = v
+
+    # Mangle directory path is specified.  Production is replaced with...
     if filesystem and args.mangle_dirpath:
         for key,val in filesystem.items():
-            filesystem[key]=filesystem[key].replace("sphnxpro","sphnxpro/"+args.mangle_dirpath)
-            filesystem[key]=filesystem[key].replace("tmp","tmp/"+args.mangle_dirpath)
+            filesystem[key]=filesystem[key].replace("production",args.mangle_dirpath)
 
-    job_          = config.get('job',None) #config['job']
+    if args.test_mode:
+        print("[TESTMODE: print filesystem block]")
+        pprint.pprint(filesystem)
+
+    job_          = config.get('job',None)
     presubmit     = config.get('presubmit',None)
+
+    if args.test_mode:
+        print("[TESTMODE: print job block]")
+        pprint.pprint(job_)
 
 
     # Do not submit if we fail sanity check on definition file
@@ -326,6 +351,11 @@ def main():
                          limit             = args.limit
                      )
 
+
+        if args.test_mode:
+            print("[TESTMODE: print constructe rule]")
+            pprint.pprint(dst_rule)
+
         #
         # Extract the subset of parameters that we need to pass to submit.  Note that (most) submitkw
         # arguments will be passed down to the matches function in the kwargs dictionary.
@@ -340,15 +370,6 @@ def main():
         if args.docstring:
             batch=batch + " " + args.docstring
 
-        #ndispatched=len(dispatched)
-        #runs={}
-        #runslist=[]
-        #for k,v in dispatched.items():
-        #    try:
-        #        runs[k].append( v )
-        #    except KeyError:
-        #        runs[k] = []
-        #        runslist.append(k)
         runcount = {}
         ndisp=0
         if type(dispatched) == type([]):
