@@ -725,6 +725,7 @@ def submit( rule, maxjobs, **kwargs ):
                 outdir = outdir.replace( '$(tag)',      '{rule.tag}' )
                 outdir = outdir.replace( '$(name)',     '{rule.name}' )
                 outdir = outdir.replace( '$(runname)',  '{rule.runname}' )
+                outdir = outdir.replace( '$(runtype)',  '{runtype}' )
                                  
                 outdir = f'f"{outdir}"'
 
@@ -734,12 +735,11 @@ def submit( rule, maxjobs, **kwargs ):
                     mxrun = mnrun+100
                     rungroup=f'{mnrun:08d}_{mxrun:08d}'                
                     for runtype in runtypes.keys():  # runtype is a possible KW in the yaml file that can be substituted
+                        print(f"Create directory {eval(outdir)}")
                         pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
 
             # submits the job to condor
             INFO("... submitting to condor")
-
-            pprint.pprint(mymatching)
 
             submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
             # commits the insert done above
