@@ -932,10 +932,7 @@ def matches( rule, kwargs={} ):
                 exit(1)
     
     if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
-
-    assert( len(fc_result)==len(outputs) )
-            
-
+    
     # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
     # we know that we do not have to produce it if it appears w/in the outputs list.
     dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
@@ -1078,6 +1075,9 @@ def matches( rule, kwargs={} ):
     list_of_runs = []
     INFO("Building matches")
     #for ((lfn,run,seg,*fc_rest),dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
+
+    assert( len(fc_result)==len(outputs) ) 
+
     for (fc,dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
 
         lfn = fc.source
