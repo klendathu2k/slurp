@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/python
+# /usr/bin/env python
 
 import cProfile
 import slurp
