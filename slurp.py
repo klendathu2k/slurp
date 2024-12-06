@@ -982,14 +982,23 @@ def matches( rule, kwargs={} ):
             pfn_lists[runseg]=[]
 
         # Build list of PFNs via direct lookup and append the results
-        if rule.direct:
+        try:
+            if rule.direct:
 
-            pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns] 
+                pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns] 
 
-        # Build list of PFNs via filecatalog lookup if direct path has not been specified
-        if rule.direct==None:            
+                # Build list of PFNs via filecatalog lookup if direct path has not been specified
+            if rule.direct==None:            
 
-            pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns]
+                pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns]
+
+        except KeyError:
+            print( "No PFN for all LFNs in the input query.")
+            print(f"direct_path: {str(rule.direct)}")
+            print( "    ... if it is None, you should specify the directory paths where input files can be found")
+            print( "        in the input query.")
+            print( "    ... if it specifies one or more directories, then your list is incomplete, or there are missing input files.")
+            raise KeyError
 
     INFO(f"... {len(pfn_lists.keys())} pfn lists")
 
