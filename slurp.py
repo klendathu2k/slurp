@@ -1211,6 +1211,10 @@ arg_parser.add_argument( "--no-dbinput", dest="dbinput", action="store_false",he
 
 arg_parser.add_argument( "--batch-name", dest="batch_name", default="$(name)_$(build)_$(tag)" )
 
+def warn_options( args, userargs ):
+    if args.dbinput==False:
+        WARN("Option --no-dbinput is deprecated, and will be retired in the future.  All workflows should become db aware.")
+
 def parse_command_line():
     global blocking
     global args
@@ -1218,6 +1222,8 @@ def parse_command_line():
 
     args, userargs = arg_parser.parse_known_args()
     #blocking_ = ["submitting","submitted","started","running","evicted","failed","finished"]
+
+    warn_options( args, userargs )
 
     if args.unblock:
         blocking = [ b for b in blocking if b not in args.unblock ]

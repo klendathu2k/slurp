@@ -561,7 +561,7 @@ def submit(args):
     if args.dbinput:
         kaedama = kaedama.bake( "submit", "--config", args.SLURPFILE, "--nevents", args.nevents, "--maxjobs", int(args.maxjobs), "--dbinput" )
     else:
-        kaedama = kaedama.bake( "submit", "--config", args.SLURPFILE, "--nevents", args.nevents, "--maxjobs", int(args.maxjobs) )
+        kaedama = kaedama.bake( "submit", "--config", args.SLURPFILE, "--nevents", args.nevents, "--maxjobs", int(args.maxjobs), "--no-dbinput" )
 
     if args.test:
         kaedama = kaedama.bake( "--batch" )
