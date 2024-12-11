@@ -458,6 +458,9 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
 
         value = f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" 
 
+        if streamname:
+            value = value.replace( '$(streamname)', streamname )
+
         values.append( value )
        
     insvals = ','.join(values)
@@ -473,6 +476,9 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
     """
 
     # Execute but don't commit the insert.  We will commit after condor successfully accepts the jobs.
+    #pprint.pprint(values)
+    #exit(0)
+
     statusdbw.execute(insert)
 
     result=[ int(x.id) for x in statusdbw ]
@@ -609,7 +615,7 @@ def submit( rule, maxjobs, **kwargs ):
                 
         run_submit_loop=30
         schedd_query = None
-        
+
         # Insert jobs into the production status table and add the ID to the dictionary
         INFO("... insert")
         cupsids = insert_production_status( matching, setup, [], state="submitting" ) 
@@ -644,8 +650,7 @@ def submit( rule, maxjobs, **kwargs ):
 
             # submits the job to condor
             INFO("... submitting to condor")
-            #pprint.pprint(mymatching)            
-            #raise
+
 
             submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
             # commits the insert done above
@@ -909,12 +914,16 @@ def matches( rule, kwargs={} ):
 
         on lfnlist.filename=files.lfn;        
         """
+        #print(fcquery)
         lfn2pfn = { r.lfn : r.pfn for r in fccro.execute( fcquery ) }
+        #pprint.pprint(lfn2pfn)
 
                     
     # Build lists of PFNs available for each run
     INFO("Building PFN lists")
     for runseg,lfns in lfn_lists.items():
+
+        print(lfns)
 
         lfns_ = [ f"'{x}'" for x in lfns ]
         list_of_lfns = ','.join(lfns_)
