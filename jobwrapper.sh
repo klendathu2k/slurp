@@ -1,6 +1,7 @@
 #!/usr/bin/bash 
 {
 
+hostname
 echo $@
 
 # Job wrapper will start with sphenix_setup level at NEW
@@ -8,7 +9,7 @@ source /opt/sphenix/core/bin/sphenix_setup.sh -n new
 
 export userscript=$1       # this is the executable script
 export cupsid=${@: -1:1}                         # this is the ID of the job on the production system
-export payload=(`echo ${@: -2:1} | tr ","  " "`) # comma sep list --> array of files to stage in
+export payload=( `echo ${@: -2:1} | tr ","  " "` ) # comma sep list --> array of files to stage in
 export subdir=${@: -3:1}                         # ... relative to the submission directory
 
 echo userscript: ${userscript}
@@ -25,10 +26,13 @@ shift                      # everything else gets passed to the executable
 
 chmod u+x ${userscript}
 
-echo source ${userscript} ${@}
-     source ${userscript} ${@}
+singularity exec -B /home -B /direct/sphenix+u -B /gpfs02 -B /sphenix/u -B /sphenix/lustre01 -B /sphenix/user  -B /sphenix/data/data02 /cvmfs/sphenix.sdcc.bnl.gov/singularity/rhic_sl7.sif ./${userscript} $*
 
-} >& /sphenix/data/data02/sphnxpro/production-testbed/physics/run2pp/DST_STREAMING_EVENT_run2pp/ana444_2024p007/run_00053800_00053900/jobwrapper.${cupsid}.log
+#echo source ${userscript} ${@}
+#     source ${userscript} ${@}
+
+} 
+#>& /sphenix/data/data02/sphnxpro/production-testbed/physics/run2pp/DST_STREAMING_EVENT_run2pp/ana444_2024p007/run_00053800_00053900/jobwrapper.containertest.log
 
    
 
