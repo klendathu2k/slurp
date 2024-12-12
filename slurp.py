@@ -189,7 +189,7 @@ class SPhnxCondorJob:
     Condor submission job template.
     """
     universe:              str = "vanilla"
-    executable:            str = "$(script)"    
+    executable:            str = "jobwrapper.sh"    
     arguments:             str = "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
     batch_name:            str = "$(name)_$(build)_$(tag)"
     #output:                str = f"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).stdout"
@@ -622,6 +622,12 @@ def submit( rule, maxjobs, **kwargs ):
 
     INFO("Get the job dictionary")
     jobd = rule.job.dict()
+
+    # If we are using a wrapper, the user script becomes the first argument
+    if jobd['executable']=='jobwrapper.sh':
+        INFO(f"Setting up general jobwrapper script.  Adding user script {rule.script} as first argument")
+        jobd['arguments']= rule.script + ' ' + jobd['arguments']
+        INFO(f"  {jobd['arguments']}")
 
     # Append $(cupsid) as the last argument
     jobd['arguments'] = jobd['arguments'] + ' $(cupsid)'
