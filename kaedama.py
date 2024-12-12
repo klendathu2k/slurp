@@ -205,8 +205,8 @@ def main():
     elif len(args.segments)>=3:
         seg_condition = "and segment in ( %s )" % ','.join( args.segments )
 
-    streamname = args.streamname
-    streamfile = args.streamfile
+    #streamname = args.streamname
+    #streamfile = args.streamfile
 
     RUNFMT = slurp.RUNFMT
     SEGFMT = slurp.SEGFMT
