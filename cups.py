@@ -21,6 +21,48 @@ import platform
 
 MAXDSTNAMES = 100
 
+def printDbInfo( cnxn, title ):
+    name=cnxn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
+    serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
+    print(f"Connected {name} from {serv} as {title}")
+
+#
+# Production status connection
+#
+try:
+    statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
+    statusdbc = statusdb.cursor()
+except (pyodbc.InterfaceError,pyodbc.OperationalError) as e:
+    for s in [ 10*random.random(), 20*random.random(), 30*random.random(), 60*random.random(), 120*random.random() ]:
+        print(f"Could not connect to DB... retry in {s}s")
+        time.sleep(s)
+        try:
+            statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
+            statusdbc = statusdb.cursor()
+            break
+        except:
+            pass
+    else:
+        print(sys.argv())
+        print(e)
+        exit(1)
+
+try:
+    statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
+    statusdbr = statusdbr_.cursor()
+except pyodbc.InterfaceError:
+    for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
+        print(f"Could not connect to DB... retry in {s}s")
+        time.sleep(s)
+        try:
+            statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
+            statusdbr = statusdbr_.cursor()
+        except:
+            exit(0)
+except pyodbc.Error as e:
+    print(e)
+    exit(1)
+
 def md5sum( filename ):
     file_hash=None
     with open( filename, "rb") as f:
@@ -114,6 +156,17 @@ def getLatestId( tablename, dstname, run, seg ):
         print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
 
     return result
+
+@subcommand()
+def info( args ):
+    printDbInfo( statusdb,   "Production Status DB [write]" )
+    printDbInfo( statusdbr_, "Production Status DB [write]" )
+    cupsid=os.getenv('cupsid')
+    print(f"Working with cupsid={cupsid}")
+    print("Printing arguments")
+    for arg in vars(args):
+        print(f"{arg}: {getattr(args, arg)}")
+
 
 
 def update_production_status( update_query, retries=10, delay=10.0 ):
