@@ -43,6 +43,11 @@ for i in ${payload[@]}; do
     cp --verbose $subdir/$i . 
 done
 
+if [ -e odbc.ini ]; then
+export ODBCINI=./odbc.ini
+fi
+
+
 chmod u+x ${userscript}
 
 singularity exec -B /home -B /direct/sphenix+u -B /gpfs02 -B /sphenix/u -B /sphenix/lustre01 -B /sphenix/user  -B /sphenix/data/data02 /cvmfs/sphenix.sdcc.bnl.gov/singularity/rhic_sl7.sif ./${userscript} ${userArgs[@]}
