@@ -55,10 +55,10 @@ arg_parser.add_argument( '--maxjobs',dest="maxjobs",help="Maximum number of jobs
 arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query after parameter substitution and exit", action="store_true", default=False )
 
 _default_filesystem = {
-        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
-    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
-    ,   'histdir' :       "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
-    ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
+    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
+    ,   'histdir' :       "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
+    ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
 }
 
 def sanity_checks( params, inputq ):
