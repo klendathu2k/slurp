@@ -142,8 +142,6 @@ cnxn_string_map = {
 
 def dbQuery( cnxn_string, query, ntries=10 ):
 
-    print(f"dbQuery {cnxn_string}")
-
     # Some guard rails
     assert( 'delete' not in query.lower() )    
     assert( 'insert' not in query.lower() )    
@@ -156,8 +154,6 @@ def dbQuery( cnxn_string, query, ntries=10 ):
     for itry in range(0,ntries):
         try:
             conn = pyodbc.connect( cnxn_string )
-
-            printDbInfo( conn, f"Connected {cnxn_string}" )
             curs = conn.cursor()
             curs.execute( query )
             return curs
