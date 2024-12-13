@@ -735,6 +735,7 @@ def submit( rule, maxjobs, **kwargs ):
                 outdir = outdir.replace( '$(tag)',      '{rule.tag}' )
                 outdir = outdir.replace( '$(name)',     '{rule.name}' )
                 outdir = outdir.replace( '$(runname)',  '{rule.runname}' )
+                outdir = outdir.replace( '$(runtype)',  '{runtype}' )
                                  
                 outdir = f'f"{outdir}"'
 
@@ -745,6 +746,7 @@ def submit( rule, maxjobs, **kwargs ):
                     rungroup=f'{mnrun:08d}_{mxrun:08d}'                
                     for runtype in runtypes.keys():  # runtype is a possible KW in the yaml file that can be substituted
                         pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
+                        INFO(f"mkdir {eval(outdir)}")
 
             # submits the job to condor
             INFO("... submitting to condor")
