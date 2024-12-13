@@ -21,6 +21,11 @@ import platform
 
 MAXDSTNAMES = 100
 
+def printDbInfo( cnxn, title ):
+    name=cnxn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
+    serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
+    print(f"Connected {name} from {serv} as {title}")
+
 #
 # Production status connection
 #
@@ -57,9 +62,6 @@ except pyodbc.InterfaceError:
 except pyodbc.Error as e:
     print(e)
     exit(1)
-
-
-
 
 
 def md5sum( filename ):
@@ -163,6 +165,17 @@ def getLatestId( tablename, dstname, run, seg ):
         print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
 
     return result
+
+@subcommand()
+def info( args ):
+    printDbInfo( statusdb,   "Production Status DB [write]" )
+    printDbInfo( statusdbr_, "Production Status DB [write]" )
+    cupsid=os.getenv('cupsid')
+    print(f"Working with cupsid={cupsid}")
+    print("Printing arguments")
+    for arg in vars(args):
+        print(f"{arg}: {getattr(args, arg)}")
+
 
 
 @subcommand()

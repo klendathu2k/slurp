@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python 
 
 import cProfile
 import slurp
@@ -40,6 +40,7 @@ arg_parser.add_argument( '--limit', help="Maximum number of jobs to submit", def
 arg_parser.add_argument( '--submit',help="Job will be submitted", dest="submit", default="True", action="store_true")
 arg_parser.add_argument( '--no-submit', help="Job will not be submitted... print things", dest="submit", action="store_false")
 arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=['26022'] )
+arg_parser.add_argument( '--runlist', default=None, help="Flat text file containing list of runs to process, separated by whitespace / newlines." )
 arg_parser.add_argument( '--segments', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[] )
 arg_parser.add_argument( '--config',help="Specifies the yaml configuration file")
 arg_parser.add_argument( '--docstring',default=None,help="Appends a documentation string to the log entry")
@@ -52,6 +53,15 @@ arg_parser.add_argument( '--mangle-dirpath',dest='mangle_dirpath',help="Inserts 
 arg_parser.add_argument( '--maxjobs',dest="maxjobs",help="Maximum number of jobs to pass to condor", default=None )
 
 arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query after parameter substitution and exit", action="store_true", default=False )
+
+
+_default_filesystem = {
+        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+    ,   'histdir' :       "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+    ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
+}
+
 
 def sanity_checks( params, inputq ):
     result = True
@@ -119,7 +129,7 @@ def main():
         logging.info("Running in testbed mode.")
 
     if args.test_mode:
-        args.mangle_dirpath = 'testbed'
+        args.mangle_dirpath = 'production-testbed'
         
 
     if args.test_mode:
@@ -178,8 +188,16 @@ def main():
         run_condition = f"and runnumber={args.runs[0]}"
     elif len(args.runs)==2:
         run_condition = f"and runnumber>={args.runs[0]} and runnumber<={args.runs[1]}"
-    elif len(args.runs)>=3:
+    elif len(args.runs)>=3 and args.runlist==None:
         run_condition = "and runnumber in ( %s )" % ','.join( args.runs )
+    elif args.runlist:
+        runs = []
+        with open( args.runlist, "r" ) as rl:
+            lines = [line.rstrip() for line in file]
+            for line in lines:
+                for run in lines.split():
+                    runs.append(run)
+        run_condition = "and runnumber in ( %s )" % ','.join( runs )
 
     seg_condition = ""
     if len(args.segments)==1:
@@ -241,17 +259,33 @@ def main():
                 print(params[key])
                 pprint.pprint(locals())
                 params[key]=params[key].format(**locals())
-                
+
+    if args.test_mode:
+        print("[TESTMODE: print parameter block]")
+        pprint.pprint(params)
                 
 
-    filesystem    = config.get('filesystem',None)                         
+    # Default filesystem.  Override with vaules specified in the workflow.
+    filesystem   = _default_filesystem
+    filesystem_  = config.get('filesystem',{} )
+    for k,v in filesystem_.items():
+        filesystem[k] = v
+
+    # Mangle directory path is specified.  Production is replaced with...
     if filesystem and args.mangle_dirpath:
         for key,val in filesystem.items():
-            filesystem[key]=filesystem[key].replace("sphnxpro","sphnxpro/"+args.mangle_dirpath)
-            filesystem[key]=filesystem[key].replace("tmp","tmp/"+args.mangle_dirpath)
+            filesystem[key]=filesystem[key].replace("production",args.mangle_dirpath)
 
-    job_          = config.get('job',None) #config['job']
+    if args.test_mode:
+        print("[TESTMODE: print filesystem block]")
+        pprint.pprint(filesystem)
+
+    job_          = config.get('job',None)
     presubmit     = config.get('presubmit',None)
+
+    if args.test_mode:
+        print("[TESTMODE: print job block]")
+        pprint.pprint(job_)
 
 
     # Do not submit if we fail sanity check on definition file
@@ -317,6 +351,11 @@ def main():
                          limit             = args.limit
                      )
 
+
+        if args.test_mode:
+            print("[TESTMODE: print constructe rule]")
+            pprint.pprint(dst_rule)
+
         #
         # Extract the subset of parameters that we need to pass to submit.  Note that (most) submitkw
         # arguments will be passed down to the matches function in the kwargs dictionary.
@@ -331,15 +370,6 @@ def main():
         if args.docstring:
             batch=batch + " " + args.docstring
 
-        #ndispatched=len(dispatched)
-        #runs={}
-        #runslist=[]
-        #for k,v in dispatched.items():
-        #    try:
-        #        runs[k].append( v )
-        #    except KeyError:
-        #        runs[k] = []
-        #        runslist.append(k)
         runcount = {}
         ndisp=0
         if type(dispatched) == type([]):
