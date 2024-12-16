@@ -127,6 +127,18 @@ def dbconsistency():
     except:
         logging.warn( "Read and write instance of status db are out of sync / or could not connect to one or both." )
     return (idr,idw)
+
+def checkRequiredParams( params ):
+
+    fatal=False
+    if params.get( 'rsync', None )==None:
+        logging.error("Specify rsync: <payload files> in the params block.")
+        fatal=True
+
+    if fatal:
+        logging.error("YAML rule is not properly defined.  Correct above errors and try again.")
+        exit(1)
+        
     
 
 def main():
@@ -336,8 +348,13 @@ def main():
     if job_:
         assert( filesystem is not None )
         assert( params     is not None )
+        assert( params.get('rsync',None) is not None), "The params block should specify rsync: <payload directories and files>"
+        assert( '{PWD}'   in job_['arguments']), "The last two arguments must be {PWD} {rsync}" 
+        assert( '{rsync}' in job_['arguments']), "The last two arguments must be {PWD} {rsync}" 
+        
         for k,v in job_.items():
             jobkw[k] = v.format( **locals(), **filesystem, **params )
+
 
 
         # And now we can create the job definition thusly
