@@ -66,11 +66,18 @@ arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query
 
 # TODO: physics/run2pp/ana449_2024p008/”run range”/DST_TRKR_CLUSTER
 #       runtype runname build_tag  runrange DST
+#_default_filesystem = {
+#        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
+#    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
+#    ,   'histdir' :       "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
+#    ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
+#}
+
 _default_filesystem = {
-        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
-    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
-    ,   'histdir' :       "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
-    ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
+        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
+    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
+    ,   'histdir' :       "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
+    ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
 }
 
 

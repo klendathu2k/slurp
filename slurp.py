@@ -632,6 +632,16 @@ def submit( rule, maxjobs, **kwargs ):
     # Append $(cupsid) as the last argument
     jobd['arguments'] = jobd['arguments'] + ' $(cupsid)'
 
+    leafdir = rule.name.replace( f'_{rule.runname}', "" )
+    jobd['arguments'] = jobd['arguments'].replace( '{leafdir}', leafdir )
+
+    pprint.pprint( jobd )
+
+    #print( rule.name )
+    #print( rule.runname )
+    #print( leafdir )
+
+
     INFO("Passing job to htcondor.Submit")
     submit_job = htcondor.Submit( jobd )
     if verbose>0:
@@ -670,6 +680,8 @@ def submit( rule, maxjobs, **kwargs ):
             runtype='none'
             d['runtype']='unset'
             d['runname']=rule.runname
+
+            leafdir=m["name"].replace(f"_{rule.runname}","")
 
             # massage the inputs from space to comma separated
             if m.get('inputs',None): 
@@ -752,6 +764,8 @@ def submit( rule, maxjobs, **kwargs ):
             INFO("... submitting to condor")
 
             pprint.pprint(mymatching)
+
+            pprint.pprint( submit_job )
 
             submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
             # commits the insert done above
