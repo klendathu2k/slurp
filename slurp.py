@@ -635,12 +635,6 @@ def submit( rule, maxjobs, **kwargs ):
     leafdir = rule.name.replace( f'_{rule.runname}', "" )
     jobd['arguments'] = jobd['arguments'].replace( '{leafdir}', leafdir )
 
-    pprint.pprint( jobd )
-
-    #print( rule.name )
-    #print( rule.runname )
-    #print( leafdir )
-
 
     INFO("Passing job to htcondor.Submit")
     submit_job = htcondor.Submit( jobd )
@@ -762,10 +756,6 @@ def submit( rule, maxjobs, **kwargs ):
 
             # submits the job to condor
             INFO("... submitting to condor")
-
-            pprint.pprint(mymatching)
-
-            pprint.pprint( submit_job )
 
             submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
             # commits the insert done above
