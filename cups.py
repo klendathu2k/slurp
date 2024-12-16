@@ -599,7 +599,7 @@ def closeout(args):
 @subcommand([
     argument( "filename", help="Name of the file to be staged out"),
     argument( "outdir",   help="Output directory" ),
-    argument( "--retries", help="Number of retries before silent failure", type=int, default=1 ),
+    argument( "--retries", help="Number of retries before silent failure", type=int, default=5 ),
     argument( "--hostname", help="host name of the filesystem", default="lustre", choices=["lustre","gpfs"] ),
     argument( "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
     argument(     "--inc", help="If set, increments the number of events",dest="inc",default=False,action="store_true"),
@@ -619,7 +619,11 @@ def stageout(args):
         print("Copy back file")
 
     # Copy the file
-    shutil.copy2( f"{args.filename}", f"{args.outdir}" )
+    try:
+        shutil.copy2( f"{args.filename}", f"{args.outdir}" )
+    except Exception as e:
+        print(f"ERROR: Failed to copy file {args.filename} to {args.outdir}.  Aborting stageout.")
+        return
 
     sz  = int( os.path.getsize(f"{args.outdir}/{args.filename}") ) 
 
@@ -628,110 +632,117 @@ def stageout(args):
         print(md5true)
         print(md5check)
 
+    attempt = 0
 
-    # Unlikely to have failed w/out shutil throwing an error
-    if sz==sztrue:
-
-        # TODO: switch to an update mode rather than a delete / replace mode.
-        timestamp= args.timestamp
-        run      = int(args.run)
-        seg      = int(args.segment)
-        host     = args.hostname
-        nevents  = args.nevents
-
-        # n.b. not the slurp convention for dsttype
-        dstname  = args.dstname
-        dsttype='_'.join( dstname.split('_')[-2:] )
-
-        if args.dsttype != None:
-            dsttype = args.dsttype
-                
-        md5=md5true
-
-        # Strip off any leading path 
-        filename=args.filename.split('/')[-1]
-
-
-        # Copy succeeded.  Connect to file catalog and add to it
-        with pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc") as fc:
+    while attempt<args.retries:
+    
+        try:
+            # Copy succeeded.  Connect to file catalog and add to it
+            fc = pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc")
             fcc = fc.cursor()
         
+            # TODO: switch to an update mode rather than a delete / replace mode.
+            timestamp= args.timestamp
+            run      = int(args.run)
+            seg      = int(args.segment)
+            host     = args.hostname
+            nevents  = args.nevents
+
+            # n.b. not the slurp convention for dsttype
+            dstname  = args.dstname
+            dsttype='_'.join( dstname.split('_')[-2:] )
+
+            if args.dsttype != None:        dsttype = args.dsttype
+                
+            md5=md5true
+
+            # Strip off any leading path 
+            filename=args.filename.split('/')[-1]
+
             # Insert into files primary key: (lfn,full_host_name,full_file_path)
-            if args.verbose:
-                print("Insert into files")
+            if args.verbose:        print("Insert into files")
 
             insert=f"""
             insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
-               values ('{filename}','{host}','{args.outdir}/{filename}','now',{sz},'{md5}')
+            values ('{filename}','{host}','{args.outdir}/{filename}','now',{sz},'{md5}')
             on conflict
             on constraint files_pkey
             do update set 
-               time=EXCLUDED.time,
-               size=EXCLUDED.size,
-               md5=EXCLUDED.md5
+            time=EXCLUDED.time,
+            size=EXCLUDED.size,
+            md5=EXCLUDED.md5
             ;
             """
-            if args.verbose:
-                print(insert)
+            if args.verbose:        print(insert)
 
             fcc.execute(insert)
 
+
             # Insert into datasets primary key: (filename,dataset)
-            if args.verbose:
-                print("Insert into datasets")
+            if args.verbose:        print("Insert into datasets")
             insert=f"""
             insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
-               values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
+            values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
             on conflict
             on constraint datasets_pkey
             do update set
-               runnumber=EXCLUDED.runnumber,
-               segment=EXCLUDED.segment,
-               size=EXCLUDED.size,
-               dsttype=EXCLUDED.dsttype,
-               events=EXCLUDED.events
+            runnumber=EXCLUDED.runnumber,
+            segment=EXCLUDED.segment,
+            size=EXCLUDED.size,
+            dsttype=EXCLUDED.dsttype,
+            events=EXCLUDED.events
             ;
             """
-            if args.verbose:
-                print(insert)
-
-            fcc.execute(insert)
+            if args.verbose:        print(insert)
             
-            # Only commit once both have been executed
+            fcc.execute(insert)
+
+            # We commit and break out of the retry loop only if update to both the
+            # files and datasets table succeeded
             fcc.commit()
+            break
 
+        except Exception as E:
+            print(E)
+            attempt = attempt + 1
+            delay= float(attepmt)*random.random()*60
+            print(f"Unable to update filecatalog.  Retry in {delay}s")
+            time.sleep(delay)
 
-        # Add to nevents in the production status
-        if args.verbose:
-            print("Update nevents")
+    # Add to nevents in the production status
+    if args.verbose:
+        print("Update nevents")
 
-        tablename=args.table
-        dstname=args.dstname
-        run=int(args.run)
-        seg=int(args.segment)
-        if args.prodtype=="many": seg=0
-        id_ = getLatestId( tablename, dstname, run, seg )
+    tablename=args.table
+    dstname=args.dstname
+    run=int(args.run)
+    seg=int(args.segment)
+    if args.prodtype=="many": seg=0
+    id_ = getLatestId( tablename, dstname, run, seg )
+    update=None
 
-        update=None
-        if args.inc:
-            update = f"""
-            update {tablename}
-            set nevents=nevents+{args.nevents},nsegments=nsegments+1,message='last stageout {filename}'
-            where id={id_}
-            """
-            #            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
-        else:
-            update = f"""
-            update {tablename}
-            set nevents={args.nevents},nsegments=nsegments+1,message='last stageout {filename}'
-            where id={id_}
-            """
-        if args.noupdate==False: update_production_status( update )
+    if args.inc:
+        update = f"""
+        update {tablename}
+        set nevents=nevents+{args.nevents},nsegments=nsegments+1,message='last stageout {filename}'
+        where id={id_}
+        """
+        #            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
+    else:
+        update = f"""
+        update {tablename}
+        set nevents={args.nevents},nsegments=nsegments+1,message='last stageout {filename}'
+        where id={id_}
+        """
+        #            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
 
-        # and remove the file
-        if args.verbose:
-            print("Cleanup file")        
-        os.remove( f"{filename}")
+    statusdbc.execute( update )
+    statusdbc.commit()
+
+    # and remove the file
+    if args.verbose:
+        print("Cleanup file")        
+    os.remove( f"{filename}")
 
 
 @subcommand([
