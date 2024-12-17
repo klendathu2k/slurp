@@ -151,6 +151,23 @@ def sphnx_production_quality_table_def():
     );
     """
 
+#
+def sphnx_cups_stats():
+    return """
+    CREATE TABLE if not exists CUPS_STATS (
+       id        serial unique
+    ,  dstname   varchar(64) not null
+    ,  run       int         not null
+    ,  segment   int         not null
+    ,  update    varchar(32) not null
+    ,  started   timestamp   not null
+    ,  ended     timestamp   not null
+    ,  nattempts int         not null
+    ,  exception text        not null
+    ,  primary key(dstname,run,segment,update)
+    );
+    """
+#stat.write(f"{run},{seg},{dstname},{update},{upstart},{upend},{nattempts},{exception}\n") 
 
 #_____________________________________
 def sphnx_production_dataset():

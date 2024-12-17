@@ -63,7 +63,6 @@ except pyodbc.Error as e:
     print(e)
     exit(1)
 
-
 def md5sum( filename ):
     file_hash=None
     with open( filename, "rb") as f:
@@ -144,19 +143,11 @@ def getLatestId( tablename, dstname, run, seg ):
     query=f"""
     select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES};
     """
-    results = list( statusdbr.execute(query).fetchall() )
 
-    # Find the most recent ID with the given dstname
-    for r in results:
-        if r.dstname == dstname:
-            result = r.id
-            break
+    with pyodbc.connect("DSN=ProductionStatus") as statdb:
+        curs = statdb.cursor()
 
-    if result==0:
-        query=f"""
-        select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES*10};
-        """
-        for r in list( statusdbc.execute(query).fetchall() ):
+        for r in curs.execute(query):
             if r.dstname == dstname:
                 result = r.id
                 break
@@ -176,6 +167,24 @@ def info( args ):
     for arg in vars(args):
         print(f"{arg}: {getattr(args, arg)}")
 
+
+
+def update_production_status( update_query, retries=10, delay=10.0 ):
+    print(update_query)
+    for itry in range(0,retries):
+        time.sleep( delay * (itry + 1 ) * random.random() )
+        try:
+            with pyodbc.connect("DSN=ProductionStatusWrite") as statusdb:
+                curs=statusdb.cursor()
+                curs.execute(update_query)
+                curs.commit()
+                print(f"Applied after {itry+1} attempts")
+                return
+        except:
+            print(f"Failed {itry+1} attempts...")
+
+    print("Update failed")
+    
 
 
 @subcommand()
@@ -198,15 +207,8 @@ def started(args):
          execution_node='{node}'
     where id={id_}
     """    
+    if args.noupdate==False: update_production_status( update )
 
-    if args.verbose:
-        print(update)
-
-    if args.noupdate:
-        pass
-    else:
-        statusdbc.execute( update )
-        statusdbc.commit()
 
 @subcommand([
     argument(     "--nsegments",help="Number of segments produced",dest="nsegments",default=1),
@@ -228,15 +230,8 @@ def running(args):
     set status='running',running='{timestamp}',nsegments={nsegments}
     where id={id_}
     """
-#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
+    if args.noupdate==False: update_production_status( update )
 
-    if args.noupdate:
-        pass
-    else:
-        statusdbc.execute( update )
-        statusdbc.commit()
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -262,28 +257,20 @@ def finished(args):
     state='finished'
     if ec>0:
         state='failed'
+    update = None
     if args.inc:
         update = f"""
         update {tablename}
         set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents=nevents+{ne}
         where id={id_}
         """
-#        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     else:
         update = f"""
         update {tablename}
         set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
         where id={id_}
         """
-#        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
-
-    if args.noupdate:
-        pass
-    else:
-        statusdbc.execute( update )
-        statusdbc.commit()
+    if args.noupdate==False: update_production_status( update )
 
 
 #_______________________________________________________________________________________________________
@@ -309,15 +296,7 @@ def exitcode(args):
     set status='{state}',exit_code={ec}
     where id={id_}
     """
-#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
-
-    if args.noupdate:
-        pass
-    else:
-        statusdbc.execute( update )
-        statusdbc.commit()
+    if args.noupdate==False: update_production_status( update )
 
 
 #_______________________________________________________________________________________________________
@@ -342,22 +321,14 @@ def nevents(args):
         set nevents=nevents+{ne}
         where id={id_}
         """
-#       where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     else:
         update = f"""
         update {tablename}
         set nevents={ne}
         where id={id_}
         """
-#       where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
+    if args.noupdate==False: update_production_status( update )
 
-    if args.noupdate:
-        pass
-    else:
-        statusdbc.execute( update )
-        statusdbc.commit()
 
 #
 @subcommand([
@@ -374,7 +345,6 @@ def getinputs(args):
     query = f"""
     select inputs from {tablename} where id={id_} limit 1
     """
-
     ntries=0
     result = None
     while ntries<12:
@@ -386,10 +356,13 @@ def getinputs(args):
                 flist = str(result[0]).split(',')
                 for f in flist:
                     print(f)
-                break
+                return # return from function on success
 
             except pyodbc.Error:
                 time.sleep(ntries*5) # delay for ntries x 5 seconds
+
+    # If we make it to this point there has been an error
+    print("Unable to obtain the file list... I've got a bad feeling about this...")
 
 
 
@@ -414,24 +387,11 @@ def inputs(args):
     set inputs='{inputs}'
     where id={id_}
     """
-#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
-    if args.noupdate:
-        pass
-    else:
-        statusdbc.execute( update )
-        statusdbc.commit()
+    if args.noupdate==False: update_production_status( update )
 
 
-# files
-# lfn | full_host_name | full_file_path | time | size | md5 
-# datasets
-# filename | runnumber | segment | size | dataset | dsttype | events 
-
-#parser.add_argument( "--ext", help="file extension, e.g. root, prdf, ...", default="prdf" )
-#parser.add_argument( "--path", help="path to output file", default="./" )
-
+#_______________________________________________________________________________________________________
+# DEPRECATED
 #_______________________________________________________________________________________________________
 @subcommand([
     argument( "--replace",    help="remove and replace existing entries.", action="store_true", default=True ),
@@ -513,8 +473,127 @@ def message(args):
     flaginc=int(args.flag)
     id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
     update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};"
-    statusdbc.execute( update )
-    statusdbc.commit()
+    if args.noupdate==False: update_production_status( update )
+
+#_______________________________________________________________________________________________________
+@subcommand([
+    argument( "DATASET",help="Name of the dataset" ),
+    argument( "--dataset", help="sets the name of the dataset", default="test" ),
+    argument( "--dsttype", help="sets the sphenix dsttype", default=None ),
+])
+def closeout(args):
+    """
+    Adds a dataset entry indicating closeout of a dataset.
+    """
+    count=0
+    while (count<10):
+
+        time.sleep( random.random() * 10.0 )
+        with pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc") as fc:
+            fcc = fc.cursor()
+
+            run      = int(args.run)
+            seg      = int(args.segment)
+
+            # n.b. not the slurp convention for dsttype
+            dstname  = args.dstname
+            dsttype='_'.join( dstname.split('_')[-2:] )
+
+            if args.dsttype != None:
+                dsttype = args.dsttype   
+
+            dataset = args.DATASET
+
+            # Insert into datasets primary key: (filename,dataset)
+            if args.verbose:
+                print("Insert into datasets")
+
+            insert=f"""
+                insert into datasets (dataset,run,0,size,dataset,dsttype,events)
+                values ('{filename}',{run},{seg},0,'{args.dataset}','{dsttype}',0)
+                on conflict
+                on constraint datasets_pkey
+                do update set
+                runnumber= EXCLUDED.runnumber ,
+                segment  = EXCLUDED.segment   ,
+                size     = datasets.size - 1  ,
+                dsttype  = EXCLUDED.dsttype   ,
+                events   = EXCLUDED.events
+                ;
+            """
+            if args.verbose:
+                print(insert)
+
+            try:
+                fcc.execute(insert)
+                fcc.commit()
+                return
+            except:
+                pass
+
+    print("*** cups failed to close the dataset **")
+
+
+
+#_______________________________________________________________________________________________________
+@subcommand([
+    argument( "DATASET",help="Name of the dataset" ),
+    argument( "--dataset", help="sets the name of the dataset", default="test" ),
+    argument( "--dsttype", help="sets the sphenix dsttype", default=None ),
+])
+def closeout(args):
+    """
+    Adds a dataset entry indicating closeout of a dataset.
+    """
+    count=0
+    while (count<10):
+
+        time.sleep( random.random() * 10.0 )
+        with pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc") as fc:
+            fcc = fc.cursor()
+
+            run      = int(args.run)
+            seg      = int(args.segment)
+
+            # n.b. not the slurp convention for dsttype
+            dstname  = args.dstname
+            dsttype='_'.join( dstname.split('_')[-2:] )
+
+            if args.dsttype != None:
+                dsttype = args.dsttype   
+
+            dataset = args.DATASET
+
+            # Insert into datasets primary key: (filename,dataset)
+            if args.verbose:
+                print("Insert into datasets")
+
+            insert=f"""
+                insert into datasets (dataset,run,0,size,dataset,dsttype,events)
+                values ('{filename}',{run},{seg},0,'{args.dataset}','{dsttype}',0)
+                on conflict
+                on constraint datasets_pkey
+                do update set
+                runnumber= EXCLUDED.runnumber ,
+                segment  = EXCLUDED.segment   ,
+                size     = datasets.size - 1  ,
+                dsttype  = EXCLUDED.dsttype   ,
+                events   = EXCLUDED.events
+                ;
+            """
+            if args.verbose:
+                print(insert)
+
+            try:
+                fcc.execute(insert)
+                fcc.commit()
+                return
+            except:
+                pass
+
+    print("*** cups failed to close the dataset **")
+
+
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -630,8 +709,6 @@ def stageout(args):
             print(f"Unable to update filecatalog.  Retry in {delay}s")
             time.sleep(delay)
 
-
-
     # Add to nevents in the production status
     if args.verbose:
         print("Update nevents")
@@ -661,7 +738,6 @@ def stageout(args):
 
     statusdbc.execute( update )
     statusdbc.commit()
-
 
     # and remove the file
     if args.verbose:
@@ -739,8 +815,10 @@ def quality(args):
     """
 
     # File catalog
-    statusdbc.execute(qaentry)
-    statusdbc.commit()    
+    with pyodbc.connect("DSN=ProductionStatusWrite") as statusdb:
+        curs=statusdb.cursor()
+        curs.execute(qaentry)
+        curs.commit()    
 
 
 def main():
