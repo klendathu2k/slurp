@@ -977,9 +977,6 @@ def matches( rule, kwargs={} ):
     else:
         INFO("Building lfn2pfn map from filecatalog")
 
-        # TODO FIX: The build and tag should be the build / tag of the input list
-        #           Can we use the lfn_lists that we built above?
-
         for mydataset in input_datasets.keys():
         
             fcquery=f"""
