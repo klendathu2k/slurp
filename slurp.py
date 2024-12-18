@@ -111,12 +111,6 @@ rawdr_ = pyodbc.connect("DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True")
 rawdr  = rawdr_.cursor()
 printDbInfo( rawdr_, "RAW database [reads]" )
 
-
-#print(f"ProductionStatus [RO]: timeout {statusdbr_.timeout}s")
-#print(f"ProductionStatus [Wr]: timeout {statusdbw_.timeout}s")
-#print(f"FileCatalog [RO]:      timeout {fcro.timeout}s")
-#print(f"DaqDB [RO]:            timeout {daqdb.timeout}s")
-
 cursors = { 
     'daq':rawdr,
     'fc':fccro,
@@ -141,8 +135,6 @@ cnxn_string_map = {
 }
 
 def dbQuery( cnxn_string, query, ntries=10 ):
-
-    print(f"dbQuery {cnxn_string}")
 
     # Some guard rails
     assert( 'delete' not in query.lower() )    
@@ -945,7 +937,6 @@ def matches( rule, kwargs={} ):
                 
             # Drop the run and segment numbers and leading stuff and just pull the datasets
             for fn in f.files.split():
-                print(fn)
                 base1 = fn.split('-')[0]
                 base2 = base1.split('_')[-2:]
                 input_datasets[ '_'.join(base2) ] = 1
