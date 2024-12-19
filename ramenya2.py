@@ -17,6 +17,7 @@ from tqdm import tqdm
 import pydoc
 import datetime
 import traceback
+import yaml
 
 import htcondor
 import classad
@@ -528,6 +529,32 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
 
     print( tabulate( table, labels, tablefmt=tablefmt ) )
 
+def getArgsForRule( yaml, r ):
+    result = []
+
+    # If we didnt load options via yaml, return an empty dict
+    if yaml == {}:
+        return []
+
+    ruleargs = yaml.get(r, {})
+
+    # Transform into a list of arguments
+    for k,v in ruleargs.items():
+
+        flag=k.replace("_","-")
+        result.append(f"--{flag}")
+        
+        # skip if the flag is boolean
+        if isinstance( v, bool ):
+            continue
+
+        y = str(v)
+        
+        for x in y.split(' '):
+            result.append( str(x) )
+            
+    return result
+
 
 @subcommand([
     argument( '--nevents', help="Specifies number of events to submit (defaults to all)", default=0 ),
@@ -536,6 +563,7 @@ def query_jobs_by_condor(conditions="", title="Summary of jobs by with condor st
     argument( "--delay", default=300, help="Set the loop delay",type=int),
     argument( "--rules", default=[], nargs="?", help="Sets the name of the rule to be used"),
     argument( "--rules-file", dest="rules_file", default=None, help="If specified, read the list of active rules from the given file on each pass of the loop" ),
+    argument( "--rules-yaml", dest="rules_yaml", default=None, help="If specified, executes each rule in turn setting kaedama arguments specific to each rule" ),
     argument( "--timestart",default=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),help="Specifies UTC timestamp (in ISO format, e.g. YYYY-MM-DD) for query.", type=dateutil.parser.parse),
     argument( "--test",default=False,help=argparse.SUPPRESS,action="store_true"), # kaedama will be submitted in batch mode
     argument( "--experiment-mode", default=None, help="Sets experiment-mode for kaedama", dest="mode" ),
@@ -556,33 +584,42 @@ def submit(args):
 
     global timestart
     timestart=str(args.timestart)
+    kaedama  = sh.Command("kaedama.py" )
 
-    kaedama  = sh.Command("kaedama.py" )    
-    if args.dbinput:
-        kaedama = kaedama.bake( "submit", "--config", args.SLURPFILE, "--nevents", args.nevents, "--maxjobs", int(args.maxjobs), "--dbinput" )
-    else:
-        kaedama = kaedama.bake( "submit", "--config", args.SLURPFILE, "--nevents", args.nevents, "--maxjobs", int(args.maxjobs), "--no-dbinput" )
-
-    if args.test:
-        kaedama = kaedama.bake( "--batch" )
-    if args.mode is not None:
-        kaedama = kaedama.bake( "--experiment-mode", args.mode )
-    if args.resubmit:
-        kaedama.bake( "-r ")
-
+    # If provided read in yaml rules file.  The rules_yaml will be an empty dictionary... the args.rules_yaml
+    # determines whether or not the file is loaded.
+    rules_yaml = {}
     runreport = ""
-    if   len(args.runs)==1: 
-        kaedama = kaedama.bake( runs=args.runs[0] )
-        runreport = f"runs: {args.runs[0]}"
-    elif len(args.runs)==2: 
-        kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1] )
-        runreport = f"runs: {args.runs[0]} to {args.runs[1]}"
-    elif len(args.runs)==3: 
-        kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1], args.runs[2] )
-        runreport = f"runs: {args.runs}"
-    else:                   
-        kaedama = kaedama.bake( "--runs", "0", "999999" )
-        runreport = f"runs: 0 to 999999"
+    
+    if args.rules_yaml:
+        with open( args.rules_yaml ) as stream:
+            rules_yaml = yaml.safe_load( stream )
+    else:
+        
+        if args.dbinput:
+            kaedama = kaedama.bake( "submit", "--config", args.SLURPFILE, "--nevents", args.nevents, "--maxjobs", int(args.maxjobs), "--dbinput" )
+        else:
+            kaedama = kaedama.bake( "submit", "--config", args.SLURPFILE, "--nevents", args.nevents, "--maxjobs", int(args.maxjobs), "--no-dbinput" )
+
+        if args.test:
+            kaedama = kaedama.bake( "--batch" )
+        if args.mode is not None:
+            kaedama = kaedama.bake( "--experiment-mode", args.mode )
+        if args.resubmit:
+            kaedama.bake( "-r ")
+
+        if   len(args.runs)==1: 
+            kaedama = kaedama.bake( runs=args.runs[0] )
+            runreport = f"runs: {args.runs[0]}"
+        elif len(args.runs)==2: 
+            kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1] )
+            runreport = f"runs: {args.runs[0]} to {args.runs[1]}"
+        elif len(args.runs)==3: 
+            kaedama = kaedama.bake( "--runs", args.runs[0], args.runs[1], args.runs[2] )
+            runreport = f"runs: {args.runs}"
+        else:                   
+            kaedama = kaedama.bake( "--runs", "0", "999999" )
+            runreport = f"runs: 0 to 999999"
 
     tracebacks = []
     while ( go ):
@@ -593,6 +630,9 @@ def submit(args):
                 list_of_active_rules = [ 
                     line.strip() for line in f.readlines() if '#' not in line 
                 ]
+
+        if args.rules_yaml:
+            list_of_active_rules = rules_yaml.keys()                
 
         clear()
 
@@ -637,7 +677,9 @@ def submit(args):
             for r in list_of_active_rules:
                 print( f"Trying rule ... {r} {datetime.datetime.now().replace(microsecond=0)}" )
                 try:
-                    kaedama( batch=True, rule=r, _out=sys.stdout )
+                    myargs = getArgsForRule( rules_yaml, r )
+                    print(myargs)
+                    kaedama( myargs, "--batch", "--rule", r, _out=sys.stdout )
                 except sh.ErrorReturnCode_1:
                     print(traceback.format_exc())
                     tracebacks.append( r )
