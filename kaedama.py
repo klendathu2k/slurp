@@ -75,8 +75,8 @@ arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query
 
 _default_filesystem = {
         'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
-    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
-    ,   'histdir' :       "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
+    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}/log"
+    ,   'histdir' :        "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}/hist"
     ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
 }
 
