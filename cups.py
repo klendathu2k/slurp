@@ -400,62 +400,10 @@ def catalog(args):
     """
     Add the file to the file catalog.  
     """
-    # TODO: switch to an update mode rather than a delete / replace mode.
-    replace  = args.replace
-    tablename= args.table
-    dstname  = args.dstname
-    timestamp= args.timestamp
-    run      = int(args.run)
-    seg      = int(args.segment)
-    ext      = args.ext
-    host     = args.hostname
-    nevents  = args.nevents
 
-    # n.b. not the slurp convention for dsttype
-    dsttype='_'.join( dstname.split('_')[-2:] )
-
-    # TODO: allow to specify the filename
-    filename = f"{dstname}-{run:08}-{seg:04}.{ext}"
-
-    # File catalog
-    fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
-    fcc = fc.cursor()
-
-    # TODO: switch from delete / replace to update model.  and make this an atomic operation.
-
-    dataset = args.dataset
-
-    checkfile = fcc.execute( f"select size,full_file_path from files where lfn='{filename}';" ).fetchall()
-    if checkfile and replace:
-        fcc.execute(f"delete from files where lfn='{filename}';")
-        fcc.commit()
-        
-
-    checkdataset = fcc.execute( f"select size from datasets where filename='{filename}' and dataset='{dataset}';" ).fetchall()
-    if checkdataset and replace:
-        fcc.execute(f"delete from datasets where  filename='{filename}' and dataset='{dataset}';" )
-        fcc.commit()
-
-    # Calculate md5 checksum
-    md5 = md5sum( f"{filename}")#  #sh.md5sum( f"{args.path}/{filename}").split()[0]
-    #sz  = int( sh.stat( '--printf=%s', f"{args.path}/{filename}" ) )
-    sz  = int( os.path.getsize(f"{filename}") ) 
-
-    # Insert into files
-    insert=f"""
-    insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
-    values ('{filename}','{host}','{args.path}/{filename}','now',{sz},'{md5}');
-    """
-    fcc.execute(insert)
-    fcc.commit()
-
-    # Insert into datasets
-    insert=f"""
-    insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
-    values ('{filename}',{run},{seg},{sz},'{dataset}','{dsttype}',{args.nevents})
-    """
-    fcc.execute(insert)
-    fcc.commit()
+    print("[CUPS WARNING: catalog is deprecated")
+    return
+    
 
 @subcommand([
     argument( "message", help="Message to be appended to the production status entry" ),
@@ -514,85 +462,72 @@ def stageout(args):
 
     attempt = 0
 
-    while attempt<args.retries:
-    
-        try:
-            # Copy succeeded.  Connect to file catalog and add to it
-            fc = pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc")
-            fcc = fc.cursor()
-        
-            # TODO: switch to an update mode rather than a delete / replace mode.
-            timestamp= args.timestamp
-            run      = int(args.run)
-            seg      = int(args.segment)
-            host     = args.hostname
-            nevents  = args.nevents
+    # TODO: switch to an update mode rather than a delete / replace mode.
+    timestamp= args.timestamp
+    run      = int(args.run)
+    seg      = int(args.segment)
+    host     = args.hostname
+    nevents  = args.nevents
 
-            # n.b. not the slurp convention for dsttype
-            dstname  = args.dstname
-            dsttype='_'.join( dstname.split('_')[-2:] )
+    # n.b. not the slurp convention for dsttype
+    dstname  = args.dstname
+    dsttype='_'.join( dstname.split('_')[-2:] )
 
-            if args.dsttype != None:        dsttype = args.dsttype
+    if args.dsttype != None:        dsttype = args.dsttype
                 
-            md5=md5true
+    md5=md5true
 
-            # Strip off any leading path 
-            filename=args.filename.split('/')[-1]
+    # Strip off any leading path 
+    filename=args.filename.split('/')[-1]
 
-            # Insert into files primary key: (lfn,full_host_name,full_file_path)
-            if args.verbose:        print("Insert into files")
+    # Insert into files primary key: (lfn,full_host_name,full_file_path)
+    if args.verbose:        print("Insert into files")
 
-            insert=f"""
-            insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
-            values ('{filename}','{host}','{args.outdir}/{filename}','now',{sz},'{md5}')
-            on conflict
-            on constraint files_pkey
-            do update set 
-            time=EXCLUDED.time,
-            size=EXCLUDED.size,
-            md5=EXCLUDED.md5
-            ;
-            """
-            if args.verbose:        print(insert)
-
-            fcc.execute(insert)
-            print(".... insert into files executed ....")
+    insert=f"""
+    insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
+    values ('{filename}','{host}','{args.outdir}/{filename}','now',{sz},'{md5}')
+    on conflict
+    on constraint files_pkey
+    do update set 
+    time=EXCLUDED.time,
+    size=EXCLUDED.size,
+    md5=EXCLUDED.md5
+    ;
+    """
+    if args.verbose:        print(insert)
 
 
-            # Insert into datasets primary key: (filename,dataset)
-            if args.verbose:        print("Insert into datasets")
-            insert=f"""
-            insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
-            values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
-            on conflict
-            on constraint datasets_pkey
-            do update set
-            runnumber=EXCLUDED.runnumber,
-            segment=EXCLUDED.segment,
-            size=EXCLUDED.size,
-            dsttype=EXCLUDED.dsttype,
-            events=EXCLUDED.events
-            ;
-            """
-            if args.verbose:        print(insert)
+    # insert into files ...
+    insfiles = dbQuery( cnxn_string_map[ 'fcw' ], insert )
+    
+
+    # Insert into datasets primary key: (filename,dataset)
+    if args.verbose:        print("Insert into datasets")
+    insert=f"""
+    insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
+    values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
+    on conflict
+    on constraint datasets_pkey
+    do update set
+    runnumber=EXCLUDED.runnumber,
+    segment=EXCLUDED.segment,
+    size=EXCLUDED.size,
+    dsttype=EXCLUDED.dsttype,
+    events=EXCLUDED.events
+    ;
+    """
+    if args.verbose:        print(insert)
+
+    # insert into datasets
+    insdsets = dbQuery( cnxn_string_map[ 'fcw' ], insert )    
             
-            fcc.execute(insert)
-            print(".... insert into datasets executed ....")
-
-            # We commit and break out of the retry loop only if update to both the
-            # files and datasets table succeeded
-            fcc.commit()
-            print(".... commit changes ....")
-            break
-
-        except Exception as E:
-            print(E)
-            attempt = attempt + 1
-            delay= float(attepmt)*random.random()*60
-            print(f"Unable to update filecatalog.  Retry in {delay}s")
-            time.sleep(delay)
+    print(".... insert into datasets executed ....")
 
 
+    if insfiles and insdset:
+        insfiles.commit()
+        insdsets.commit()
+    
 
     # Add to nevents in the production status
     if args.verbose:
@@ -621,14 +556,16 @@ def stageout(args):
         """
         #            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
 
-    statusdbc.execute( update )
-    statusdbc.commit()
-
-
+    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
+        
     # and remove the file
     if args.verbose:
         print("Cleanup file")        
-    os.remove( f"{filename}")
+
+    # Could cache the files here ...
+    os.remove(  f"{filename}")
 
 
 @subcommand([
