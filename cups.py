@@ -39,22 +39,24 @@ def dbQuery( cnxn_string, query, ntries=10 ):
     # Some guard rails
     assert( 'delete' not in query.lower() )    
 
-    lastException = None
+    lastException = ""
     
     # Attempt to connect up to ntries
+    ntries = 0
     for itry in range(0,ntries):
         try:
             conn = pyodbc.connect( cnxn_string )
             curs = conn.cursor()
             curs.execute( query )
-            return curs
+            return curs, ntries, lastexception
                 
         except Exception as E:
-            lastException = E
+            ntries = ntries + 1
+            lastException = str(E)
             delay = (itry + 1 ) * random.random()
             time.sleep(delay)
 
-    return None # not successful
+    return None, ntries, lastException # not successful
             
 
 #
@@ -204,7 +206,7 @@ def started(args):
     where id={id_}
     """
 
-    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
 
@@ -230,7 +232,7 @@ def running(args):
     where id={id_}
     """
 
-    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
 
@@ -272,7 +274,7 @@ def finished(args):
         where id={id_}
         """
 
-    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
         
@@ -300,7 +302,7 @@ def exitcode(args):
     where id={id_}
     """
 
-    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
     
@@ -335,7 +337,7 @@ def nevents(args):
         where id={id_}
         """
 
-    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
         
@@ -354,7 +356,7 @@ def getinputs(args):
     query = f"""
     select inputs from {tablename} where id={id_} limit 1
     """
-    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         for result in curs:
             flist = str(result[0]).split(',')
@@ -382,7 +384,7 @@ def inputs(args):
     set inputs='{inputs}'
     where id={id_}
     """
-    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
 
@@ -418,7 +420,7 @@ def message(args):
     id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
     update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};"
 
-    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
 
@@ -498,7 +500,7 @@ def stageout(args):
 
 
     # insert into files ...
-    insfiles = dbQuery( cnxn_string_map[ 'fcw' ], insert )
+    insfiles, ntries_files, ex_files = dbQuery( cnxn_string_map[ 'fcw' ], insert )
     
 
     # Insert into datasets primary key: (filename,dataset)
@@ -519,7 +521,7 @@ def stageout(args):
     if args.verbose:        print(insert)
 
     # insert into datasets
-    insdsets = dbQuery( cnxn_string_map[ 'fcw' ], insert )    
+    insdsets, ntries_dsets, ex_dsets = dbQuery( cnxn_string_map[ 'fcw' ], insert )    
             
     print(".... insert into datasets executed ....")
 
@@ -556,7 +558,7 @@ def stageout(args):
         """
         #            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
 
-    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries_stat, ex_stat = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
         
