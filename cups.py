@@ -26,6 +26,37 @@ def printDbInfo( cnxn, title ):
     serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
     print(f"Connected {name} from {serv} as {title}")
 
+
+cnxn_string_map = {
+    'fcw'         : 'DSN=FileCatalog;',
+    'fcr'         : 'DSN=FileCatalog;READONLY=True',
+    'statr'       : 'DSN=ProductionStatus',
+    'statw'       : 'DSN=ProductionStatusWrite',
+}    
+
+def dbQuery( cnxn_string, query, ntries=10 ):
+
+    # Some guard rails
+    assert( 'delete' not in query.lower() )    
+
+    lastException = None
+    
+    # Attempt to connect up to ntries
+    for itry in range(0,ntries):
+        try:
+            conn = pyodbc.connect( cnxn_string )
+            curs = conn.cursor()
+            curs.execute( query )
+            return curs
+                
+        except Exception as E:
+            lastException = E
+            delay = (itry + 1 ) * random.random()
+            time.sleep(delay)
+
+    return None # not successful
+            
+
 #
 # Production status connection
 #
@@ -134,37 +165,13 @@ def argument(*name_or_flags, **kwargs):
 
 def getLatestId( tablename, dstname, run, seg ):
 
-    cache="cups.cache"
-
     cupsid=os.getenv('cupsid')
     if cupsid and tablename=='production_status':
         return cupsid
 
-    result  = 0
-    query=f"""
-    select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES};
-    """
-    results = list( statusdbr.execute(query).fetchall() )
+    print("[CUPS FATAL]: cupsid is not defined")
+    exit(0) # operating without a cupsid is now a fatal error
 
-    # Find the most recent ID with the given dstname
-    for r in results:
-        if r.dstname == dstname:
-            result = r.id
-            break
-
-    if result==0:
-        query=f"""
-        select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES*10};
-        """
-        for r in list( statusdbc.execute(query).fetchall() ):
-            if r.dstname == dstname:
-                result = r.id
-                break
-
-    if result==0: 
-        print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
-
-    return result
 
 @subcommand()
 def info( args ):
@@ -175,8 +182,6 @@ def info( args ):
     print("Printing arguments")
     for arg in vars(args):
         print(f"{arg}: {getattr(args, arg)}")
-
-
 
 @subcommand()
 def started(args):
@@ -197,16 +202,12 @@ def started(args):
          started='{timestamp}',
          execution_node='{node}'
     where id={id_}
-    """    
+    """
 
-    if args.verbose:
-        print(update)
+    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
 
-    if args.noupdate:
-        pass
-    else:
-        statusdbc.execute( update )
-        statusdbc.commit()
 
 @subcommand([
     argument(     "--nsegments",help="Number of segments produced",dest="nsegments",default=1),
@@ -228,15 +229,10 @@ def running(args):
     set status='running',running='{timestamp}',nsegments={nsegments}
     where id={id_}
     """
-#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
 
-    if args.noupdate:
-        pass
-    else:
-        statusdbc.execute( update )
-        statusdbc.commit()
+    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -275,17 +271,11 @@ def finished(args):
         set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
         where id={id_}
         """
-#        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
 
-    if args.noupdate:
-        pass
-    else:
-        statusdbc.execute( update )
-        statusdbc.commit()
-
-
+    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
+        
 #_______________________________________________________________________________________________________
 @subcommand([
     argument("-e","--exit",help="Exit code of the payload macro",dest="exit",default=-1),
@@ -309,16 +299,11 @@ def exitcode(args):
     set status='{state}',exit_code={ec}
     where id={id_}
     """
-#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
 
-    if args.noupdate:
-        pass
-    else:
-        statusdbc.execute( update )
-        statusdbc.commit()
-
+    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
+    
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -349,17 +334,12 @@ def nevents(args):
         set nevents={ne}
         where id={id_}
         """
-#       where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
 
-    if args.noupdate:
-        pass
-    else:
-        statusdbc.execute( update )
-        statusdbc.commit()
+    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
+        
 
-#
 @subcommand([
 ])
 def getinputs(args):
@@ -374,24 +354,12 @@ def getinputs(args):
     query = f"""
     select inputs from {tablename} where id={id_} limit 1
     """
-
-    ntries=0
-    result = None
-    while ntries<12:
-        ntries=ntries+1
-        with  pyodbc.connect("DSN=ProductionStatus") as prodstat:
-            cursor = prodstat.cursor() 
-            try:
-                result = cursor.execute( query ).fetchone()
-                flist = str(result[0]).split(',')
-                for f in flist:
-                    print(f)
-                break
-
-            except pyodbc.Error:
-                time.sleep(ntries*5) # delay for ntries x 5 seconds
-
-
+    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        for result in curs:
+            flist = str(result[0]).split(',')
+            for f in flist:
+                print(f)
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -414,23 +382,9 @@ def inputs(args):
     set inputs='{inputs}'
     where id={id_}
     """
-#    where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
-    if args.verbose:
-        print(update)
-    if args.noupdate:
-        pass
-    else:
-        statusdbc.execute( update )
-        statusdbc.commit()
-
-
-# files
-# lfn | full_host_name | full_file_path | time | size | md5 
-# datasets
-# filename | runnumber | segment | size | dataset | dsttype | events 
-
-#parser.add_argument( "--ext", help="file extension, e.g. root, prdf, ...", default="prdf" )
-#parser.add_argument( "--path", help="path to output file", default="./" )
+    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -466,6 +420,8 @@ def catalog(args):
     # File catalog
     fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
     fcc = fc.cursor()
+
+    # TODO: switch from delete / replace to update model.  and make this an atomic operation.
 
     dataset = args.dataset
 
@@ -513,8 +469,10 @@ def message(args):
     flaginc=int(args.flag)
     id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
     update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};"
-    statusdbc.execute( update )
-    statusdbc.commit()
+
+    curs = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -542,6 +500,7 @@ def stageout(args):
     # Copy the file
     try:
         shutil.copy2( f"{args.filename}", f"{args.outdir}" )
+        print(".... copy back finished ....")
     except Exception as e:
         print(f"ERROR: Failed to copy file {args.filename} to {args.outdir}.  Aborting stageout.")
         return
@@ -597,6 +556,7 @@ def stageout(args):
             if args.verbose:        print(insert)
 
             fcc.execute(insert)
+            print(".... insert into files executed ....")
 
 
             # Insert into datasets primary key: (filename,dataset)
@@ -617,10 +577,12 @@ def stageout(args):
             if args.verbose:        print(insert)
             
             fcc.execute(insert)
+            print(".... insert into datasets executed ....")
 
             # We commit and break out of the retry loop only if update to both the
             # files and datasets table succeeded
             fcc.commit()
+            print(".... commit changes ....")
             break
 
         except Exception as E:
@@ -690,59 +652,19 @@ def execute(args):
     script, rather than the payload macro.
     """
 
-
-    # We have to go through the parser to run these subcommands, and we don't want
-    # to shell out... otherwise we make another DB connection
-
-    # Flag job as started...
-    started = parser.parse_args( ["-d", args.dstname, "-r", args.run,"-s",args.segment,"started"] ); 
-    started.func( started )
-
-    # And immediately drop into running
-    running = parser.parse_args( ["-d", args.dstname, "-r", args.run, "-s", args.segment, "running"] );
-    running.func(running)
-
-    #
-    # Execute the user payload.  Exit 
-    #
-    exit_code = 0
-    cmd = sh.Command(args.script)    
-        
-    result = cmd( args.scriptargs, _out=args.stdout, _err=args.stderr, _ok_code=range(1,255) )
-    exit_code = result.exit_code
-        
-    state = "finished"
-            
-    finished=parser.parse_args( ["-d", args.dstname, "-r", args.run, "-s", args.segment, state, "-e","%s"%result.exit_code ] ); 
-    finished.func(finished)
+    print("[CUPS WARNING]: execute is deprecated")
+    return
 
 #_______________________________________________________________________________________________________
 @subcommand([
     argument( "--qafile", help="Read the given QA file and save as a jsonb entry in the production quality table" )
 ])
 def quality(args):
-    tablename = args.table             # the production_status table
-    dstname   = args.dstname
-    run       = int( args.run )
-    segment   = int( args.segment )
-    id_       = getLatestId( tablename, dstname, run, segment )    # the corresponding production status entry
-    qastring  = None
-    with open( args.qafile, 'r') as qafile:
-        qastring = str( json.load( qafile ) )
 
-    # Make sure to replace the single quotes with double
-    qastring = qastring.replace("'",'"')
+    print("[CUPS WARNING]: quality is deprecated")
+    return
 
-    qaentry=f"""
-    INSERT INTO production_quality (stat_id,dstname,run,segment,qual) values
-      ( {id_},'{dstname}',{run},{segment},'{qastring}' );   
-    """
-
-    # File catalog
-    statusdbc.execute(qaentry)
-    statusdbc.commit()    
-
-
+    
 def main():
 
     args=parser.parse_args()
