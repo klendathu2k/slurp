@@ -149,7 +149,7 @@ def dbQuery( cnxn_string, query, ntries=10 ):
         try:
             conn = pyodbc.connect( cnxn_string )
 
-            printDbInfo( conn, f"Connected {cnxn_string}" )
+            if itry>0: printDbInfo( conn, f"Connected {cnxn_string} attempt {itry}" )
             curs = conn.cursor()
             curs.execute( query )
             return curs
@@ -906,6 +906,7 @@ def matches( rule, kwargs={} ):
     runMin=999999
     runMax=0
     INFO("Building candidate inputs")
+    
     if rule.files:
         curs      = cursors[ rule.filesdb ]
 
