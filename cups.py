@@ -629,10 +629,15 @@ def main():
 
     args=parser.parse_args()
 
+    result = ""
+    
     if args.subcommand is None:
         parser.print_help()
     else:
-        args.func(args)        
+        result = args.func(args)
+
+    with open( 'cups.stats', 'a' ) as stats:
+        stats.write( f"{args.subcommand} {str(result)}\n" )
 
 if __name__ == '__main__':
     main()
