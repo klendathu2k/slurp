@@ -185,6 +185,10 @@ def info( args ):
     for arg in vars(args):
         print(f"{arg}: {getattr(args, arg)}")
 
+    return 0, "NA"
+
+    
+
 @subcommand()
 def started(args):
     """
@@ -209,6 +213,8 @@ def started(args):
     curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
+
+    return ntries, ex
 
 
 @subcommand([
@@ -235,6 +241,8 @@ def running(args):
     curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
+
+    return ntries, ex
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -277,6 +285,8 @@ def finished(args):
     curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
+
+    return ntries, ex
         
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -305,6 +315,8 @@ def exitcode(args):
     curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
+
+    return ntries, ex
     
 
 #_______________________________________________________________________________________________________
@@ -340,6 +352,8 @@ def nevents(args):
     curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
+
+    return ntries, ex
         
 
 @subcommand([
@@ -362,6 +376,8 @@ def getinputs(args):
             flist = str(result[0]).split(',')
             for f in flist:
                 print(f)
+
+    return ntries, ex
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -387,6 +403,8 @@ def inputs(args):
     curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
+
+    return ntries, ex
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -423,6 +441,8 @@ def message(args):
     curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
+
+    return ntries, ex
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -524,8 +544,7 @@ def stageout(args):
     insdsets, ntries_dsets, ex_dsets = dbQuery( cnxn_string_map[ 'fcw' ], insert )    
             
     print(".... insert into datasets executed ....")
-
-
+    
     if insfiles and insdset:
         insfiles.commit()
         insdsets.commit()
@@ -568,6 +587,8 @@ def stageout(args):
 
     # Could cache the files here ...
     os.remove(  f"{filename}")
+
+    return ntries_files, ex_files, ntries_dsets, ex_dsets, ntries_stat, ex_stat    
 
 
 @subcommand([
