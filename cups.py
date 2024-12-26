@@ -42,7 +42,7 @@ def dbQuery( cnxn_string, query, ntries=10 ):
     lastException = ""
     
     # Attempt to connect up to ntries
-    ntries = 0
+    ntries = 1
     for itry in range(0,ntries):
         try:
             conn = pyodbc.connect( cnxn_string )
@@ -56,6 +56,7 @@ def dbQuery( cnxn_string, query, ntries=10 ):
             delay = (itry + 1 ) * random.random()
             time.sleep(delay)
 
+            
     return None, ntries, lastException # not successful
             
 
@@ -630,14 +631,18 @@ def main():
     args=parser.parse_args()
 
     result = ""
+
+    start=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
     
     if args.subcommand is None:
         parser.print_help()
     else:
         result = args.func(args)
 
+    finish=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+
     with open( 'cups.stats', 'a' ) as stats:
-        stats.write( f"{args.subcommand} {str(result)}\n" )
+        stats.write( f"{args.subcommand} {start} {finish} {str(result)}\n" )
 
 if __name__ == '__main__':
     main()
