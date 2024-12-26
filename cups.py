@@ -370,7 +370,7 @@ def getinputs(args):
     query = f"""
     select inputs from {tablename} where id={id_} limit 1
     """
-    curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, ex = dbQuery( cnxn_string_map[ 'statw' ], query )
     if curs:
         for result in curs:
             flist = str(result[0]).split(',')
