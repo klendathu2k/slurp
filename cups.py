@@ -630,7 +630,7 @@ def main():
 
     args=parser.parse_args()
 
-    result = ""
+    result = []
 
     start=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
     
@@ -642,7 +642,11 @@ def main():
     finish=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
 
     with open( 'cups.stats', 'a' ) as stats:
-        stats.write( f"{args.subcommand} {start} {finish} {str(result)}\n" )
+        stats.write( f"{args.subcommand} {start} {finish}" )
+        for r in list(result):
+            stats.write(r)
+            stats.write(" ")
+        stats.write("\n")
 
 if __name__ == '__main__':
     main()
