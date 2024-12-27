@@ -546,7 +546,7 @@ def stageout(args):
             
     print(".... insert into datasets executed ....")
     
-    if insfiles and insdset:
+    if insfiles and insdsets:
         insfiles.commit()
         insdsets.commit()
     
