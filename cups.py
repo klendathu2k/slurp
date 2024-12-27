@@ -644,8 +644,8 @@ def main():
     with open( 'cups.stats', 'a' ) as stats:
         stats.write( f"{args.subcommand},{start},{finish}" )
         for r in list(result):
-            stats.write(r)
             stats.write(",")
+            stats.write(str(r))
         stats.write("\n")
 
 if __name__ == '__main__':
