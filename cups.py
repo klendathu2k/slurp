@@ -48,7 +48,7 @@ def dbQuery( cnxn_string, query, ntries=10 ):
             conn = pyodbc.connect( cnxn_string )
             curs = conn.cursor()
             curs.execute( query )
-            return curs, ntries, lastexception
+            return curs, ntries, "success"
                 
         except Exception as E:
             ntries = ntries + 1
@@ -57,7 +57,7 @@ def dbQuery( cnxn_string, query, ntries=10 ):
             time.sleep(delay)
 
             
-    return None, ntries, lastException # not successful
+    return None, ntries, lastException
             
 
 #
