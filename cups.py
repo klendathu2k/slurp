@@ -186,7 +186,7 @@ def info( args ):
     for arg in vars(args):
         print(f"{arg}: {getattr(args, arg)}")
 
-    return 0, "NA"
+    return None, 0, "success"
 
     
 
