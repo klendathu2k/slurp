@@ -186,7 +186,7 @@ def info( args ):
     for arg in vars(args):
         print(f"{arg}: {getattr(args, arg)}")
 
-    return None, 0, "success"
+    return 0, "success"
 
     
 
@@ -215,7 +215,7 @@ def started(args):
     if curs:
         curs.commit()
 
-    return curs, ntries, ex
+    return ntries, ex
 
 
 @subcommand([
@@ -646,6 +646,7 @@ def main():
         for r in list(result):
             stats.write(",")
             stats.write(str(r))
+
         stats.write("\n")
 
 if __name__ == '__main__':
