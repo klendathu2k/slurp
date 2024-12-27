@@ -215,7 +215,7 @@ def started(args):
     if curs:
         curs.commit()
 
-    return ntries, ex
+    return curs, ntries, ex
 
 
 @subcommand([
