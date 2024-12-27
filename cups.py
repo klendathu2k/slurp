@@ -28,8 +28,8 @@ def printDbInfo( cnxn, title ):
 
 
 cnxn_string_map = {
-    'fcw'         : 'DSN=FileCatalog;',
-    'fcr'         : 'DSN=FileCatalog;READONLY=True',
+    'fcw'         : 'DSN=FileCatalog;UID=phnxrc',
+    'fcr'         : 'DSN=FileCatalog;READONLY=True;UID=phnxrc',
     'statr'       : 'DSN=ProductionStatus',
     'statw'       : 'DSN=ProductionStatusWrite',
 }    
