@@ -645,7 +645,7 @@ def main():
 
     result = args.func(args)
 
-    with open( 'cups.stats', 'a' ) as stats:
+    with open( 'cups.stat', 'a' ) as stats:
 
         for r in [result[i:i + 5] for i in range(0, len(result), 5)]:
             stats.write( f"{args.subcommand}" )
