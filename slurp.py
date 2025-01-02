@@ -955,7 +955,8 @@ def matches( rule, kwargs={} ):
             for fn in f.files.split():
                 base1 = fn.split('-')[0]
                 base2 = base1.split('_')[-2:]
-                input_datasets[ '_'.join(base2) ] = 1
+                key='_'.join(base2)
+                input_datasets[ key ] = 1
 
     
     if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
