@@ -55,23 +55,8 @@ arg_parser.add_argument( '--maxjobs',dest="maxjobs",help="Maximum number of jobs
 arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query after parameter substitution and exit", action="store_true", default=False )
 
 
-# TODO: physics/run2pp/ana449_2024p008/”run range”/DST_TRKR_CLUSTER
-#_default_filesystem = {
-#        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
-#    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
-#    ,   'histdir' :       "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
-#    ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
-#}
-
-
-# TODO: physics/run2pp/ana449_2024p008/”run range”/DST_TRKR_CLUSTER
-#       runtype runname build_tag  runrange DST
-#_default_filesystem = {
-#        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
-#    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
-#    ,   'histdir' :       "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
-#    ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
-#}
+arg_parser.add_argument( '--streamname', help="Name of the data stream for single-stream jobs" ) #TODO:  May not need these arguments...
+arg_parser.add_argument( '--streamfile', help="Filename (not incl run number) for the data stream" )
 
 _default_filesystem = {
         'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
@@ -79,7 +64,6 @@ _default_filesystem = {
     ,   'histdir' :        "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}/hist"
     ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
 }
-
 
 def sanity_checks( params, inputq ):
     result = True
@@ -100,9 +84,9 @@ def sanity_checks( params, inputq ):
     #
 
     # Name should be of the form DST_NAME_runXauau
-    if re.match( "[A-Z][A-Z][A-Z]_([A-Z]+_)+[a-z0-9]+", params['name'] ) == None:
-        logging.error( f'params.name {params["name"]} does not respect the sPHENIX convention:  DST_NAME_run<N>species' )
-        result = False
+    #if re.match( "[A-Z][A-Z][A-Z]_([A-Z]+_)+[a-z0-9]+", params['name'] ) == None:
+    #    logging.warn( f'params.name {params["name"]} does not respect the sPHENIX convention:  DST_NAME_run<N>species' )
+    #    result = False
 
     # Build and dbtag should not contain a "_"
     if re.match("_",params['build']):
@@ -237,6 +221,8 @@ def main():
     elif len(args.segments)>=3:
         seg_condition = "and segment in ( %s )" % ','.join( args.segments )
 
+    streamname = args.streamname
+    streamfile = args.streamfile
 
     RUNFMT = slurp.RUNFMT
     SEGFMT = slurp.SEGFMT
@@ -276,6 +262,8 @@ def main():
     runlist_query = config.get('runlist_query','').format(**locals())
 
     if params:
+
+        params['name']=params['name'].format( **locals() )
 
         if args.mangle_dstname:
             params['name']=params['name'].replace('DST',args.mangle_dstname)
