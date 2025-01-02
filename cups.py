@@ -39,7 +39,7 @@ def dbQuery( cnxn_string, query, ntries=10 ):
     # Some guard rails
     assert( 'delete' not in query.lower() )    
 
-    lastException = ""
+    lastException = "noexception"
     
     # Attempt to connect up to ntries
 
