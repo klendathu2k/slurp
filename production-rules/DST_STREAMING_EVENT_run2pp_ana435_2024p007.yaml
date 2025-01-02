@@ -1,0 +1,202 @@
+PHYS_DST_SINGLE_STREAMING_EVENT_run2pp:
+
+   params:
+     name:       DST_STREAMING_EVENT_{streamname}_run2pp
+     build:      ana.435
+     build_name: ana435
+     dbtag:      2024p007
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT})
+     outbase :   $(name)_$(build)_$(tag)
+     script  :   run_cosmics.sh
+     payload :   ./slurp-examples/sPHENIX/cosmics/
+     mem     :   20480MB
+     neventsper: 1000
+     comment :    "---"
+     rsync   : "./slurp-examples/sPHENIX/cosmics/*,cups.py,bachi.py,odbc.ini"
+
+   input:
+      db: daqdb
+      direct_path: /sphenix/lustre01/sphnxpro/{mode}/*/physics/
+      query: |-
+         with partialrun as (
+         select 'daqdb/filelist'                                                                                    as source      , 
+                runnumber                                                                                                          , 
+                0                                                                                                   as segment     , 
+                string_agg( distinct split_part(filename,'/',-1), ' ' )                                             as files       ,   
+                string_agg( distinct split_part(filename,'/',-1) || ':' || firstevent || ':' || lastevent, ' ' )    as fileranges  
+
+         from filelist
+         where 
+           ( 
+             (filename  like '/bbox%/{streamfile}%-0000.evt'   and lastevent>2 ) or
+             (filename  like '/bbox%/GL1_physics%-0000.evt'    and lastevent>2 ) 
+           )
+           {run_condition}
+
+         group by runnumber
+         having
+                every(transferred_to_sdcc)   and
+                max(lastevent)>1000          and
+
+                sum( case when filename like '/bbox%/GL1_physics%'  then 1 else 0 end )>0 and
+                sum( case when filename like '/bbox%/{streamfile}%' then 1 else 0 end )>0
+
+         order by runnumber
+         ),
+ 
+         fullrun as (
+         select 
+                'daqdb/filelist'                                                                                    as source      , 
+                runnumber                                                                                                          , 
+                0                                                                                                   as segment     , 
+                string_agg( distinct split_part(filename,'/',-1), ' ' )                                             as files       ,   
+                string_agg( distinct split_part(filename,'/',-1) || ':' || firstevent || ':' || lastevent, ' ' )    as fileranges  
+         from  
+                filelist
+         where 
+           ( 
+             (filename  like '/bbox%/{streamfile}%.evt'   and lastevent>2 ) or
+             (filename  like '/bbox%/GL1_physics%.evt'   and lastevent>2 ) 
+
+           )
+           {run_condition}
+
+         group by runnumber
+         having
+                every(transferred_to_sdcc)   and
+                max(lastevent)>1000          and
+
+                sum( case when filename like '/bbox%/GL1_physics%'  then 1 else 0 end )>0 and
+                sum( case when filename like '/bbox%/{streamfile}%' then 1 else 0 end )>0 
+
+         order by runnumber
+         )
+
+         select *,'partial run' as runtype from partialrun where runnumber not in ( select runnumber from fullrun ) 
+              union all 
+         select *,'full run' as runtype from fullrun where true 
+
+              ;
+
+   # TODO:  Need to add error checking to make sure that outdir, logdir, etc... are quoted properly.  Else, this will cause problems with argument substitution
+   filesystem:  
+     outdir  : "/sphenix/lustre01/sphnxpro/physics/slurp/streaming/physics/$(build)_$(tag)/run_$(rungroup)"
+     logdir  : "file:///sphenix/data/data02/sphnxpro/streaminglogs/$(build)_$(tag)/run_$(rungroup)"
+     histdir :       "/sphenix/data/data02/sphnxpro/streamhist/$(build)_$(tag)/run_$(rungroup)"
+     condor :        "/tmp/testlogs/$(build)_$(tag)/run_$(rungroup)"
+
+   #
+   # Again I note the need to ensure that the arguments are properly specified given the
+   # definition of the payload script.
+   #
+   job:
+     executable            : "{payload}/run_cosmics.sh"
+     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {neventsper} {logdir} {comment} {histdir} {PWD} {rsync}"
+     output_destination    : '{logdir}'
+     log                   : '{condor}/{logbase}.condor'
+     accounting_group      : "group_sphenix.mdc2"
+     accounting_group_user : "sphnxpro"
+     priority : '4000'
+     request_xferslots: '0'
+
+
+
+#_____________________________________________________________________________________________________________________________
+
+PHYS_DST_SINGLE_TRKR_HIT_SET_physics_2024p007:
+   # DST_EVENT works from a pre-built set of run lists.
+   params:
+     name:       DST_TRKR_HIT_{streamname}_run2pp
+     build:      new
+     build_name: new
+     dbtag:      2024p007
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT})
+     outbase :   $(name)_$(build)_$(tag)
+     script  :   run.sh
+     payload :   ./slurp-examples/sPHENIX/TrackingProduction/
+     mem     :   2048MB
+     rsync   : "./slurp-examples/sPHENIX/TrackingProduction/*,cups.py,bachi.py,odbc.ini"
+
+   input:
+      db: fc
+      query: |-
+         select 
+                'filecatalog/datasets'   as source       ,
+                runnumber                                ,
+                segment                                  ,
+                filename                    as files     ,
+                'X'                         as fileranges
+         from  
+                datasets
+         where
+                filename like 'DST_STREAMING_EVENT_{streamname}_run2pp_ana435_2024p007%'
+                {run_condition}
+                and runnumber>=49700
+         order by runnumber
+                {limit_condition}
+              ;              
+   filesystem:  
+     outdir : "/sphenix/lustre01/sphnxpro/physics/slurp/tracking/$(build)_$(tag)/run_$(rungroup)"
+     logdir : "file:///sphenix/data/data02/sphnxpro/trackinglogs/$(build)_$(tag)/run_$(rungroup)"
+     histdir :       "/sphenix/data/data02/sphnxpro/hitsethist/$(build)_$(tag)/run_$(rungroup)"
+     condor :        "/tmp/trkrogs/$(build)_$(tag)/run_$(rungroup)"
+
+   job:
+     executable            : "{payload}/run.sh"
+     arguments             : "$(nevents) {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {logdir} {histdir} {PWD} {rsync}"
+     output_destination    : '{logdir}'
+     log                   : '{condor}/{logbase}.condor'
+     accounting_group      : "group_sphenix.mdc2"
+     accounting_group_user : "sphnxpro"
+     priority : '3800'
+
+
+#_____________________________________________________________________________________________________________________________
+
+DST_TRKR_CLUSTER_SET_run2pp_2024p007:
+   # DST_EVENT works from a pre-built set of run lists.
+   params:
+     name:       DST_TRKR_CLUSTER_run2pp
+     build:      new
+     build_name: new
+     dbtag:      2024p007
+     logbase :   $(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT})
+     outbase :   $(name)_$(build)_$(tag)
+     script  :   run_job0.sh
+     payload :   ./slurp-examples/sPHENIX/TrackingProduction/
+     mem     :   2048MB
+     nevents :  0
+     rsync   : "./slurp-examples/sPHENIX/TrackingProduction/*,cups.py,bachi.py,odbc.ini"
+
+   input:
+      db: fc
+      query: |-
+         select 
+                'filecatalog/datasets'   as source       ,
+                runnumber                                ,
+                segment                                  ,
+                filename                    as files     ,
+                'X' as fileranges
+         from  
+                datasets
+         where
+                filename like 'DST_TRKR_HIT_run2pp_new_2024p007%'
+                {run_condition}
+                and runnumber>=49700
+         order by runnumber
+                {limit_condition}
+              ;              
+   filesystem:  
+     outdir : "/sphenix/lustre01/sphnxpro/physics/slurp/tracking/$(build)_$(tag)/run_$(rungroup)"
+     logdir : "file:///sphenix/data/data02/sphnxpro/trackinglogs/$(build)_$(tag)/run_$(rungroup)"
+     histdir :       "/sphenix/data/data02/sphnxpro/clusterhist/$(build)_$(tag)/run_$(rungroup)"
+     condor :        "/tmp/trkrlogs/$(build)_$(tag)/run_$(rungroup)"
+
+   job:
+     executable            : "{payload}/run_job0.sh"
+     arguments             : "{nevents} {outbase} {logbase} $(run) $(seg) {outdir} $(build) $(tag) $(inputs) $(ranges) {logdir} {histdir} {PWD} {rsync}"
+     output_destination    : '{logdir}'
+     log                   : '{condor}/{logbase}.condor'
+     accounting_group      : "group_sphenix.mdc2"
+     accounting_group_user : "sphnxpro"
+     priority : '3800'

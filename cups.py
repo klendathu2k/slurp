@@ -112,7 +112,6 @@ except pyodbc.Error as e:
     print(e)
     exit(1)
 
-
 def md5sum( filename ):
     file_hash=None
     with open( filename, "rb") as f:
@@ -191,6 +190,7 @@ def getLatestId( tablename, dstname, run, seg ):
     exit(0) # operating without a cupsid is now a fatal error
 
 
+
 @subcommand()
 def info( args ):
     start = datetime.datetime.now(datetime.timezone.utc)        
@@ -206,6 +206,24 @@ def info( args ):
     return 'result', 0, start, finish, 'success', '....', '....'
 
     
+
+def update_production_status( update_query, retries=10, delay=10.0 ):
+    print(update_query)
+    for itry in range(0,retries):
+        time.sleep( delay * (itry + 1 ) * random.random() )
+        try:
+            with pyodbc.connect("DSN=ProductionStatusWrite") as statusdb:
+                curs=statusdb.cursor()
+                curs.execute(update_query)
+                curs.commit()
+                print(f"Applied after {itry+1} attempts")
+                return
+        except:
+            print(f"Failed {itry+1} attempts...")
+
+    print("Update failed")
+    
+
 
 @subcommand()
 def started(args):
@@ -226,6 +244,7 @@ def started(args):
          started='{timestamp}',
          execution_node='{node}'
     where id={id_}
+
     """
 
     curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
@@ -233,7 +252,6 @@ def started(args):
         curs.commit()
 
     return 'result', ntries, start, finish, ex, nm, sv
-
 
 @subcommand([
     argument(     "--nsegments",help="Number of segments produced",dest="nsegments",default=1),
@@ -256,11 +274,13 @@ def running(args):
     where id={id_}
     """
 
+
     curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
 
     return 'result', ntries, start, finish, ex, nm, sv
+
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -286,13 +306,13 @@ def finished(args):
     state='finished'
     if ec>0:
         state='failed'
+    update = None
     if args.inc:
         update = f"""
         update {tablename}
         set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents=nevents+{ne}
         where id={id_}
         """
-#        where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     else:
         update = f"""
         update {tablename}
@@ -359,7 +379,6 @@ def nevents(args):
         set nevents=nevents+{ne}
         where id={id_}
         """
-#       where dstname='{dstname}' and run={run} and segment={seg} and id={id_}
     else:
         update = f"""
         update {tablename}
@@ -372,7 +391,6 @@ def nevents(args):
         curs.commit()
 
     return 'result', ntries, start, finish, ex, nm, sv
-        
 
 @subcommand([
 ])
@@ -388,6 +406,7 @@ def getinputs(args):
     query = f"""
     select inputs from {tablename} where id={id_} limit 1
     """
+
     curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], query )
     if curs:
         for result in curs:
@@ -396,6 +415,7 @@ def getinputs(args):
                 print(f)
 
     return 'result', ntries, start, finish, ex, nm, sv
+
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -418,6 +438,7 @@ def inputs(args):
     set inputs='{inputs}'
     where id={id_}
     """
+
     curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
@@ -454,13 +475,13 @@ def message(args):
     """
     flaginc=int(args.flag)
     id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
-    update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};"
-
+    update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};
     curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
 
     return 'result', ntries, start, finish, ex, nm, sv
+
 
 #_______________________________________________________________________________________________________
 @subcommand([

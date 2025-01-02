@@ -16,7 +16,9 @@ import itertools
 from  glob import glob
 import math
 import platform
+from collections import defaultdict
 import random
+
 
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
@@ -293,6 +295,8 @@ class SPhnxMatch:
     lastevent: str = None;
     runs_last_event: str = None;
     neventsper : str = None
+    streamname : str = None
+    streamfile : str = None
     #intputfile: str = None;
     #outputfile: str = None;
 
@@ -334,39 +338,24 @@ def table_exists( tablename ):
 
 
 
-def fetch_production_status( setup, runmn=0, runmx=-1, update=True, dstname=" " ):
+def fetch_production_status( setup, runmn=0, runmx=-1 ):
     """
     Given a production setup, returns the production status table....
     """
     result = [] # of SPhnxProductionStatus
 
-    name = "PRODUCTION_STATUS"
-    
-    if table_exists( name ):
+    query = f"select * from production_status where true"
+    if ( runmn>runmx ): 
+        query = query + f" and run>={runmn}"
+    else              : 
+        query = query + f" and run>={runmn} and run<={runmx}"
 
-        query = f"select * from {name} where true"
-        if ( runmn>runmx ): 
-            query = query + f" and run>={runmn}"
-        else              : 
-            query = query + f" and run>={runmn} and run<={runmx}"
+    query=query+";"
 
-        #if dstname is not None:
-        #    query = query + f" and dstfile like '{dstname}%'"
+    dbresult = dbQuery( cnxn_string_map['statusw'], query )
 
-        query=query+";"
-
-        dbresult = dbQuery( cnxn_string_map['statusw'], query )
-
-        # Transform the list of tuples from the db query to a list of prouction status dataclass objects
-        result = [ SPhnxProductionStatus( *db ) for db in dbresult if dstname in db.dstfile ]
-
-    elif update==True: # note: we should never reach this state ...  tables ought to exist already
-
-        create = sphnx_production_status_table_def( setup.name, setup.build, setup.dbtag )
-
-        statusdbw.execute(create) # 
-        statusdbw.commit()
-        
+    # Transform the list of tuples from the db query to a list of prouction status dataclass objects
+    result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
 
     return result
 
@@ -391,14 +380,6 @@ def fetch_invalid_run_entry( dstname, run, seg ):
         for db in 
                statusdbr.execute( query ).fetchall() 
     ]
-
-
-#def getLatestId( tablename, dstname, run, seg ):  # limited to status db
-#    query=f"""
-#    select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
-#    """
-#    result = statusdbw.execute(query).fetchone()[0]
-#    return result
 
 def getLatestId( tablename, dstname, run, seg ):
 
@@ -452,8 +433,18 @@ def update_production_status( matching, setup, condor, state ):
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
+        name    = str(m['name'])
 
-        key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
+        streamname = m.get( 'streamname', None )
+        name_ = name
+        if streamname:
+            name_ = name.replace("$(streamname)",streamname)
+
+        dsttype = name_
+        dstname = dsttype +'_'+setup.build.replace(".","")+'_'+setup.dbtag
+        dstfile = ( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)                
+
+        key     = dstfile
 
         try:
             cluster = condor_map[ key.lower() ][ 'ClusterId' ]
@@ -465,13 +456,9 @@ def update_production_status( matching, setup, condor, state ):
             cluster=0
             process=0
         
-        dsttype=setup.name
-        dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
-        dstfile=( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
 
         # 1s time resolution
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
-
         id_ = getLatestId( 'production_status', dstname, run, segment )
 
         update=f"""
@@ -486,9 +473,7 @@ def update_production_status( matching, setup, condor, state ):
 
 def insert_production_status( matching, setup, condor=[], state='submitting' ):
 
-    # Condor map contains a dictionary keyed on the "output" field of the job description.
-    # The map contains the cluster ID, the process ID, the arguments, and the output log.
-    # (This is the condor.stdout log...)
+    # Build the map of submitted jobs so that we can pull in the cluster and process id
     condor_map = {}
     for ad in condor:
         clusterId = ad['ClusterId']
@@ -496,27 +481,29 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         out       = ad['Out'].split('/')[-1]   # discard anything that looks like a filepath
         ulog      = ad['UserLog'].split('/')[-1] 
         key       = ulog.split('.')[0].lower()  # lowercase b/c referenced by file basename
-
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
 
-    # replace with sphenix_dstname( setup.name, setup.build, setup.dbtag )
-    name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
-
+    # Prepare the insert for all matches that we are submitting to condor
     values = []
-
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
+        name    = m['name']
+        streamname = m.get( 'streamname', None )
+        name_ = name
+        if streamname:
+            name_ = name.replace("$(streamname)",streamname)
+
         dstfileinput = m['lfn'].split('.')[0]
 
-        # If the match contains a list of inputs... we will set it in the production status...
         if m['inputs']:
             dstfileinput=m['inputs']
+
+        dsttype = name_
+        dstname = dsttype +'_'+setup.build.replace(".","")+'_'+setup.dbtag
+        dstfile = ( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)        
+
         key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
-        
-        dsttype=setup.name
-        dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
-        dstfile=( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
         
         prod_id = setup.id
         try:
@@ -533,17 +520,16 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         # TODO: Handle conflict
         node=platform.node().split('.')[0]
 
-        insert=f"""
-        insert into production_status
-               (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents, submission_host )
+        value = f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" 
 
-        values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )
-        """
+        if streamname:
+            value = value.replace( '$(streamname)', streamname )
 
-        values.append( f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" )
-        
+        values.append( value )
+       
     insvals = ','.join(values)
 
+    # Inserts the production status lines for each match, returning the list of IDs associated with each match.
     insert = f"""
     insert into production_status
            (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents, submission_host )
@@ -552,10 +538,10 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
 
     returning id
     """
-    statusdbw.execute(insert)
-    # commit is deferred until the update succeeds
 
-    result=[ int(x.id) for x in statusdbw.fetchall() ]
+    statusdbw.execute(insert)    # commit is deferred until the update succeeds
+
+    result=[ int(x.id) for x in statusdbw ]
 
     return result
     
@@ -691,12 +677,13 @@ def submit( rule, maxjobs, **kwargs ):
             if m.get('ranges',None):
                 m['ranges']= ','.join( m['ranges'].split() )
 
+            #pprint.pprint(m)
             for k,v in m.items():
 
                 if k in ['outdir','logdir','histdir','condor']:
                     m[k] = v.format( **locals() )
 
-                if k in str(submit_job):
+                if k in str(submit_job) or k=='streamname': # b/c it may not be declared in the arglist
                     d[k] = m[k]
                
                 if args.dbinput: 
@@ -709,7 +696,7 @@ def submit( rule, maxjobs, **kwargs ):
                 
         run_submit_loop=30
         schedd_query = None
-        
+
         # Insert jobs into the production status table and add the ID to the dictionary
         INFO("... insert")
         cupsids = insert_production_status( matching, setup, [], state="submitting" ) 
@@ -796,13 +783,17 @@ def submit( rule, maxjobs, **kwargs ):
 
     return dispatched_runs
 
-def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
+def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_ ):
     """
     Fetches the production setup from the database for the given (name,build,dbtag,hash).
     If it doesn't exist in the DB it is created.  Queries the git repository to verify 
     that the local repo is clean and up to date with the remote.  Returns production setup
     object.
     """
+
+    name=name_
+    if '$(streamname)' in name:
+        name = name.replace('$(streamname)','_X_')
 
     result = None # SPhnxProductionSetup
 
@@ -815,7 +806,6 @@ def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
                  limit 1;
     """%( name, build, dbtag, hash_ )
     
-    #array = list( statusdbw.execute( query ).fetchall() )
     array = [ x for x in dbQuery( cnxn_string_map['statusw'], query ) ]
     assert( len(array)<2 )
 
@@ -825,8 +815,12 @@ def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
                values('%s','%s','%s','%s','%s','%s');
         """%(name,build,dbtag,repo,dir_,hash_)
 
-        statusdbw.execute( insert )
-        statusdbw.commit()
+        try:
+            statusdbw.execute( insert )            
+            statusdbw.commit()
+        except Exception as e:
+            print(f"Could not execute: {insert}")
+            raise
 
         result = fetch_production_setup(name, build, dbtag, repo, dir_, hash_)
 
@@ -881,7 +875,7 @@ def matches( rule, kwargs={} ):
 
     result = []
 
-    name      = kwargs.get('name',      rule.name)
+    name      = kwargs.get('name',      rule.name)       # Can we handle multiple names (eg DST_STREAMING_EVENT_TPCnn_run2pp) in a single submission?
     build     = kwargs.get('build',     rule.build)      # TODO... correct handling from submit.  build=ana.xyz --> build=anaxyz buildarg=ana.xyz
     buildarg  = kwargs.get('buildarg',  rule.buildarg)
     tag       = kwargs.get('tag',       rule.tag)
@@ -906,7 +900,9 @@ def matches( rule, kwargs={} ):
     runMin=999999
     runMax=0
     INFO("Building candidate inputs")
-    
+
+    dstnames = {}
+
     if rule.files:
         curs      = cursors[ rule.filesdb ]
 
@@ -921,21 +917,36 @@ def matches( rule, kwargs={} ):
             fc_result.append(f) # cache the query
             run     = f.runnumber
             segment = f.segment
+            runsegkey = f"{run}-{segment}"
 
-            outputs.append( DSTFMT %(name,build,tag,int(run),int(segment)) )
+            streamname = getattr( f, 'streamname', None )
+            name_ = name
+            if streamname:
+                name_ = name.replace( '$(streamname)',streamname ) # hack in condor replacement
+                runsegkey = f"{run}-{segment}-{streamname}"
+
+
+
+            output_ = DSTFMT %(name_,build,tag,int(run),int(segment)) 
+
+            outputs.append( output_ )
+
+            dstnames[ output_ ] = (f'{name_}',f'{build}_{tag}')
+
 
             if run>runMax: runMax=run
             if run<runMin: runMin=run
+
             if lfn_lists.get(run,None) == None:
-                lfn_lists[ f"'{run}-{segment}'" ] = f.files.split()
-                rng_lists[ f"'{run}-{segment}'" ] = getattr( f, 'fileranges', '' ).split()
+                lfn_lists[ runsegkey ] = f.files.split()
+                rng_lists[ runsegkey ] = getattr( f, 'fileranges', '' ).split()
             else:
                 # If we hit this result, then the db query has resulted in two rows with identical
                 # run numbers.  Violating the implicit submission schema.
-                ERROR(f"Run number {run}-{segment} reached twice in this query...")
+                ERROR(f"Run number {runsegkey} reached twice in this query...")
                 ERROR(rule.files)
                 exit(1)
-                
+  
             # Drop the run and segment numbers and leading stuff and just pull the datasets
             for fn in f.files.split():
                 base1 = fn.split('-')[0]
@@ -944,16 +955,22 @@ def matches( rule, kwargs={} ):
 
     
     if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
-    
+
     # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
     # we know that we do not have to produce it if it appears w/in the outputs list.
     dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
     
     exists = {}
     INFO("Building list of existing outputs")
-    chkq = f"select filename,runnumber,segment from datasets where runnumber>={runMin} and runnumber<={runMax} and filename like'"+dsttype+"%';"
-    for check in dbQuery( cnxn_string_map['fccro'], chkq ):
-        exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
+    
+    for output_, tuple_ in dstnames.items():
+        dt, ds = tuple_
+        exists.update( 
+            { 
+                c.filename : ( c.runnumber, c.segment ) for c in 
+                fccro.execute( f"select filename, runnumber, segment from datasets where runnumber>={runMin} and runnumber<={runMax} and dsttype='{dt}' and dataset='{ds}'" ) 
+            }
+        )
     INFO(f"... {len(exists.keys())} existing outputs")
 
 
@@ -992,9 +1009,6 @@ def matches( rule, kwargs={} ):
     INFO("Building PFN lists")
     for runseg,lfns in lfn_lists.items():
 
-        runnumber, segment = runseg.strip("'").split('-')        
-        output = DSTFMT %(name,build,tag,int(runnumber),int(segment))
-        
         lfns_ = [ f"'{x}'" for x in lfns ]
         list_of_lfns = ','.join(lfns_)
 
@@ -1004,14 +1018,7 @@ def matches( rule, kwargs={} ):
 
         # Build list of PFNs via direct lookup and append the results
         try:
-            if rule.direct:
-
-                pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns] 
-
-                # Build list of PFNs via filecatalog lookup if direct path has not been specified
-            if rule.direct==None:            
-
-                pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns]
+            pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns] 
 
         except KeyError:
             print( "No PFN for all LFNs in the input query.")
@@ -1027,10 +1034,12 @@ def matches( rule, kwargs={} ):
     # The production setup will be unique based on (1) the specified analysis build, (2) the specified DB tag,
     # and (3) the hash of the local github repository where the payload scripts/macros are found.
     #
-    repo_dir  = payload #'/'.join(payload.split('/')[1:]) 
+    repo_dir  = payload 
     repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
     repo_url  = sh.git('config','--get','remote.origin.url',_cwd=payload ).rstrip()  # TODO: fix hardcoded directory
 
+    # Question is whether the production setup can / should have name replacement with the input stream.  
+    # Perhaps a placeholder substitution in the fetch / update / create methods.
     INFO("Fetching production setup")
     setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
     
@@ -1042,7 +1051,7 @@ def matches( rule, kwargs={} ):
         runMin=0
 
     INFO("Fetching production status")
-    prod_status = fetch_production_status ( setup, runMin, runMax, update, sphenix_dstname(setup.name,setup.build,setup.dbtag))  # between run min and run max inclusive
+    prod_status = fetch_production_status ( setup, runMin, runMax )  # between run min and run max inclusive
 
     #
     # Map the production status table onto the output filename.  We use this map later on to determine whether
@@ -1052,11 +1061,9 @@ def matches( rule, kwargs={} ):
     prod_status_map = {}
     INFO("Building production status map")    
     for stat in prod_status:
-        # replace with sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
-        file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        # Not even sure how this was working???  This is the filename of the proposed job
-        fbn = stat.dstfile
-        prod_status_map[fbn] = stat.status  # supposed to be the map of the jobs which are in the production database to the filename of that job
+        prod_status_map[stat.dstfile] = stat.status 
 
+    INFO("Production status map")
 
     #
     # Build the list of matches.  We iterate over the fc_result zipped with the set of proposed outputs
@@ -1066,8 +1073,8 @@ def matches( rule, kwargs={} ):
     INFO("Building matches")
 
     assert( len(fc_result)==len(outputs) ) 
+    for (fc,dst) in zip(fc_result,outputs):
 
-    for (fc,dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
 
         lfn = fc.source
         run = fc.runnumber
@@ -1075,11 +1082,20 @@ def matches( rule, kwargs={} ):
         firstevent = getattr(fc,'firstevent',None)
         lastevent  = getattr(fc,'lastevent',None)
         runs_last_event = getattr(fc,'runs_last_event',None)
+        streamname = getattr(fc,'streamname',None)
+        streamfile = getattr(fc,'streamfile',None)
+
         if firstevent: firstevent=str(firstevent)
         if lastevent: lastevent=str(lastevent)
         if runs_last_event: runs_last_event=str(runs_last_event)
+        if streamname: streamname=str(streamname)
+        if streamfile: streamfile=str(streamfile)
 
         neventsper = getattr(fc,'neventsper',None)
+
+        runsegkey = f"{run}-{seg}"
+        if streamname:
+            runsegkey = f"{run}-{seg}-{streamname}"
                 
         #
         # Get the production status from the proposed output name
@@ -1111,31 +1127,29 @@ def matches( rule, kwargs={} ):
         # Check consistentcy between the LFN list (from input query) and PFN list (from file catalog query) 
         # for the current run.  Verify that the two lists are consistent.
         #
-        num_lfn = len( lfn_lists[f"'{run}-{seg}'"] )
-        num_pfn = len( pfn_lists[f"'{run}-{seg}'"] )
+        num_lfn = len( lfn_lists[ runsegkey ] )
+        num_pfn = len( pfn_lists[ runsegkey ] )
         sanity = True
-        pfn_check = [ x.split('/')[-1] for x in pfn_lists[f"'{run}-{seg}'"] ]
+        pfn_check = [ x.split('/')[-1] for x in pfn_lists[runsegkey] ]
         for x in pfn_check:
-            if x not in lfn_lists[f"'{run}-{seg}'"]:
+            if x not in lfn_lists[ runsegkey ]:
                 sanity = False
                 break
-
-        # TODO: Add MD5 check
 
         #
         # If there are more LFNs requested than exist on disk, OR if the lfn list does
         # not match the pfn list, then reject.
         #
         if num_lfn > num_pfn or sanity==False:
-            WARN(f"LFN list and PFN list are different.  Skipping this run {run} {seg}")
+            WARN(f"LFN list and PFN list are different.  Skipping this run {runsegkey}")
             WARN( f"{num_lfn} {num_pfn} {sanity}" )
-            for i in itertools.zip_longest( lfn_lists[f"'{run}-{seg}'"], pfn_lists[f"'{run}-{seg}'"] ):
+            for i in itertools.zip_longest( lfn_lists[runsegkey], pfn_lists[runsegkey] ):
                 print(i)
             continue
 
 
-        inputs_ = pfn_lists[f"'{run}-{seg}'"]
-        ranges_ = rng_lists[f"'{run}-{seg}'"]
+        inputs_ = pfn_lists[ runsegkey ]
+        ranges_ = rng_lists[ runsegkey ]
         
 
         #
@@ -1145,9 +1159,6 @@ def matches( rule, kwargs={} ):
         if test and resubmit:
             WARN("%s exists and will be overwritten"%dst)
 
-        #
-        #
-        #
         if True:
 
             if verbose>10:
@@ -1158,15 +1169,6 @@ def matches( rule, kwargs={} ):
 
             if inputs_:
                 myinputs = ' '.join(inputs_) ### ??????
-
-            # Direct lookup used in event builder jobs and implies we should obtain our
-            # inputs from the database
-            #
-            #if inputs_ and rule.direct:
-            #    myinputs = "dbinputs"
-            #
-
-
 
             if ranges_:
                 myranges = ' '.join(ranges_)
@@ -1194,6 +1196,8 @@ def matches( rule, kwargs={} ):
                 lastevent=lastevent,
                 runs_last_event=runs_last_event,
                 neventsper=neventsper,
+                streamname=streamname,
+                streamfile=streamfile
                 )
 
             match = match.dict()
