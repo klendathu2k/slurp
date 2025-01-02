@@ -475,7 +475,7 @@ def message(args):
     """
     flaginc=int(args.flag)
     id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
-    update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};
+    update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};"
     curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
