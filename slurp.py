@@ -935,7 +935,7 @@ def matches( rule, kwargs={} ):
 
             outputs.append( output_ )
 
-            dstnames[ output_ ] = (f'{name_}',f'{build}_{tag}')
+            dstnames[ f"{name_}_{build}_{tag}" ] = (f'{name_}',f'{build}_{tag}')
 
 
             if run>runMax: runMax=run
@@ -965,9 +965,9 @@ def matches( rule, kwargs={} ):
     dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
     
     exists = {}
-    INFO("Building list of existing outputs")
-    
-    for output_, tuple_ in dstnames.items():
+    INFO(f"Building list of existing outputs: # dstnames={len(dstnames.items())}")
+
+    for buildnametag, tuple_ in dstnames.items():
         dt, ds = tuple_
         exists.update( 
             { 
