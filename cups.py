@@ -48,6 +48,10 @@ def dbQuery( cnxn_string, query, ntries=10 ):
     ntries = 1
     curs = None
 
+    name = "noconnection" # cnxn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
+    serv = "noconnection" # cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
+    conn = None
+
     for itry in range(0,ntries):
         try:
             conn = pyodbc.connect( cnxn_string )
@@ -61,9 +65,14 @@ def dbQuery( cnxn_string, query, ntries=10 ):
             delay = (itry + 1 ) * random.random()
             time.sleep(delay)
 
+    if conn:
+        name = conn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
+        serv = conn.getinfo(pyodbc.SQL_SERVER_NAME)        
+        
+
     finish = datetime.datetime.now(datetime.timezone.utc)        
             
-    return curs, ntries, start, finish, lastException
+    return curs, ntries, start, finish, lastException, name, serv
             
 
 #
@@ -194,7 +203,7 @@ def info( args ):
         print(f"{arg}: {getattr(args, arg)}")
     finish = datetime.datetime.now(datetime.timezone.utc)        
 
-    return 'result', 0, start, finish, "success"
+    return 'result', 0, start, finish, 'success', '....', '....'
 
     
 
@@ -219,11 +228,11 @@ def started(args):
     where id={id_}
     """
 
-    curs, ntries, start, finish, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
 
-    return 'result', ntries, start, finish, ex
+    return 'result', ntries, start, finish, ex, nm, sv
 
 
 @subcommand([
@@ -247,11 +256,11 @@ def running(args):
     where id={id_}
     """
 
-    curs, ntries, start, finish, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
 
-    return 'result', ntries, start, finish, ex
+    return 'result', ntries, start, finish, ex, nm, sv
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -291,11 +300,11 @@ def finished(args):
         where id={id_}
         """
 
-    curs, ntries, start, finish, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
 
-    return 'result', ntries, start, finish, ex
+    return 'result', ntries, start, finish, ex, nm, sv
         
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -321,11 +330,11 @@ def exitcode(args):
     where id={id_}
     """
 
-    conn, ntries, start, finish, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
+    conn, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
 
-    return 'result', ntries, start, finish, ex
+    return 'result', ntries, start, finish, ex, nm, sv
     
 
 #_______________________________________________________________________________________________________
@@ -358,11 +367,11 @@ def nevents(args):
         where id={id_}
         """
 
-    curs, ntries, start, finish, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
 
-    return 'result', ntries, start, finish, ex
+    return 'result', ntries, start, finish, ex, nm, sv
         
 
 @subcommand([
@@ -379,14 +388,14 @@ def getinputs(args):
     query = f"""
     select inputs from {tablename} where id={id_} limit 1
     """
-    curs, ntries, start, finish, ex = dbQuery( cnxn_string_map[ 'statw' ], query )
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], query )
     if curs:
         for result in curs:
             flist = str(result[0]).split(',')
             for f in flist:
                 print(f)
 
-    return 'result', ntries, start, finish, ex
+    return 'result', ntries, start, finish, ex, nm, sv
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -409,11 +418,11 @@ def inputs(args):
     set inputs='{inputs}'
     where id={id_}
     """
-    curs, ntries, start, finish, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
 
-    return 'result', ntries, start, finish, ex
+    return 'result', ntries, start, finish, ex, nm, sv
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -447,11 +456,11 @@ def message(args):
     id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
     update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};"
 
-    curs, ntries, start, finish, ex = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
 
-    return 'result', ntries, start, finish, ex
+    return 'result', ntries, start, finish, ex, nm, sv
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -529,7 +538,7 @@ def stageout(args):
 
 
     # insert into files ...
-    insfiles, ntries_files, start_files, finish_files, ex_files = dbQuery( cnxn_string_map[ 'fcw' ], insert )
+    insfiles, ntries_files, start_files, finish_files, ex_files, nm_files, sv_files = dbQuery( cnxn_string_map[ 'fcw' ], insert )
     
 
     # Insert into datasets primary key: (filename,dataset)
@@ -550,7 +559,7 @@ def stageout(args):
     if args.verbose:        print(insert)
 
     # insert into datasets
-    insdsets, ntries_dsets, start_dsets, finish_dsets, ex_dsets = dbQuery( cnxn_string_map[ 'fcw' ], insert )    
+    insdsets, ntries_dsets, start_dsets, finish_dsets, ex_dsets, nm_dsets, sv_dsets = dbQuery( cnxn_string_map[ 'fcw' ], insert )    
             
     print(".... insert into datasets executed ....")
     
@@ -586,7 +595,7 @@ def stageout(args):
         """
         #            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
 
-    curs, ntries_stat, start_stat, finish_stat, ex_stat = dbQuery( cnxn_string_map[ 'statw' ], update )
+    curs, ntries_stat, start_stat, finish_stat, ex_stat, nm_stat, sv_stat = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
         
@@ -597,7 +606,7 @@ def stageout(args):
     # Could cache the files here ...
     os.remove(  f"{filename}")
 
-    return 'result.files', ntries_files, start_files, finish_files, ex_files, 'result.datasets', ntries_dsets, start_dsets, finish_dsets, ex_dsets, 'result.status', ntries_stat, start_stat, finish_stat, ex_stat    
+    return 'result.files', ntries_files, start_files, finish_files, ex_files, nm_files, sv_files, 'result.datasets', ntries_dsets, start_dsets, finish_dsets, ex_dsets, nm_dsets, sv_dsets, 'result.status', ntries_stat, start_stat, finish_stat, ex_stat, nm_stat, sv_stat    
 
 
 @subcommand([
@@ -636,6 +645,8 @@ def quality(args):
     
 def main():
 
+    cupsid=os.getenv('cupsid', 0)    
+
     args=parser.parse_args()
     if args.subcommand is None:
         parser.print_help()
@@ -647,8 +658,8 @@ def main():
 
     with open( 'cups.stat', 'a' ) as stats:
 
-        for r in [result[i:i + 5] for i in range(0, len(result), 5)]:
-            stats.write( f"{args.subcommand}" )
+        for r in [result[i:i + 7] for i in range(0, len(result), 7)]:
+            stats.write( f"{args.subcommand},{cupsid},{args.dstname},{args.run},{args.segment},{platform.node()}" )
             for x in r:
                 stats.write(",")
                 stats.write(str(x))
