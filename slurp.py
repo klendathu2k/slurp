@@ -16,7 +16,10 @@ import itertools
 from  glob import glob
 import math
 import platform
+
 from collections import defaultdict
+import random
+
 
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
@@ -47,9 +50,16 @@ __rules__  = []
 #fc = pyodbc.connect("DSN=FileCatalog")
 #fcc = fc.cursor()
 
+def printDbInfo( cnxn, title ):
+    name=cnxn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
+    serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
+    print(f"Connected {name} from {serv} as {title}")
+
 try:
-    statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
+    statusdbr_ = pyodbc.connect("DSN=ProductionStatus")    
     statusdbr = statusdbr_.cursor()
+    printDbInfo( statusdbr_, "Production Status Table [reads]" )
+
 except pyodbc.InterfaceError:
     for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
         print(f"Could not connect to DB... retry in {s}s")
@@ -67,6 +77,8 @@ except pyodbc.Error as e:
 try:
     statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
     statusdbw = statusdbw_.cursor()
+    printDbInfo( statusdbw_, "Production Status Table [writes]" )
+
 except (pyodbc.InterfaceError) as e:
     for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
         print(f"Could not connect to DB... retry in {s}s")
@@ -85,26 +97,76 @@ except pyodbc.Error as e:
 
 fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
 fccro = fcro.cursor()
+printDbInfo( fcro, "File Catalog [reads]" )
 
 try:
     daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;READONLY=True");
     daqc = daqdb.cursor()
+    printDbInfo( daqdb, "DAQ database [reads]" )
+
 except:
     daqdb = None
     daqc = None
 
-#print(f"ProductionStatus [RO]: timeout {statusdbr_.timeout}s")
-#print(f"ProductionStatus [Wr]: timeout {statusdbw_.timeout}s")
-#print(f"FileCatalog [RO]:      timeout {fcro.timeout}s")
-#print(f"DaqDB [RO]:            timeout {daqdb.timeout}s")
+
+
+rawdr_ = pyodbc.connect("DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True")
+rawdr  = rawdr_.cursor()
+printDbInfo( rawdr_, "RAW database [reads]" )
 
 cursors = { 
-    'daq':daqc,
+    'daq':rawdr,
     'fc':fccro,
-    'daqdb':daqc,
+    'fccro':fccro,
+    'daqdb':rawdr,
     'filecatalog': fccro,
-    'status' : statusdbr
+    'status' : statusdbr,
+    'raw':rawdr,
+    'rawdr':rawdr,
 }
+
+cnxn_string_map = {
+    'daq'         : 'DSN=daq;UID=phnxrc;READONLY=True',
+    'daqdb'       : 'DSN=daq;UID=phnxrc;READONLY=True',
+    'fc'          : 'DSN=FileCatalog;READONLY=True',
+    'fccro'       : 'DSN=FileCatalog;READONLY=True',
+    'filecatalog' : 'DSN=FileCatalog;READONLY=True',
+    'status'      : 'DSN=ProductionStatus',
+    'statusw'     : 'DSN=ProductionStatusWrite',
+    'raw'         : 'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
+    'rawdr'       : 'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
+}
+
+def dbQuery( cnxn_string, query, ntries=10 ):
+
+    # Some guard rails
+    assert( 'delete' not in query.lower() )    
+    assert( 'insert' not in query.lower() )    
+    assert( 'update' not in query.lower() )    
+    assert( 'select'     in query.lower() )
+
+    lastException = None
+    
+    # Attempt to connect up to ntries
+    for itry in range(0,ntries):
+        try:
+            conn = pyodbc.connect( cnxn_string )
+
+            if itry>0: printDbInfo( conn, f"Connected {cnxn_string} attempt {itry}" )
+            curs = conn.cursor()
+            curs.execute( query )
+            return curs
+                
+        except Exception as E:
+            lastException = E
+            delay = (itry + 1 ) * random.random()
+            time.sleep(delay)
+
+    print(lastException)
+    exit(0)
+            
+
+    
 
 verbose=0
 
@@ -122,7 +184,7 @@ class SPhnxCondorJob:
     Condor submission job template.
     """
     universe:              str = "vanilla"
-    executable:            str = "$(script)"    
+    executable:            str = "jobwrapper.sh"    
     arguments:             str = "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
     batch_name:            str = "$(name)_$(build)_$(tag)"
     #output:                str = f"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).stdout"
@@ -161,7 +223,9 @@ class SPhnxCondorJob:
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
     def __post_init__(self):
-        pass
+
+        if args:
+            object.__setattr__( self, 'batch_name', args.batch_name )
 
 @dataclass( frozen= __frozen__ )
 class SPhnxRule:
@@ -178,6 +242,7 @@ class SPhnxRule:
     buildarg:          str  = ""      # The build tag passed as an argument (leaves the "." in place).
     payload:           str = "";      # Payload directory (condor transfers inputs from)
     limit:    int = 0                 # maximum number of matches to return 0=all
+    runname:           str = None     # eg run2pp, extracted from name or ...
 
     def __eq__(self, that ):
         return self.name == that.name
@@ -195,6 +260,9 @@ class SPhnxRule:
         b = self.build
         b = b.replace(".","")
         object.__setattr__(self, 'build', b)        
+
+        if self.runname==None:
+            object.__setattr__(self, 'runname', self.name.split('_')[-1])
 
         # Add to the global list of rules
         __rules__.append(self)
@@ -283,9 +351,7 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
     else              : 
         query = query + f" and run>={runmn} and run<={runmx}"
 
-    query=query+";"
-
-    dbresult = statusdbw.execute( query )
+    dbresult = dbQuery( cnxn_string_map['statusw'], query )
 
     # Transform the list of tuples from the db query to a list of prouction status dataclass objects
     result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
@@ -326,18 +392,17 @@ def getLatestId( tablename, dstname, run, seg ):
     """
     # Find the most recent ID with the given dstname
 
-    for r in list( statusdbw.execute(query).fetchall() ):
+    for r in dbQuery( cnxn_string_map[ 'statusw' ], query ):
         if r.dstname == dstname:
             result = r.id
             break
 
-    # Possible that there may have been multiple jobs launched that pushes our entry below the limit... Try again w/ 10x higher limit.
-
-    if result==0: 
+    # Widen the search if needed...
+    if result==0:
         query=f"""
         select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES*10};
         """
-        for r in list( statusdbw.execute(query).fetchall() ):
+        for r in dbQuery( cnxn_string_map[ 'statusw' ], query ):
             if r.dstname == dstname:
                 result = r.id
                 break
@@ -386,7 +451,6 @@ def update_production_status( matching, setup, condor, state ):
         except KeyError:
             ERROR("Key Error getting cluster and/or process number from the class ads map.")
             ERROR(f"  key={key}")
-            #pprint.pprint( condor_map )
             ERROR("Assuming this is an issue with condor, setting cluster=0, process=0 and trying to continue...")
             cluster=0
             process=0
@@ -418,8 +482,8 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         key       = ulog.split('.')[0].lower()  # lowercase b/c referenced by file basename
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
 
+    #$$$ name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
 
-    # Prepare the insert for all matches that we are submitting to condor
     values = []
     for m in matching:
         run     = int(m['run'])
@@ -480,6 +544,7 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
     #exit(0)
 
     statusdbw.execute(insert)
+    # commit is deferred until the update succeeds
 
     result=[ int(x.id) for x in statusdbw ]
 
@@ -541,8 +606,18 @@ def submit( rule, maxjobs, **kwargs ):
     INFO("Get the job dictionary")
     jobd = rule.job.dict()
 
+    # If we are using a wrapper, the user script becomes the first argument
+    if jobd['executable']=='jobwrapper.sh':
+        INFO(f"Setting up general jobwrapper script.  Adding user script {rule.script} as first argument")
+        jobd['arguments']= rule.script + ' ' + jobd['arguments']
+        INFO(f"  {jobd['arguments']}")
+
     # Append $(cupsid) as the last argument
     jobd['arguments'] = jobd['arguments'] + ' $(cupsid)'
+
+    leafdir = rule.name.replace( f'_{rule.runname}', "" )
+    jobd['arguments'] = jobd['arguments'].replace( '{leafdir}', leafdir )
+
 
     INFO("Passing job to htcondor.Submit")
     submit_job = htcondor.Submit( jobd )
@@ -580,16 +655,27 @@ def submit( rule, maxjobs, **kwargs ):
 
             # TODO:  This should be accessed from the run table / daqdb
             runtype='none'
+            d['runtype']='unset'
+            d['runname']=rule.runname
+
+            leafdir=m["name"].replace(f"_{rule.runname}","")
 
             # massage the inputs from space to comma separated
             if m.get('inputs',None): 
                 m['inputs']= ','.join( m['inputs'].split() )
                 if '/physics/' in m['inputs']: # physics can appear twice by mistake...
                     runtype = 'physics'
+                    d['runtype']=runtype
                 if '/beam/' in m['inputs']: # beam supercedes...
                     runtype = 'beam'
+                    d['runtype']=runtype
                 if '/cosmics/' in m['inputs']: # beam supercedes...
                     runtype = 'cosmics'
+                    d['runtype']=runtype
+                if '/calib/' in m['inputs']: # beam supercedes...
+                    runtype = 'calib'
+                    d['runtype']=runtype
+
                 
             runtypes[runtype]=1 # register the runtype for directory creation below
 
@@ -637,6 +723,9 @@ def submit( rule, maxjobs, **kwargs ):
                 outdir = outdir.replace( '$(rungroup)', '{rungroup}')
                 outdir = outdir.replace( '$(build)',    '{rule.build}' )
                 outdir = outdir.replace( '$(tag)',      '{rule.tag}' )
+                outdir = outdir.replace( '$(name)',     '{rule.name}' )
+                outdir = outdir.replace( '$(runname)',  '{rule.runname}' )
+                outdir = outdir.replace( '$(runtype)',  '{runtype}' )
                                  
                 outdir = f'f"{outdir}"'
 
@@ -647,10 +736,10 @@ def submit( rule, maxjobs, **kwargs ):
                     rungroup=f'{mnrun:08d}_{mxrun:08d}'                
                     for runtype in runtypes.keys():  # runtype is a possible KW in the yaml file that can be substituted
                         pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
+                        INFO(f"mkdir {eval(outdir)}")
 
             # submits the job to condor
             INFO("... submitting to condor")
-
 
             submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
             # commits the insert done above
@@ -722,7 +811,8 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_ ):
                  limit 1;
     """%( name, build, dbtag, hash_ )
     
-    array = list( statusdbw.execute( query ).fetchall() )
+    #array = list( statusdbw.execute( query ).fetchall() )
+    array = [ x for x in dbQuery( cnxn_string_map['statusw'], query ) ]
     assert( len(array)<2 )
 
     if   len(array)==0:
@@ -811,7 +901,6 @@ def matches( rule, kwargs={} ):
 
     lfn_lists  = {}  # LFN lists per run requested in the input query
     pfn_lists  = {}  # PFN lists per run existing on disk
-    #pth_lists  = {}  # PFN list in format DIR:file1,file2,...,fileN
     rng_lists  = {}  # LFN:firstevent:lastevent
 
     runMin=999999
@@ -822,19 +911,19 @@ def matches( rule, kwargs={} ):
 
     if rule.files:
         curs      = cursors[ rule.filesdb ]
-        #fc_result = list( curs.execute( rule.files ).fetchall() )
 
-        # Execute the query
-        curs.execute( rule.files )
+        inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
 
-        # Candidate outputs
-        outputs = []
+        outputs = [] # WARNING: len(outputs) and len(fc_result) must be equal
+        
+        input_datasets = {}
 
         INFO(f"... {len(fc_result)} inputs")
-        for f in curs:
+        for f in inputquery:
             fc_result.append(f) # cache the query
             run     = f.runnumber
             segment = f.segment
+
             runsegkey = f"{run}-{segment}"
 
             streamname = getattr( f, 'streamname', None )
@@ -863,15 +952,16 @@ def matches( rule, kwargs={} ):
                 ERROR(f"Run number {runsegkey} reached twice in this query...")
                 ERROR(rule.files)
                 exit(1)
+                
+            # Drop the run and segment numbers and leading stuff and just pull the datasets
+            for fn in f.files.split():
+                base1 = fn.split('-')[0]
+                base2 = base1.split('_')[-2:]
+                input_datasets[ '_'.join(base2) ] = 1
 
-
-
-
-            
-
-    # These are not the droids you are looking for.  Move along.
-    if len(lfn_lists)==0: return [], None, []
-            
+   
+    if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
+    
 
     # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
     # we know that we do not have to produce it if it appears w/in the outputs list.
@@ -879,9 +969,11 @@ def matches( rule, kwargs={} ):
     
     exists = {}
     INFO("Building list of existing outputs")
+
     for output_, tuple_ in dstnames.items():
         dt, ds = tuple_
         exists = { c.filename : ( c.runnumber, c.segment ) for c in fccro.execute( f"select filename, runnumber, segment from datasets where runnumber>={runMin} and runnumber<={runMax} and dsttype='{dt}' and dataset='{ds}'" ) }
+
     INFO(f"... {len(exists.keys())} existing outputs")
 
 
@@ -890,25 +982,24 @@ def matches( rule, kwargs={} ):
     # LFN to PFN here...
     lfn2pfn = {}
     if rule.direct:
-        INFO("Building lfn2pfn map from filesystem")
+        INFO(f"Building lfn2pfn map from filesystem {rule.direct}")
         lfn2pfn = { pfn.split("/")[-1] : pfn for pfn in glob(rule.direct+'/*') }
-        #for pfn in glob(rule.direct+'/*'):
-        #    lfn = pfn.split("/")[-1]
-        #    if os.path.isfile( pfn ):
-        #        lfn2pfn[lfn]=pfn
-        INFO("done")
+        INFO(f"done {len(lfn2pfn)}")
 
     else:
         INFO("Building lfn2pfn map from filecatalog")
-        fcquery=f"""
 
-        with lfnlist as (
+        for mydataset in input_datasets.keys():
+        
+            fcquery=f"""
+
+            with lfnlist as (
    
-            select filename from datasets where runnumber>={runMin} and runnumber<={runMax} and dataset='{build}_{tag}'
+            select filename from datasets where runnumber>={runMin} and runnumber<={runMax} and dataset='{mydataset}'
 
-        )
+            )
 
-        select lfn,full_file_path as pfn from 
+            select lfn,full_file_path as pfn from 
 
             lfnlist join files
 
@@ -923,8 +1014,9 @@ def matches( rule, kwargs={} ):
     INFO("Building PFN lists")
     for runseg,lfns in lfn_lists.items():
 
-        print(lfns)
-
+        #$$$ runnumber, segment = runseg.strip("'").split('-')        
+        #$$$ output = DSTFMT %(name,build,tag,int(runnumber),int(segment))
+        
         lfns_ = [ f"'{x}'" for x in lfns ]
         list_of_lfns = ','.join(lfns_)
 
@@ -932,7 +1024,8 @@ def matches( rule, kwargs={} ):
         if pfn_lists.get(runseg,None)==None:
             pfn_lists[runseg]=[]
 
-        # Build list of PFNs via direct lookup and append the results
+        # Build list of PFNs via direct lookup and append the results... TODO... both branches of this IF statement look identical...
+
         if rule.direct:
 
             pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns] 
@@ -942,6 +1035,7 @@ def matches( rule, kwargs={} ):
 
             pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns]
 
+            
     INFO(f"... {len(pfn_lists.keys())} pfn lists")
 
     # 
@@ -975,6 +1069,7 @@ def matches( rule, kwargs={} ):
     prod_status_map = {}
     INFO("Building production status map")    
     for stat in prod_status:
+
         prod_status_map[stat.dstfile] = stat.status 
 
     INFO("Production status map")
@@ -985,6 +1080,7 @@ def matches( rule, kwargs={} ):
     #
     list_of_runs = []
     INFO("Building matches")
+
     assert( len(outputs) == len(fc_result ) )
     for (fc,dst) in zip(fc_result,outputs): 
 
@@ -1058,6 +1154,7 @@ def matches( rule, kwargs={} ):
             for i in itertools.zip_longest( lfn_lists[runsegkey], pfn_lists[runsegkey] ):
                 print(i)
             continue
+
 
         inputs_ = pfn_lists[ runsegkey ]
         ranges_ = rng_lists[ runsegkey ]
@@ -1141,7 +1238,15 @@ arg_parser.add_argument( "--batch", default=False, action="store_true",help="Bat
 arg_parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=["submitting","submitted","started","running","evicted","failed","finished"] )
 arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, action='store_true', 
                          help='Existing filecatalog entry does not block a job')
-arg_parser.add_argument( "--dbinput", default=False, action="store_true",help="Passes input filelist through the production status db rather than the argument list of the production script." )
+
+arg_parser.add_argument( "--dbinput", default=True, action="store_true",help="Passes input filelist through the production status db rather than the argument list of the production script." )
+arg_parser.add_argument( "--no-dbinput", dest="dbinput", action="store_false",help="Unsets dbinput flag." )
+
+arg_parser.add_argument( "--batch-name", dest="batch_name", default="$(name)_$(build)_$(tag)" )
+
+def warn_options( args, userargs ):
+    if args.dbinput==False:
+        WARN("Option --no-dbinput is deprecated, and will be retired in the future.  All workflows should become db aware.")
 
 def parse_command_line():
     global blocking
@@ -1150,6 +1255,8 @@ def parse_command_line():
 
     args, userargs = arg_parser.parse_known_args()
     #blocking_ = ["submitting","submitted","started","running","evicted","failed","finished"]
+
+    warn_options( args, userargs )
 
     if args.unblock:
         blocking = [ b for b in blocking if b not in args.unblock ]

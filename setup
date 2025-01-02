@@ -6,10 +6,15 @@ export PATH=${PATH}:${HOME}/bin
 export ODBCINI=./odbc.ini
 
 if [[ $OS =~ "Alma" ]]; then
-   echo "Rejiggering python path"
-   PYTHONPATH=/opt/sphenix/core/lib/python3.9/site-packages
+
+   export PATH=/usr/bin:${PATH}
+   export PYTHONPATH=/opt/sphenix/core/lib/python3.9/site-packages
    alias python=/usr/bin/python
+   alias pip=/opt/sphenix/core/bin/pip3.9
 fi
+ 
+echo Using $(python --version)
+
 
 
 
