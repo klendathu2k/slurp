@@ -26,6 +26,55 @@ def printDbInfo( cnxn, title ):
     serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
     print(f"Connected {name} from {serv} as {title}")
 
+
+cnxn_string_map = {
+    'fcw'         : 'DSN=FileCatalog;UID=phnxrc',
+    'fcr'         : 'DSN=FileCatalog;READONLY=True;UID=phnxrc',
+    'statr'       : 'DSN=ProductionStatus',
+    'statw'       : 'DSN=ProductionStatusWrite',
+}    
+
+def dbQuery( cnxn_string, query, ntries=10 ):
+
+    # Some guard rails
+    assert( 'delete' not in query.lower() )    
+
+    lastException = "noexception"
+    
+    # Attempt to connect up to ntries
+
+    start  = datetime.datetime.now(datetime.timezone.utc)        
+
+    ntries = 1
+    curs = None
+
+    name = "noconnection" # cnxn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
+    serv = "noconnection" # cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
+    conn = None
+
+    for itry in range(0,ntries):
+        try:
+            conn = pyodbc.connect( cnxn_string )
+            curs = conn.cursor()
+            curs.execute( query )
+            break
+                
+        except Exception as E:
+            ntries = ntries + 1
+            lastException = str(E)
+            delay = (itry + 1 ) * random.random()
+            time.sleep(delay)
+
+    if conn:
+        name = conn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
+        serv = conn.getinfo(pyodbc.SQL_SERVER_NAME)        
+        
+
+    finish = datetime.datetime.now(datetime.timezone.utc)        
+            
+    return curs, ntries, start, finish, lastException, name, serv
+            
+
 #
 # Production status connection
 #
@@ -133,32 +182,18 @@ def argument(*name_or_flags, **kwargs):
 
 def getLatestId( tablename, dstname, run, seg ):
 
-    cache="cups.cache"
-
     cupsid=os.getenv('cupsid')
     if cupsid and tablename=='production_status':
         return cupsid
 
-    result  = 0
-    query=f"""
-    select id,dstname from {tablename} where run={run} and segment={seg} order by id desc limit {MAXDSTNAMES};
-    """
+    print("[CUPS FATAL]: cupsid is not defined")
+    exit(0) # operating without a cupsid is now a fatal error
 
-    with pyodbc.connect("DSN=ProductionStatus") as statdb:
-        curs = statdb.cursor()
 
-        for r in curs.execute(query):
-            if r.dstname == dstname:
-                result = r.id
-                break
-
-    if result==0: 
-        print(f"Warning: could not find {dstname} with run={run} seg={seg}... this may not end well.")
-
-    return result
 
 @subcommand()
 def info( args ):
+    start = datetime.datetime.now(datetime.timezone.utc)        
     printDbInfo( statusdb,   "Production Status DB [write]" )
     printDbInfo( statusdbr_, "Production Status DB [write]" )
     cupsid=os.getenv('cupsid')
@@ -166,8 +201,11 @@ def info( args ):
     print("Printing arguments")
     for arg in vars(args):
         print(f"{arg}: {getattr(args, arg)}")
+    finish = datetime.datetime.now(datetime.timezone.utc)        
 
+    return 'result', 0, start, finish, 'success', '....', '....'
 
+    
 
 def update_production_status( update_query, retries=10, delay=10.0 ):
     print(update_query)
@@ -206,9 +244,14 @@ def started(args):
          started='{timestamp}',
          execution_node='{node}'
     where id={id_}
-    """    
-    if args.noupdate==False: update_production_status( update )
 
+    """
+
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
+
+    return 'result', ntries, start, finish, ex, nm, sv
 
 @subcommand([
     argument(     "--nsegments",help="Number of segments produced",dest="nsegments",default=1),
@@ -230,7 +273,13 @@ def running(args):
     set status='running',running='{timestamp}',nsegments={nsegments}
     where id={id_}
     """
-    if args.noupdate==False: update_production_status( update )
+
+
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
+
+    return 'result', ntries, start, finish, ex, nm, sv
 
 
 #_______________________________________________________________________________________________________
@@ -270,9 +319,13 @@ def finished(args):
         set status='{state}',ended='{timestamp}',nsegments={ns},exit_code={ec},nevents={ne}
         where id={id_}
         """
-    if args.noupdate==False: update_production_status( update )
 
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
 
+    return 'result', ntries, start, finish, ex, nm, sv
+        
 #_______________________________________________________________________________________________________
 @subcommand([
     argument("-e","--exit",help="Exit code of the payload macro",dest="exit",default=-1),
@@ -296,8 +349,13 @@ def exitcode(args):
     set status='{state}',exit_code={ec}
     where id={id_}
     """
-    if args.noupdate==False: update_production_status( update )
 
+    conn, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
+
+    return 'result', ntries, start, finish, ex, nm, sv
+    
 
 #_______________________________________________________________________________________________________
 @subcommand([
@@ -327,10 +385,13 @@ def nevents(args):
         set nevents={ne}
         where id={id_}
         """
-    if args.noupdate==False: update_production_status( update )
 
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
 
-#
+    return 'result', ntries, start, finish, ex, nm, sv
+
 @subcommand([
 ])
 def getinputs(args):
@@ -345,25 +406,15 @@ def getinputs(args):
     query = f"""
     select inputs from {tablename} where id={id_} limit 1
     """
-    ntries=0
-    result = None
-    while ntries<12:
-        ntries=ntries+1
-        with  pyodbc.connect("DSN=ProductionStatus") as prodstat:
-            cursor = prodstat.cursor() 
-            try:
-                result = cursor.execute( query ).fetchone()
-                flist = str(result[0]).split(',')
-                for f in flist:
-                    print(f)
-                return # return from function on success
 
-            except pyodbc.Error:
-                time.sleep(ntries*5) # delay for ntries x 5 seconds
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], query )
+    if curs:
+        for result in curs:
+            flist = str(result[0]).split(',')
+            for f in flist:
+                print(f)
 
-    # If we make it to this point there has been an error
-    print("Unable to obtain the file list... I've got a bad feeling about this...")
-
+    return 'result', ntries, start, finish, ex, nm, sv
 
 
 #_______________________________________________________________________________________________________
@@ -387,11 +438,13 @@ def inputs(args):
     set inputs='{inputs}'
     where id={id_}
     """
-    if args.noupdate==False: update_production_status( update )
 
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
 
-#_______________________________________________________________________________________________________
-# DEPRECATED
+    return 'result', ntries, start, finish, ex, nm, sv
+
 #_______________________________________________________________________________________________________
 @subcommand([
     argument( "--replace",    help="remove and replace existing entries.", action="store_true", default=True ),
@@ -406,60 +459,10 @@ def catalog(args):
     """
     Add the file to the file catalog.  
     """
-    # TODO: switch to an update mode rather than a delete / replace mode.
-    replace  = args.replace
-    tablename= args.table
-    dstname  = args.dstname
-    timestamp= args.timestamp
-    run      = int(args.run)
-    seg      = int(args.segment)
-    ext      = args.ext
-    host     = args.hostname
-    nevents  = args.nevents
 
-    # n.b. not the slurp convention for dsttype
-    dsttype='_'.join( dstname.split('_')[-2:] )
-
-    # TODO: allow to specify the filename
-    filename = f"{dstname}-{run:08}-{seg:04}.{ext}"
-
-    # File catalog
-    fc = pyodbc.connect("DSN=FileCatalog;UID=phnxrc")
-    fcc = fc.cursor()
-
-    dataset = args.dataset
-
-    checkfile = fcc.execute( f"select size,full_file_path from files where lfn='{filename}';" ).fetchall()
-    if checkfile and replace:
-        fcc.execute(f"delete from files where lfn='{filename}';")
-        fcc.commit()
-        
-
-    checkdataset = fcc.execute( f"select size from datasets where filename='{filename}' and dataset='{dataset}';" ).fetchall()
-    if checkdataset and replace:
-        fcc.execute(f"delete from datasets where  filename='{filename}' and dataset='{dataset}';" )
-        fcc.commit()
-
-    # Calculate md5 checksum
-    md5 = md5sum( f"{filename}")#  #sh.md5sum( f"{args.path}/{filename}").split()[0]
-    #sz  = int( sh.stat( '--printf=%s', f"{args.path}/{filename}" ) )
-    sz  = int( os.path.getsize(f"{filename}") ) 
-
-    # Insert into files
-    insert=f"""
-    insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
-    values ('{filename}','{host}','{args.path}/{filename}','now',{sz},'{md5}');
-    """
-    fcc.execute(insert)
-    fcc.commit()
-
-    # Insert into datasets
-    insert=f"""
-    insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
-    values ('{filename}',{run},{seg},{sz},'{dataset}','{dsttype}',{args.nevents})
-    """
-    fcc.execute(insert)
-    fcc.commit()
+    print("[CUPS WARNING: catalog is deprecated")
+    return
+    
 
 @subcommand([
     argument( "message", help="Message to be appended to the production status entry" ),
@@ -472,127 +475,12 @@ def message(args):
     """
     flaginc=int(args.flag)
     id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
-    update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};"
-    if args.noupdate==False: update_production_status( update )
+    update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
 
-#_______________________________________________________________________________________________________
-@subcommand([
-    argument( "DATASET",help="Name of the dataset" ),
-    argument( "--dataset", help="sets the name of the dataset", default="test" ),
-    argument( "--dsttype", help="sets the sphenix dsttype", default=None ),
-])
-def closeout(args):
-    """
-    Adds a dataset entry indicating closeout of a dataset.
-    """
-    count=0
-    while (count<10):
-
-        time.sleep( random.random() * 10.0 )
-        with pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc") as fc:
-            fcc = fc.cursor()
-
-            run      = int(args.run)
-            seg      = int(args.segment)
-
-            # n.b. not the slurp convention for dsttype
-            dstname  = args.dstname
-            dsttype='_'.join( dstname.split('_')[-2:] )
-
-            if args.dsttype != None:
-                dsttype = args.dsttype   
-
-            dataset = args.DATASET
-
-            # Insert into datasets primary key: (filename,dataset)
-            if args.verbose:
-                print("Insert into datasets")
-
-            insert=f"""
-                insert into datasets (dataset,run,0,size,dataset,dsttype,events)
-                values ('{filename}',{run},{seg},0,'{args.dataset}','{dsttype}',0)
-                on conflict
-                on constraint datasets_pkey
-                do update set
-                runnumber= EXCLUDED.runnumber ,
-                segment  = EXCLUDED.segment   ,
-                size     = datasets.size - 1  ,
-                dsttype  = EXCLUDED.dsttype   ,
-                events   = EXCLUDED.events
-                ;
-            """
-            if args.verbose:
-                print(insert)
-
-            try:
-                fcc.execute(insert)
-                fcc.commit()
-                return
-            except:
-                pass
-
-    print("*** cups failed to close the dataset **")
-
-
-
-#_______________________________________________________________________________________________________
-@subcommand([
-    argument( "DATASET",help="Name of the dataset" ),
-    argument( "--dataset", help="sets the name of the dataset", default="test" ),
-    argument( "--dsttype", help="sets the sphenix dsttype", default=None ),
-])
-def closeout(args):
-    """
-    Adds a dataset entry indicating closeout of a dataset.
-    """
-    count=0
-    while (count<10):
-
-        time.sleep( random.random() * 10.0 )
-        with pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc") as fc:
-            fcc = fc.cursor()
-
-            run      = int(args.run)
-            seg      = int(args.segment)
-
-            # n.b. not the slurp convention for dsttype
-            dstname  = args.dstname
-            dsttype='_'.join( dstname.split('_')[-2:] )
-
-            if args.dsttype != None:
-                dsttype = args.dsttype   
-
-            dataset = args.DATASET
-
-            # Insert into datasets primary key: (filename,dataset)
-            if args.verbose:
-                print("Insert into datasets")
-
-            insert=f"""
-                insert into datasets (dataset,run,0,size,dataset,dsttype,events)
-                values ('{filename}',{run},{seg},0,'{args.dataset}','{dsttype}',0)
-                on conflict
-                on constraint datasets_pkey
-                do update set
-                runnumber= EXCLUDED.runnumber ,
-                segment  = EXCLUDED.segment   ,
-                size     = datasets.size - 1  ,
-                dsttype  = EXCLUDED.dsttype   ,
-                events   = EXCLUDED.events
-                ;
-            """
-            if args.verbose:
-                print(insert)
-
-            try:
-                fcc.execute(insert)
-                fcc.commit()
-                return
-            except:
-                pass
-
-    print("*** cups failed to close the dataset **")
-
+    return 'result', ntries, start, finish, ex, nm, sv
 
 
 #_______________________________________________________________________________________________________
@@ -621,6 +509,7 @@ def stageout(args):
     # Copy the file
     try:
         shutil.copy2( f"{args.filename}", f"{args.outdir}" )
+        print(".... copy back finished ....")
     except Exception as e:
         print(f"ERROR: Failed to copy file {args.filename} to {args.outdir}.  Aborting stageout.")
         return
@@ -634,80 +523,71 @@ def stageout(args):
 
     attempt = 0
 
-    while attempt<args.retries:
-    
-        try:
-            # Copy succeeded.  Connect to file catalog and add to it
-            fc = pyodbc.connect("DSN=FileCatalogWrite;UID=phnxrc")
-            fcc = fc.cursor()
-        
-            # TODO: switch to an update mode rather than a delete / replace mode.
-            timestamp= args.timestamp
-            run      = int(args.run)
-            seg      = int(args.segment)
-            host     = args.hostname
-            nevents  = args.nevents
+    # TODO: switch to an update mode rather than a delete / replace mode.
+    timestamp= args.timestamp
+    run      = int(args.run)
+    seg      = int(args.segment)
+    host     = args.hostname
+    nevents  = args.nevents
 
-            # n.b. not the slurp convention for dsttype
-            dstname  = args.dstname
-            dsttype='_'.join( dstname.split('_')[-2:] )
+    # n.b. not the slurp convention for dsttype
+    dstname  = args.dstname
+    dsttype='_'.join( dstname.split('_')[-2:] )
 
-            if args.dsttype != None:        dsttype = args.dsttype
+    if args.dsttype != None:        dsttype = args.dsttype
                 
-            md5=md5true
+    md5=md5true
 
-            # Strip off any leading path 
-            filename=args.filename.split('/')[-1]
+    # Strip off any leading path 
+    filename=args.filename.split('/')[-1]
 
-            # Insert into files primary key: (lfn,full_host_name,full_file_path)
-            if args.verbose:        print("Insert into files")
+    # Insert into files primary key: (lfn,full_host_name,full_file_path)
+    if args.verbose:        print("Insert into files")
 
-            insert=f"""
-            insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
-            values ('{filename}','{host}','{args.outdir}/{filename}','now',{sz},'{md5}')
-            on conflict
-            on constraint files_pkey
-            do update set 
-            time=EXCLUDED.time,
-            size=EXCLUDED.size,
-            md5=EXCLUDED.md5
-            ;
-            """
-            if args.verbose:        print(insert)
-
-            fcc.execute(insert)
+    insert=f"""
+    insert into files (lfn,full_host_name,full_file_path,time,size,md5) 
+    values ('{filename}','{host}','{args.outdir}/{filename}','now',{sz},'{md5}')
+    on conflict
+    on constraint files_pkey
+    do update set 
+    time=EXCLUDED.time,
+    size=EXCLUDED.size,
+    md5=EXCLUDED.md5
+    ;
+    """
+    if args.verbose:        print(insert)
 
 
-            # Insert into datasets primary key: (filename,dataset)
-            if args.verbose:        print("Insert into datasets")
-            insert=f"""
-            insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
-            values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
-            on conflict
-            on constraint datasets_pkey
-            do update set
-            runnumber=EXCLUDED.runnumber,
-            segment=EXCLUDED.segment,
-            size=EXCLUDED.size,
-            dsttype=EXCLUDED.dsttype,
-            events=EXCLUDED.events
-            ;
-            """
-            if args.verbose:        print(insert)
+    # insert into files ...
+    insfiles, ntries_files, start_files, finish_files, ex_files, nm_files, sv_files = dbQuery( cnxn_string_map[ 'fcw' ], insert )
+    
+
+    # Insert into datasets primary key: (filename,dataset)
+    if args.verbose:        print("Insert into datasets")
+    insert=f"""
+    insert into datasets (filename,runnumber,segment,size,dataset,dsttype,events)
+    values ('{filename}',{run},{seg},{sz},'{args.dataset}','{dsttype}',{args.nevents})
+    on conflict
+    on constraint datasets_pkey
+    do update set
+    runnumber=EXCLUDED.runnumber,
+    segment=EXCLUDED.segment,
+    size=EXCLUDED.size,
+    dsttype=EXCLUDED.dsttype,
+    events=EXCLUDED.events
+    ;
+    """
+    if args.verbose:        print(insert)
+
+    # insert into datasets
+    insdsets, ntries_dsets, start_dsets, finish_dsets, ex_dsets, nm_dsets, sv_dsets = dbQuery( cnxn_string_map[ 'fcw' ], insert )    
             
-            fcc.execute(insert)
-
-            # We commit and break out of the retry loop only if update to both the
-            # files and datasets table succeeded
-            fcc.commit()
-            break
-
-        except Exception as E:
-            print(E)
-            attempt = attempt + 1
-            delay= float(attepmt)*random.random()*60
-            print(f"Unable to update filecatalog.  Retry in {delay}s")
-            time.sleep(delay)
+    print(".... insert into datasets executed ....")
+    
+    if insfiles and insdsets:
+        insfiles.commit()
+        insdsets.commit()
+    
 
     # Add to nevents in the production status
     if args.verbose:
@@ -736,13 +616,18 @@ def stageout(args):
         """
         #            where dstname='{dstname}' and id={id_} and run={run} and segment={seg};
 
-    statusdbc.execute( update )
-    statusdbc.commit()
-
+    curs, ntries_stat, start_stat, finish_stat, ex_stat, nm_stat, sv_stat = dbQuery( cnxn_string_map[ 'statw' ], update )
+    if curs:
+        curs.commit()
+        
     # and remove the file
     if args.verbose:
         print("Cleanup file")        
-    os.remove( f"{filename}")
+
+    # Could cache the files here ...
+    os.remove(  f"{filename}")
+
+    return 'result.files', ntries_files, start_files, finish_files, ex_files, nm_files, sv_files, 'result.datasets', ntries_dsets, start_dsets, finish_dsets, ex_dsets, nm_dsets, sv_dsets, 'result.status', ntries_stat, start_stat, finish_stat, ex_stat, nm_stat, sv_stat    
 
 
 @subcommand([
@@ -766,69 +651,40 @@ def execute(args):
     script, rather than the payload macro.
     """
 
-
-    # We have to go through the parser to run these subcommands, and we don't want
-    # to shell out... otherwise we make another DB connection
-
-    # Flag job as started...
-    started = parser.parse_args( ["-d", args.dstname, "-r", args.run,"-s",args.segment,"started"] ); 
-    started.func( started )
-
-    # And immediately drop into running
-    running = parser.parse_args( ["-d", args.dstname, "-r", args.run, "-s", args.segment, "running"] );
-    running.func(running)
-
-    #
-    # Execute the user payload.  Exit 
-    #
-    exit_code = 0
-    cmd = sh.Command(args.script)    
-        
-    result = cmd( args.scriptargs, _out=args.stdout, _err=args.stderr, _ok_code=range(1,255) )
-    exit_code = result.exit_code
-        
-    state = "finished"
-            
-    finished=parser.parse_args( ["-d", args.dstname, "-r", args.run, "-s", args.segment, state, "-e","%s"%result.exit_code ] ); 
-    finished.func(finished)
+    print("[CUPS WARNING]: execute is deprecated")
+    return
 
 #_______________________________________________________________________________________________________
 @subcommand([
     argument( "--qafile", help="Read the given QA file and save as a jsonb entry in the production quality table" )
 ])
 def quality(args):
-    tablename = args.table             # the production_status table
-    dstname   = args.dstname
-    run       = int( args.run )
-    segment   = int( args.segment )
-    id_       = getLatestId( tablename, dstname, run, segment )    # the corresponding production status entry
-    qastring  = None
-    with open( args.qafile, 'r') as qafile:
-        qastring = str( json.load( qafile ) )
 
-    # Make sure to replace the single quotes with double
-    qastring = qastring.replace("'",'"')
+    print("[CUPS WARNING]: quality is deprecated")
+    return
 
-    qaentry=f"""
-    INSERT INTO production_quality (stat_id,dstname,run,segment,qual) values
-      ( {id_},'{dstname}',{run},{segment},'{qastring}' );   
-    """
-
-    # File catalog
-    with pyodbc.connect("DSN=ProductionStatusWrite") as statusdb:
-        curs=statusdb.cursor()
-        curs.execute(qaentry)
-        curs.commit()    
-
-
+    
 def main():
 
-    args=parser.parse_args()
+    cupsid=os.getenv('cupsid', 0)    
 
+    args=parser.parse_args()
     if args.subcommand is None:
         parser.print_help()
-    else:
-        args.func(args)        
+        return
+
+    result = []
+
+    result = args.func(args)
+
+    with open( 'cups.stat', 'a' ) as stats:
+
+        for r in [result[i:i + 7] for i in range(0, len(result), 7)]:
+            stats.write( f"{args.subcommand},{cupsid},{args.dstname},{args.run},{args.segment},{platform.node()}" )
+            for x in r:
+                stats.write(",")
+                stats.write(str(x))
+            stats.write("\n")
 
 if __name__ == '__main__':
     main()

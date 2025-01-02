@@ -4,6 +4,9 @@
 hostname
 echo $@
 
+# This is the container that the job will run under
+container=/cvmfs/sphenix.sdcc.bnl.gov/singularity/rhic_sl7.sif
+
 export userscript=$1       # this is the executable script
 export cupsid=${@: -1:1}                         # this is the ID of the job on the production system
 export payload=( `echo ${@: -2:1} | tr ","  " "` ) # comma sep list --> array of files to stage in
@@ -29,9 +32,6 @@ fi
 echo Argument list is now completely fubared
 echo $@
 
-# Job wrapper will start with sphenix_setup level at NEW
-#source /opt/sphenix/core/bin/sphenix_setup.sh -n new
-
 
 echo userscript: ${userscript}
 echo cupsid:     ${cupsid}
@@ -44,13 +44,14 @@ for i in ${payload[@]}; do
 done
 
 if [ -e odbc.ini ]; then
+echo "Setting user provided odbc.ini file"
 export ODBCINI=./odbc.ini
 fi
 
 
 chmod u+x ${userscript}
 
-singularity exec -B /home -B /direct/sphenix+u -B /gpfs02 -B /sphenix/u -B /sphenix/lustre01 -B /sphenix/user  -B /sphenix/data/data02 /cvmfs/sphenix.sdcc.bnl.gov/singularity/rhic_sl7.sif ./${userscript} ${userArgs[@]}
+singularity exec -B /home -B /direct/sphenix+u -B /gpfs02 -B /sphenix/u -B /sphenix/lustre01 -B /sphenix/user  -B /sphenix/data/data02 ${container} ./${userscript} ${userArgs[@]}
 
 }
 #>& /sphenix/data/data02/sphnxpro/production-testbed/jobwrapper.log

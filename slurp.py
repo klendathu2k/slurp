@@ -113,12 +113,6 @@ rawdr_ = pyodbc.connect("DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True")
 rawdr  = rawdr_.cursor()
 printDbInfo( rawdr_, "RAW database [reads]" )
 
-
-#print(f"ProductionStatus [RO]: timeout {statusdbr_.timeout}s")
-#print(f"ProductionStatus [Wr]: timeout {statusdbw_.timeout}s")
-#print(f"FileCatalog [RO]:      timeout {fcro.timeout}s")
-#print(f"DaqDB [RO]:            timeout {daqdb.timeout}s")
-
 cursors = { 
     'daq':rawdr,
     'fc':fccro,
@@ -144,8 +138,6 @@ cnxn_string_map = {
 
 def dbQuery( cnxn_string, query, ntries=10 ):
 
-    print(f"dbQuery {cnxn_string}")
-
     # Some guard rails
     assert( 'delete' not in query.lower() )    
     assert( 'insert' not in query.lower() )    
@@ -159,7 +151,7 @@ def dbQuery( cnxn_string, query, ntries=10 ):
         try:
             conn = pyodbc.connect( cnxn_string )
 
-            printDbInfo( conn, f"Connected {cnxn_string}" )
+            if itry>0: printDbInfo( conn, f"Connected {cnxn_string} attempt {itry}" )
             curs = conn.cursor()
             curs.execute( query )
             return curs
@@ -917,6 +909,8 @@ def matches( rule, kwargs={} ):
         inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
 
         outputs = [] # WARNING: len(outputs) and len(fc_result) must be equal
+        
+        input_datasets = {}
 
         INFO(f"... {len(fc_result)} inputs")
         for f in inputquery:
@@ -952,9 +946,15 @@ def matches( rule, kwargs={} ):
                 ERROR(f"Run number {runsegkey} reached twice in this query...")
                 ERROR(rule.files)
                 exit(1)
+  
+            # Drop the run and segment numbers and leading stuff and just pull the datasets
+            for fn in f.files.split():
+                base1 = fn.split('-')[0]
+                base2 = base1.split('_')[-2:]
+                input_datasets[ '_'.join(base2) ] = 1
 
-    # These are not the droids you are looking for.  Move along.
-    if len(lfn_lists)==0: return [], None, []
+    
+    if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
 
     # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
     # we know that we do not have to produce it if it appears w/in the outputs list.
@@ -979,27 +979,30 @@ def matches( rule, kwargs={} ):
     # LFN to PFN here...
     lfn2pfn = {}
     if rule.direct:
-        INFO("Building lfn2pfn map from filesystem")
+        INFO(f"Building lfn2pfn map from filesystem {rule.direct}")
         lfn2pfn = { pfn.split("/")[-1] : pfn for pfn in glob(rule.direct+'/*') }
-        INFO("done")
+        INFO(f"done {len(lfn2pfn)}")
 
     else:
         INFO("Building lfn2pfn map from filecatalog")
-        fcquery=f"""
 
-        with lfnlist as (
+        for mydataset in input_datasets.keys():
+        
+            fcquery=f"""
+
+            with lfnlist as (
    
-            select filename from datasets where runnumber>={runMin} and runnumber<={runMax} and dataset='{build}_{tag}'
+            select filename from datasets where runnumber>={runMin} and runnumber<={runMax} and dataset='{mydataset}'
 
-        )
+            )
 
-        select lfn,full_file_path as pfn from 
+            select lfn,full_file_path as pfn from 
 
             lfnlist join files
 
-        on lfnlist.filename=files.lfn;        
-        """
-        lfn2pfn = { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) }
+            on lfnlist.filename=files.lfn;        
+            """
+            lfn2pfn.update( { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) } )
 
                     
     # Build lists of PFNs available for each run
