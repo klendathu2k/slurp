@@ -725,13 +725,17 @@ def submit( rule, maxjobs, **kwargs ):
                 outdir = f'f"{outdir}"'
 
                 rungroups = {}
+                madedir = {}
                 for run in runlist:
                     mnrun = 100 * ( math.floor(run/100) )
                     mxrun = mnrun+100
                     rungroup=f'{mnrun:08d}_{mxrun:08d}'                
                     for runtype in runtypes.keys():  # runtype is a possible KW in the yaml file that can be substituted
-                        pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
-                        INFO(f"mkdir {eval(outdir)}")
+                        targetdir = eval(outdir)
+                        if madedir.get( targetdir, False )==False:
+                            pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
+                            INFO(f"mkdir {eval(outdir)}")
+                            madedir[targetdir]=True
 
             # submits the job to condor
             INFO("... submitting to condor")
