@@ -1010,7 +1010,7 @@ def matches( rule, kwargs={} ):
 
                     
     # Build lists of PFNs available for each run
-    INFO("Building PFN lists")
+    INFO(f"Building PFN lists {len(lfn_lists)}")
     for runseg,lfns in lfn_lists.items():
 
         lfns_ = [ f"'{x}'" for x in lfns ]
