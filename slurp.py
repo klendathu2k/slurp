@@ -962,9 +962,9 @@ def matches( rule, kwargs={} ):
     # LFN to PFN here...
     lfn2pfn = {}
     if rule.direct:
-        INFO("Building lfn2pfn map from filesystem")
+        INFO(f"Building lfn2pfn map from filesystem {rule.direct}")
         lfn2pfn = { pfn.split("/")[-1] : pfn for pfn in glob(rule.direct+'/*') }
-        INFO("done")
+        INFO(f"done {len(lfn2pfn)}")
 
     else:
         INFO("Building lfn2pfn map from filecatalog")
