@@ -49,10 +49,10 @@ arg_parser.add_argument( '--experiment-mode',dest="mode",help="Specifies the exp
 arg_parser.add_argument( '--test-mode',dest="test_mode",default=False,help="Sets testing mode, which will mangle DST names and directory paths.",action="store_true")
 arg_parser.add_argument( '--mangle-dstname',dest='mangle_dstname',help="Replaces 'DST' with the specified name.", default=None )
 arg_parser.add_argument( '--mangle-dirpath',dest='mangle_dirpath',help="Inserts string after sphnxpro/ (or tmp/) in the directory structure", default=None, type=int )
-
 arg_parser.add_argument( '--maxjobs',dest="maxjobs",help="Maximum number of jobs to pass to condor", default=None )
-
 arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query after parameter substitution and exit", action="store_true", default=False )
+
+arg_parser.add_argument( '--append-to-rsync', dest='append2rsync', default=None,help="Appends the argument to the list of rsync files to copy to the worker node" )
 
 _default_filesystem = {
         'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
@@ -238,8 +238,12 @@ def main():
 
     logging.info( f"Executing rule {args.rule} where ... {run_condition} {seg_condition} {limit_condition}" )
 
-    #
-    params        = config.get('params',None)
+    # Get  the user parameters and append additional payload
+    params          = config.get('params',None)
+    if args.append2rsync:
+        params['rsync'] = params['rsync']+','+args.append2rsync
+
+        
 
     # Input query specifies the source of the input files
     input_         = config.get('input')
