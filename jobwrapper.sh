@@ -3,8 +3,10 @@
 # Create an initialization script on the worker node to get around singularity
 cat <<EOF > sPHENIX_INIT
 
-    echo "Executing sPHENIX_INIT: build ${1}"
-    source /opt/sphenix/core/bin/sphenix_setup.sh -n ${1}
+    #echo sPHENIX_INIT \$@
+
+    echo "Executing sPHENIX_INIT: build \${1}"
+    source /opt/sphenix/core/bin/sphenix_setup.sh -n \${1}
 
     # user has supplied an odbc.ini file.  use it.
     if [ -e odbc.ini ]; then
