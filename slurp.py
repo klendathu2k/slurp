@@ -419,6 +419,7 @@ def update_production_status( matching, setup, condor, state ):
         run     = int(m['run'])
         segment = int(m['seg'])
         name    = str(m['name'])
+        revision = m.get('revision',None)
 
         streamname = m.get( 'streamname', None )
         name_ = name
@@ -427,7 +428,10 @@ def update_production_status( matching, setup, condor, state ):
 
         dsttype = name_
         dstname = dsttype +'_'+setup.build.replace(".","")+'_'+setup.dbtag
-        dstfile = ( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)                
+        dstfile = ( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
+        if revision:
+            dstfile = ( dstname + '_' + revision + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
+        
 
         key     = dstfile
 
