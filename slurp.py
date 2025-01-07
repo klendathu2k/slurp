@@ -186,12 +186,9 @@ class SPhnxCondorJob:
     executable:            str = "jobwrapper.sh"    
     arguments:             str = "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
     batch_name:            str = "$(name)_$(build)_$(tag)"
-    #output:                str = f"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).stdout"
-    #error:                 str = f"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).stderr"
     output:                str = None 
     error:                 str = None
     log:                   str = f"$(condor)/$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).condor"
-#   periodichold: 	   str = "(NumJobStarts>=1 && JobStatus == 1) || (NumJobStarts>=2 && JobStatus == 2)"
     periodichold: 	   str = "(NumJobStarts>=1 && JobStatus == 1)"
     priority:              str = "1958"
     job_lease_duration:    str = "3600"
@@ -200,13 +197,11 @@ class SPhnxCondorJob:
     request_memory:        str = "$(mem)"
     should_transfer_files: str = "YES"
     output_destination:    str = "file://./output/"
-    #output_destination:    str = "file:////sphenix/data/data02/sphnxpro/condorlog/$$($(run)/100)00"
     when_to_transfer_output: str = "ON_EXIT"
     request_disk:          str = None    
     initialdir:            str = None
     accounting_group:      str = None
     accounting_group_user: str = None
-#   transfer_output_files: str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).out,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).err"
     transfer_output_files: str = '""'
     transfer_output_remaps: str = None
     
@@ -283,7 +278,6 @@ class SPhnxMatch:
     mem:      str = None;        # Required memory
     disk:     str = None;        # Required disk space
     payload:  str = None;        # Payload directory (condor transfers inputs from)
-    #manifest: list[str] = field( default_factory=list );  # List of files in the payload directory
     stdout:   str = None; 
     stderr:   str = None; 
     condor:   str = None;
@@ -297,9 +291,6 @@ class SPhnxMatch:
     neventsper : str = None
     streamname : str = None
     streamfile : str = None
-    #intputfile: str = None;
-    #outputfile: str = None;
-
 
     def __eq__( self, that ):
         return self.run==that.run and self.seg==that.seg
@@ -312,17 +303,6 @@ class SPhnxMatch:
         object.__setattr__(self, 'build', b)                
         run = int(self.run)
         object.__setattr__(self, 'rungroup', f'{100*math.floor(run/100):08d}_{100*math.ceil((run+1)/100):08d}')
-
-        #sldir = "/tmp/slurp/%i"%( math.trunc(run/100)*100 )
-        #if self.condor == None: object.__setattr__(self, 'condor', sldir )
-        #sldir = "/sphenix/data/data02/sphnxpro/condorlogs/%i"%( math.trunc(run/100)*100 )            
-        #if self.stdout == None: object.__setattr__(self, 'stdout', sldir )
-        #if self.stderr == None: object.__setattr__(self, 'stderr', sldir )
-
-#    def __post_init__(self):
-#        if self.condor == None:
-#            a = int(self.run)
-#            self.condor = "/tmp/slurp/%i"%( math.trunc(a/100)*100 )
 
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
