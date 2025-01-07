@@ -54,11 +54,15 @@ arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query
 
 arg_parser.add_argument( '--append-to-rsync', dest='append2rsync', default=None,help="Appends the argument to the list of rsync files to copy to the worker node" )
 
+#
+# Specifies the default directory layout for files.  Note that "production" will be replaced with "production-testbed" for the
+# testbed setups.
+#
 _default_filesystem = {
-        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
-    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}/log"
-    ,   'histdir' :        "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}/hist"
-    ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
+        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)/dst"
+    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)/log"
+    ,   'histdir' :        "/sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)/hist"
+    ,   'condor'  :                                 "/tmp/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)"    
 }
 
 def sanity_checks( params, inputq ):
