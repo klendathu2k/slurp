@@ -24,6 +24,7 @@ CREATE TABLE if not exists PRODUCTION_SETUP
        repo     text             not null,   -- git repo used
        dir      text             not null,   -- directory relative to repo
        hash     varchar(8)       not null,   -- hash for the production setup
+       revision int,                         -- revision number
        primary key (name,build,dbtag,hash)
 )
 """
@@ -38,10 +39,9 @@ class SPhnxProductionSetup:
     repo:       str
     dir_:       str
     hash_:      str
-#   fromrun:    int
-#   lastrun:    int
     is_clean:   bool
     is_current: bool
+    revision:   int = None
 
 
 
