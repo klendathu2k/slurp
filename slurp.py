@@ -899,6 +899,8 @@ def matches( rule, kwargs={} ):
     payload   = kwargs.get('payload',   rule.payload)
     update    = kwargs.get('update',    True ) # update the DB
 
+    revision  = rule.revision
+
     outputs = []
 
     # Build list of possible outputs from filelist query... (requires run,sequence as 2nd and 3rd
@@ -941,8 +943,11 @@ def matches( rule, kwargs={} ):
                 runsegkey = f"{run}-{segment}-{streamname}"
 
 
+            # This is where the candidate output filename is built...  
+            output_ = DSTFMT %(name_,build,tag,int(run),int(segment))
 
-            output_ = DSTFMT %(name_,build,tag,int(run),int(segment)) 
+            if revision:
+                output_ = DSTFMTv %(name_,build,tag,str(revision),int(run),int(segment))
 
             outputs.append( output_ )
 
@@ -1213,7 +1218,8 @@ def matches( rule, kwargs={} ):
                 runs_last_event=runs_last_event,
                 neventsper=neventsper,
                 streamname=streamname,
-                streamfile=streamfile
+                streamfile=streamfile,
+                revision=revision
                 )
 
             match = match.dict()
