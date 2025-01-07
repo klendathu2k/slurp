@@ -176,6 +176,7 @@ verbose=0
 RUNFMT = "%08i"
 SEGFMT = "%05i"
 DSTFMT = "%s_%s_%s-" + RUNFMT + "-" + SEGFMT + ".root"
+DSTFMTv = "%s_%s_%s_%s-" + RUNFMT + "-" + SEGFMT + ".root"
 
 @dataclass
 class SPhnxCondorJob:
@@ -261,6 +262,8 @@ class SPhnxRule:
 
         # Add to the global list of rules
         __rules__.append(self)
+
+        
 
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v is not None }        
