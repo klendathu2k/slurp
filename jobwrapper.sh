@@ -3,8 +3,6 @@
 # Create an initialization script on the worker node to get around singularity
 cat <<EOF > sPHENIX_INIT
 
-    #echo sPHENIX_INIT \$@
-
     echo "Executing sPHENIX_INIT: build \${1}"
     source /opt/sphenix/core/bin/sphenix_setup.sh -n \${1}
 
@@ -24,7 +22,8 @@ EOF
 hostname
 echo $@
 
-# This is the container that the job will run under
+# This is the container that the job will run under.  Comment out to run
+# on the bare OS.
 container=/cvmfs/sphenix.sdcc.bnl.gov/singularity/rhic_sl7.sif
 
 export userscript=$1       # this is the executable script
@@ -75,8 +74,13 @@ fi
 
 chmod u+x ${userscript} sPHENIX_INIT
 
-echo "Running the job in singularity: ${container}"
-singularity exec -B /home -B /direct/sphenix+u -B /gpfs02 -B /sphenix/u -B /sphenix/lustre01 -B /sphenix/user  -B /sphenix/data/data02 ${container} ./${userscript} ${userArgs[@]}
+if [ -z "${container}" ]; then
+    echo "Running the job on the bare metal"
+    ./${userscript} ${userArgs[@]}
+else
+    echo "Running the job in singularity: ${container}"
+    singularity exec -B /home -B /direct/sphenix+u -B /gpfs02 -B /sphenix/u -B /sphenix/lustre01 -B /sphenix/user  -B /sphenix/data/data02 ${container} ./${userscript} ${userArgs[@]}
+fi
 
  
 
