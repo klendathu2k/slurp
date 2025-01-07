@@ -1,5 +1,23 @@
 #!/usr/bin/bash 
-{ 
+
+# Create an initialization script on the worker node to get around singularity
+cat <<EOF > sPHENIX_INIT
+
+    echo "Executing sPHENIX_INIT: build ${1}"
+    source /opt/sphenix/core/bin/sphenix_setup.sh -n ${1}
+
+    # user has supplied an odbc.ini file.  use it.
+    if [ -e odbc.ini ]; then
+	echo "... setting user provided odbc.ini file"
+	export ODBCINI=./odbc.ini
+    fi
+
+    if [ -e sPHENIX_newcdb.json ]; then
+	echo "... setting user provided conditions database config"
+	export NOPAYLOADCLIENT_CONF=./sPHENIX_newcdb.json
+    fi
+
+EOF
 
 hostname
 echo $@
@@ -32,7 +50,6 @@ fi
 echo Argument list is now completely fubared
 echo $@
 
-
 echo userscript: ${userscript}
 echo cupsid:     ${cupsid}
 echo payload:    ${payload[@]}
@@ -43,19 +60,21 @@ for i in ${payload[@]}; do
     cp --verbose $subdir/$i . 
 done
 
+# user has supplied an odbc.ini file.  use it.
 if [ -e odbc.ini ]; then
 echo "Setting user provided odbc.ini file"
 export ODBCINI=./odbc.ini
 fi
 
+if [ -e sPHENIX_newcdb.json ]; then
+echo "Setting user provided conditions database config"
+export NOPAYLOADCLIENT_CONF=./sPHENIX_newcdb.json
+fi
 
-chmod u+x ${userscript}
+chmod u+x ${userscript} sPHENIX_INIT
 
+echo "Running the job in singularity: ${container}"
 singularity exec -B /home -B /direct/sphenix+u -B /gpfs02 -B /sphenix/u -B /sphenix/lustre01 -B /sphenix/user  -B /sphenix/data/data02 ${container} ./${userscript} ${userArgs[@]}
 
-}
-#>& /sphenix/data/data02/sphnxpro/production-testbed/jobwrapper.log
-
-   
-
+ 
 
