@@ -776,12 +776,15 @@ def submit( rule, maxjobs, **kwargs ):
 
     return dispatched_runs
 
-def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_ ):
+def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, revision=None ):
     """
     Fetches the production setup from the database for the given (name,build,dbtag,hash).
     If it doesn't exist in the DB it is created.  Queries the git repository to verify 
     that the local repo is clean and up to date with the remote.  Returns production setup
     object.
+
+    If provided, we look for a user-specified revision number.
+
     """
 
     name=name_
@@ -790,23 +793,42 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_ ):
 
     result = None # SPhnxProductionSetup
 
-    query="""
-    select id,hash from production_setup 
-           where name='%s'  and 
-                 build='%s' and 
-                 dbtag='%s' and 
-                 hash='%s'
-                 limit 1;
-    """%( name, build, dbtag, hash_ )
+    query = ""
+    if revision is None:
+        query="""
+        select id,hash from production_setup 
+               where name='%s'  and 
+                   build='%s' and 
+                   dbtag='%s' and 
+                   hash='%s'
+                   limit 1;
+        """%( name, build, dbtag, hash_ )
+    else:
+        query="""
+        select id,hash from production_setup 
+               where name='%s'  and 
+                   build='%s' and 
+                   dbtag='%s' and 
+                   hash='%s'  and
+                   revision=%i        
+                   limit 1;
+        """%( name, build, dbtag, hash_, revision )        
     
     array = [ x for x in dbQuery( cnxn_string_map['statusw'], query ) ]
     assert( len(array)<2 )
 
     if   len(array)==0:
-        insert="""
-        insert into production_setup(name,build,dbtag,repo,dir,hash)
-               values('%s','%s','%s','%s','%s','%s');
-        """%(name,build,dbtag,repo,dir_,hash_)
+        insert=""
+        if revision is None:
+            insert="""
+            insert into production_setup(name,build,dbtag,repo,dir,hash)
+                   values('%s','%s','%s','%s','%s','%s');
+            """%(name,build,dbtag,repo,dir_,hash_)
+        else:
+            insert="""
+            insert into production_setup(name,build,dbtag,repo,dir,hash,revision)
+                   values('%s','%s','%s','%s','%s','%s',%i);
+            """%(name,build,dbtag,repo,dir_,hash_,revision)            
 
         try:
             statusdbw.execute( insert )            
@@ -815,7 +837,7 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_ ):
             print(f"Could not execute: {insert}")
             raise
 
-        result = fetch_production_setup(name, build, dbtag, repo, dir_, hash_)
+        result = fetch_production_setup(name, build, dbtag, repo, dir_, hash_, revision)
 
     elif len(array)==1:
 
@@ -841,7 +863,7 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_ ):
         # 2) OR it exists... the repo and local directories do not matter... but if the hash
         #    has changed it is a problem...  
         # Should issue a warning before submitting in case clean or current is violated...
-        result=SPhnxProductionSetup( id_, name, build, dbtag, repo, dir_, hash_, is_clean, is_current )
+        result=SPhnxProductionSetup( id_, name, build, dbtag, repo, dir_, hash_, is_clean, is_current, revision )
 
     return result
 
