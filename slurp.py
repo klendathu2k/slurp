@@ -237,6 +237,7 @@ class SPhnxRule:
     payload:           str = "";      # Payload directory (condor transfers inputs from)
     limit:    int = 0                 # maximum number of matches to return 0=all
     runname:           str = None     # eg run2pp, extracted from name or ...
+    revision:          str = None     # eg v001 
 
     def __eq__(self, that ):
         return self.name == that.name
@@ -291,6 +292,7 @@ class SPhnxMatch:
     neventsper : str = None
     streamname : str = None
     streamfile : str = None
+    revision: str = None
 
     def __eq__( self, that ):
         return self.run==that.run and self.seg==that.seg
