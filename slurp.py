@@ -413,7 +413,8 @@ def update_production_status( matching, setup, condor, state ):
 
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
 
-    name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
+    # TODO: revision???
+    name = sphenix_dstname( setup.name, setup.build, setup.dbtag, setup.revision )
 
     for m in matching:
         run     = int(m['run'])
@@ -426,11 +427,14 @@ def update_production_status( matching, setup, condor, state ):
         if streamname:
             name_ = name.replace("$(streamname)",streamname)
 
+        # Does revison need to go into here???
         dsttype = name_
         dstname = dsttype +'_'+setup.build.replace(".","")+'_'+setup.dbtag
         dstfile = ( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
         if revision:
+            dstname = ( dstname + '_' + revision )            
             dstfile = ( dstname + '_' + revision + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
+
         
 
         key     = dstfile
@@ -488,11 +492,17 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         if m['inputs']:
             dstfileinput=m['inputs']
 
+        # TODO: revision ???
+        # TODO: is dstfile and key redundant ???
+        revision = m.get('revision',None)
         dsttype = name_
         dstname = dsttype +'_'+setup.build.replace(".","")+'_'+setup.dbtag
+        if revision:
+            dstname = dstname + "_" + revision  
         dstfile = ( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)        
 
-        key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
+        # TODO: revision???
+        key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment, revision )
         
         prod_id = setup.id
         try:
@@ -528,6 +538,7 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
     returning id
     """
 
+    # TODO: standardized query
     statusdbw.execute(insert)    # commit is deferred until the update succeeds
 
     result=[ int(x.id) for x in statusdbw ]
@@ -867,14 +878,13 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, revision=Non
 
     return result
 
-        
-def sphenix_dstname( dsttype, build, dbtag ):
-    result = "%s_%s_%s"%( dsttype, build.replace(".",""), dbtag )
+
+def sphenix_dstname( dsttype, build, dbtag, revision=None ):
+    result = '_'.join( [x for x in [dsttype, build, dbtag, revision] if x] )
     return result
 
-def sphenix_base_filename( dsttype, build, dbtag, run, segment ):
-    #result = "%s-%08i-%04i" %( sphenix_dstname(dsttype, build, dbtag), int(run), int(segment) )
-    result = ("%s-" + RUNFMT + "-" + SEGFMT) % ( sphenix_dstname(dsttype, build, dbtag), int(run), int(segment) )
+def sphenix_base_filename( dsttype, build, dbtag, run, segment, revision=None ):
+    result = ("%s-" + RUNFMT + "-" + SEGFMT) % ( sphenix_dstname(dsttype, build, dbtag, revision), int(run), int(segment) )
     return result
     
 
@@ -926,9 +936,13 @@ def matches( rule, kwargs={} ):
         inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
 
         outputs = [] # WARNING: len(outputs) and len(fc_result) must be equal
-        
+
+        # This will hold the list of datasets which are present in the input query
         input_datasets = {}
 
+        # Matches the dsttype runtype 
+        regex_dset = re.compile( '(DST_[A-Z0-9_]+_[a-z0-9]+)_([a-z0-9]+_\d\d\d\dp\d\d\d)_*(v\d\d\d)*' )
+        
         INFO(f"... {len(fc_result)} inputs")
         for f in inputquery:
             fc_result.append(f) # cache the query
@@ -966,19 +980,39 @@ def matches( rule, kwargs={} ):
                 ERROR(f"Run number {runsegkey} reached twice in this query...")
                 ERROR(rule.files)
                 exit(1)
-  
-            # Drop the run and segment numbers and leading stuff and just pull the datasets
+
+            #
+            # Drop the run and segment numbers and leading stuff and just pull the datasets.  Note.  When
+            # we switch up to versioning of the files, this will sweep up the version number as well.
+            # Do we want version to be part of the dataset, or a separate entity on its own?
+            #
+            # Additionally... we can no longer rely on just doing a split here UNLESS we are planning to
+            # have a complete break with backwards compatability... The dataset convention goes from
+            #
+            # anaIII_202JpKKK --> anaIII_202JpKKK_vMMM
+            #
+            # I can use a regex here instead.  But do we need to?  Do we want to?  I could see us making
+            # a complete break here... so that the old naming convention is just simply dropped dropped dropped
+            # and we reprocess.
+            #
             for fn in f.files.split():
                 base1 = fn.split('-')[0]
-                base2 = base1.split('_')[-2:]
-                key='_'.join(base2)
-                input_datasets[ key ] = 1
+                rematch = regex_dset.match( base1 )
+                dset = rematch.group(1)
+                dtype = rematch.group(2)
+                vnum = rematch.group(3)
+                if vnum:
+                    dtype = dtype + '_' + vnum
+                #input_datasets[ dset ] = 1
+                input_datasets[ ( dset, dtype ) ] = 1
 
     
     if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
 
+    #
     # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
     # we know that we do not have to produce it if it appears w/in the outputs list.
+    #
     dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
     
     exists = {}
@@ -996,8 +1030,20 @@ def matches( rule, kwargs={} ):
 
 
 
-    # IF we are on a direct (disk) lookup for PFN lists, we will build a map of
-    # LFN to PFN here...
+    #
+    # lfn2pfn provides a mapping between physical files on disk and the corresponding lfn
+    # (i.e. the pfn with the directory path stripped off).
+    #
+    # A few notes.  This mapping will not be constrained to the set of input files provided
+    # by the query.  It will either be all files in the direct search path specified in the
+    # yaml file, OR it will be all files contained in the input data set(s).
+    #
+    # When running from the direct path there is the risk of duplicate entries... ymmv.
+    #
+    # When running from the file catalog... this will pull in all lfn/pfns from the
+    # datasets which appear in the input datasets.  We could extend this to use a
+    # tuple as the key, where the tuple is the dataset, dsttype pair.
+    #
     lfn2pfn = {}
     if rule.direct:
         INFO(f"Building lfn2pfn map from filesystem {rule.direct}")
@@ -1007,13 +1053,21 @@ def matches( rule, kwargs={} ):
     else:
         INFO("Building lfn2pfn map from filecatalog")
 
-        for mydataset in input_datasets.keys():
+        for mydatasettuple in input_datasets.keys():
+
+            mydataset=mydatasettuple[0]
+            mydsttype=mydatasettuple[1]
         
             fcquery=f"""
 
             with lfnlist as (
    
-            select filename from datasets where runnumber>={runMin} and runnumber<={runMax} and dataset='{mydataset}'
+            select filename from datasets where 
+
+            runnumber>={runMin}   and 
+            runnumber<={runMax}   and 
+            dataset='{mydataset}' and 
+            dsttype='{mydsttype}'
 
             )
 
