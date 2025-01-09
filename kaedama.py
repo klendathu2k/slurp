@@ -95,19 +95,18 @@ def sanity_checks( params, inputq ):
         logging.error( f'params.dbtag {params["dbtag"]} cannot contain an underscore' )
         result = False
 
-    # DST_STREAMING_EVENT_TPC00_run3auau_ana666_2025p001-<run>-<seg>.root
-    # DST_STREAMING_EVENT_TPC00_run3auau_ana666_2025p001_v001-<run>-<seg>.root
-    # ...
 
+    build = params['build']
+    rev   = params.get( 'revision', 0 )
+    assert ( rev >= 0 )
+    
+    if rev==0 and build != 'new':
+        logging.error( f'production version must be nonzero for fixed builds' )
+        result = False
 
-    
-    # 
-    # The input query should be of the form
-    #
-    # select dummy as source, runnumber, segment (as segment), list of input files as files, list of file ranges as ranges
-    # it must not do any updates, writes, etc...
-    # 
-    
+    if rev!=0 and build == 'new':
+        logging.error( 'production version must be zero for new build' )
+        result = False
     
     return result
 
