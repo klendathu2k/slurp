@@ -30,6 +30,8 @@ export cupsid=${@: -1:1}                         # this is the ID of the job on 
 export payload=( `echo ${@: -2:1} | tr ","  " "` ) # comma sep list --> array of files to stage in
 export subdir=${@: -3:1}                         # ... relative to the submission directory
 
+
+
 myArgs=( "$@")
 shift
 userArgs=( "$@" )
@@ -37,8 +39,16 @@ userArgs=( "$@" )
 OS=$( hostnamectl | awk '/Operating System/{ print $3" "$4 }' )
 echo "Setting up SLURP for ${OS}"
 
-source /opt/sphenix/core/bin/sphenix_setup.sh -n new
+# We are relying on the sPHENIX build to be in argument #7.
+# TODO:  buildarg should be one of the special arguments appended at the end of the list
+source /opt/sphenix/core/bin/sphenix_setup.sh -n ${7}
 export PATH=${PATH}:${HOME}/bin
+
+
+if [[ $OFFLINE_MAIN =~ "*alma*" ]]; then
+    echo "OFFLINE_MAIN points to an alma9 build.  Run in alma9 container";
+    container=/cvmfs/sphenix.sdcc.bnl.gov/singularity/sdcc_a9.sif
+fi
 
 if [[ $OS =~ "Alma" ]]; then
    echo "Rejiggering python path"
