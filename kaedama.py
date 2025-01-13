@@ -99,14 +99,18 @@ def sanity_checks( params, inputq ):
         logging.error( f'params.dbtag {params["dbtag"]} cannot contain an underscore' )
         result = False
 
+
+    build = params['build']
+    rev   = params.get( 'revision', 0 )
+    assert ( rev >= 0 )
     
-    # 
-    # The input query should be of the form
-    #
-    # select dummy as source, runnumber, segment (as segment), list of input files as files, list of file ranges as ranges
-    # it must not do any updates, writes, etc...
-    # 
-    
+    if rev==0 and build != 'new':
+        logging.error( f'production version must be nonzero for fixed builds' )
+        result = False
+
+    if rev!=0 and build == 'new':
+        logging.error( 'production version must be zero for new build' )
+        result = False
     
     return result
 
@@ -293,10 +297,26 @@ def main():
     for k,v in filesystem_.items():
         filesystem[k] = v
 
+            
     # Mangle directory path is specified.  Production is replaced with...
     if filesystem and args.mangle_dirpath:
         for key,val in filesystem.items():
             filesystem[key]=filesystem[key].replace("production",args.mangle_dirpath)
+
+    revision_number = params.get('revision',None)
+    if revision_number is not None:
+        revision_number = f"v{revision_number:03d}"
+
+
+    # If we have a revision number futher manipulate the directory structure...
+    if revision_number is not None:
+        for key,val in filesystem.items():
+            filesystem[key]=filesystem[key].replace("{leafdir}","{leafdir}/"+f"{revision_number}")        
+        
+        
+
+
+            
 
     if args.test_mode:
         print("[TESTMODE: print filesystem block]")
@@ -364,6 +384,7 @@ def main():
     # Perform job submission IFF we have the params, input_query, filesystem
     # and job blocks
     #
+        
     if args.submit and params and input_query and filesystem and job:
         dst_rule = Rule( name              = params['name'],
                          files             = input_query,
@@ -375,7 +396,8 @@ def main():
                          tag               = params['dbtag'],
                          payload           = params['payload'],
                          job               = job,
-                         limit             = args.limit
+                         limit             = args.limit,
+                         revision          = revision_number
                      )
 
 

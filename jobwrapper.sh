@@ -24,6 +24,7 @@ echo $@
 
 # This is the container that the job will run under
 container=/cvmfs/sphenix.sdcc.bnl.gov/singularity/rhic_sl7.sif
+#container=/cvmfs/sphenix.sdcc.bnl.gov/singularity/sdcc_a9.sif
 
 export userscript=$1       # this is the executable script
 export cupsid=${@: -1:1}                         # this is the ID of the job on the production system
