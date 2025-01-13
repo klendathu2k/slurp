@@ -186,7 +186,7 @@ class SPhnxCondorJob:
     universe:              str = "vanilla"
     executable:            str = "jobwrapper.sh"    
     arguments:             str = "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
-    batch_name:            str = "$(name)_$(build)_$(tag)"
+    batch_name:            str = "$(name)_$(build)_$(tag)_$(revision)"
     output:                str = None 
     error:                 str = None
     log:                   str = f"$(condor)/$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).condor"
@@ -413,7 +413,7 @@ def update_production_status( matching, setup, condor, state ):
 
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
 
-    # TODO: revision???
+    # TODO: revision???  does setup get the v000 string or just 0?
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag, setup.revision )
 
     for m in matching:
@@ -427,15 +427,12 @@ def update_production_status( matching, setup, condor, state ):
         if streamname:
             name_ = name.replace("$(streamname)",streamname)
 
-        # Does revison need to go into here???
+        # Does revison need to go into here???  YES YES YES.
         dsttype = name_
         dstname = dsttype +'_'+setup.build.replace(".","")+'_'+setup.dbtag
+        if setup.revision is not None:
+            dstname = dstname + '_' + setup.revision
         dstfile = ( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
-        if revision:
-            dstname = ( dstname + '_' + revision )            
-            dstfile = ( dstname + '_' + revision + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
-
-        
 
         key     = dstfile
 
@@ -798,6 +795,9 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, revision=Non
 
     """
 
+    # revision is a string of the form v000... we need to convert in some places...
+    revision_ = int(revision.replace('v',''))
+
     name=name_
     if '$(streamname)' in name:
         name = name.replace('$(streamname)','_X_')
@@ -815,6 +815,9 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, revision=Non
                    limit 1;
         """%( name, build, dbtag, hash_ )
     else:
+
+
+        
         query="""
         select id,hash from production_setup 
                where name='%s'  and 
@@ -823,7 +826,7 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, revision=Non
                    hash='%s'  and
                    revision=%i        
                    limit 1;
-        """%( name, build, dbtag, hash_, revision )        
+        """%( name, build, dbtag, hash_, revision_ )        
     
     array = [ x for x in dbQuery( cnxn_string_map['statusw'], query ) ]
     assert( len(array)<2 )
@@ -839,7 +842,7 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, revision=Non
             insert="""
             insert into production_setup(name,build,dbtag,repo,dir,hash,revision)
                    values('%s','%s','%s','%s','%s','%s',%i);
-            """%(name,build,dbtag,repo,dir_,hash_,revision)            
+            """%(name,build,dbtag,repo,dir_,hash_,revision_)
 
         try:
             statusdbw.execute( insert )            
@@ -880,10 +883,18 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, revision=Non
 
 
 def sphenix_dstname( dsttype, build, dbtag, revision=None ):
-    result = '_'.join( [x for x in [dsttype, build, dbtag, revision] if x] )
+    if type(revision)==int:
+        revision_ = f'v{revision:03d}'
+    else:
+        revision_ = revision
+    result = '_'.join( [x for x in [dsttype, build, dbtag, revision_] if x] )
     return result
 
 def sphenix_base_filename( dsttype, build, dbtag, run, segment, revision=None ):
+    if type(revision)==int:
+        revision_ = f'v{revision:03d}'
+    else:
+        revision_ = revision    
     result = ("%s-" + RUNFMT + "-" + SEGFMT) % ( sphenix_dstname(dsttype, build, dbtag, revision), int(run), int(segment) )
     return result
     
@@ -1117,8 +1128,11 @@ def matches( rule, kwargs={} ):
 
     # Question is whether the production setup can / should have name replacement with the input stream.  
     # Perhaps a placeholder substitution in the fetch / update / create methods.
+    #
+    # Revision???
+    #
     INFO("Fetching production setup")
-    setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
+    setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash, revision )
     
     #
     # Returns the production status table from the database
@@ -1312,7 +1326,7 @@ arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, act
 arg_parser.add_argument( "--dbinput", default=True, action="store_true",help="Passes input filelist through the production status db rather than the argument list of the production script." )
 arg_parser.add_argument( "--no-dbinput", dest="dbinput", action="store_false",help="Unsets dbinput flag." )
 
-arg_parser.add_argument( "--batch-name", dest="batch_name", default="$(name)_$(build)_$(tag)" )
+arg_parser.add_argument( "--batch-name", dest="batch_name", default="$(name)_$(build)_$(tag)_$(revision)" )
 
 def warn_options( args, userargs ):
     if args.dbinput==False:
