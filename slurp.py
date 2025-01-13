@@ -995,16 +995,18 @@ def matches( rule, kwargs={} ):
             # a complete break here... so that the old naming convention is just simply dropped dropped dropped
             # and we reprocess.
             #
-            for fn in f.files.split():
-                base1 = fn.split('-')[0]
-                rematch = regex_dset.match( base1 )
-                dset = rematch.group(1)
-                dtype = rematch.group(2)
-                vnum = rematch.group(3)
-                if vnum:
-                    dtype = dtype + '_' + vnum
-                #input_datasets[ dset ] = 1
-                input_datasets[ ( dset, dtype ) ] = 1
+            # ... but we don't need to build this if we are using direct lookup
+            if rule.direct==None:            
+                for fn in f.files.split():
+                    base1 = fn.split('-')[0]
+                    rematch = regex_dset.match( base1 )
+                    dset = rematch.group(1)
+                    dtype = rematch.group(2)
+                    vnum = rematch.group(3)
+                    if vnum:
+                        dtype = dtype + '_' + vnum
+                        #input_datasets[ dset ] = 1
+                        input_datasets[ ( dset, dtype ) ] = 1
 
     
     if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
