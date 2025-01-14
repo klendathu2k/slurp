@@ -638,6 +638,7 @@ def submit( rule, maxjobs, **kwargs ):
         schedd = htcondor.Schedd()    
 
         runtypes = {}
+        streams  = {}
         # Strip out unused $(...) condor macros
         INFO("Converting matches to list of dictionaries for schedd...")
         mymatching = []
@@ -681,6 +682,7 @@ def submit( rule, maxjobs, **kwargs ):
 
                 if k in str(submit_job) or k=='streamname': # b/c it may not be declared in the arglist
                     d[k] = m[k]
+                    if k=='streamname': streams[ m[k] ] = 1
                
                 if args.dbinput: 
                     d['inputs']= 'dbinput'            
