@@ -219,8 +219,7 @@ class SPhnxCondorJob:
 
     def __post_init__(self):
 
-        if args:
-            object.__setattr__( self, 'batch_name', args.batch_name )
+        pass
 
 @dataclass( frozen= __frozen__ )
 class SPhnxRule:
@@ -1326,7 +1325,7 @@ arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, act
 arg_parser.add_argument( "--dbinput", default=True, action="store_true",help="Passes input filelist through the production status db rather than the argument list of the production script." )
 arg_parser.add_argument( "--no-dbinput", dest="dbinput", action="store_false",help="Unsets dbinput flag." )
 
-arg_parser.add_argument( "--batch-name", dest="batch_name", default="$(name)_$(build)_$(tag)_$(version)" )
+arg_parser.add_argument( "--batch-name", dest="batch_name", default=None ) #default="$(name)_$(build)_$(tag)_$(version)"
 
 def warn_options( args, userargs ):
     if args.dbinput==False:
