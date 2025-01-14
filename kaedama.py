@@ -99,9 +99,13 @@ def sanity_checks( params, inputq ):
         logging.error( f'params.dbtag {params["dbtag"]} cannot contain an underscore' )
         result = False
 
-
     build = params['build']
-    rev   = params.get( 'version', 0 )
+    rev   = params.get( 'version', None )
+
+    if rev is None:
+        params['version']=0
+        rev = 0
+
     assert ( rev >= 0 )
     
     if rev==0 and build != 'new':
@@ -303,7 +307,8 @@ def main():
         for key,val in filesystem.items():
             filesystem[key]=filesystem[key].replace("production",args.mangle_dirpath)
 
-    version_number = params.get('version',None)
+    # Version number will default to zero
+    version_number = params.get('version',0)
     if version_number is not None:
         version_number = f"v{version_number:03d}"
 
@@ -332,7 +337,6 @@ def main():
 
     # Do not submit if we fail sanity check on definition file
     if sanity_checks( params, input_ ) == False:        exit(1)
-
 
     if runlist_query =='': runlist_query = None
     if input_query   =='': input_query   = None
