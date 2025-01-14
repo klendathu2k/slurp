@@ -718,7 +718,7 @@ def submit( rule, maxjobs, **kwargs ):
                 outdir = outdir.replace( '$(name)',     '{rule.name}' )
                 outdir = outdir.replace( '$(runname)',  '{rule.runname}' )
                 outdir = outdir.replace( '$(runtype)',  '{runtype}' )
-                                 
+
                 outdir = f'f"{outdir}"'
 
                 rungroups = {}
@@ -727,13 +727,27 @@ def submit( rule, maxjobs, **kwargs ):
                     mnrun = 100 * ( math.floor(run/100) )
                     mxrun = mnrun+100
                     rungroup=f'{mnrun:08d}_{mxrun:08d}'                
+
                     for runtype in runtypes.keys():  # runtype is a possible KW in the yaml file that can be substituted
                         targetdir = eval(outdir)
-                        if madedir.get( targetdir, False )==False:
-                            pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
-                            INFO(f"mkdir {eval(outdir)}")
-                            madedir[targetdir]=True
+                        
+                        if '$(streamname)' in targetdir: # ... 
+                            
+                            for mystreamname in streams.keys():
+                                
+                                if madedir.get( targetdir, False )==False:
+                                    td =  targetdir.replace('$(streamname)',mystreamname )
+                                    pathlib.Path( td ).mkdir( parents=True, exist_ok=True )            
+                                    INFO(f"mkdir {td}")
+                                    madedir[ td ]=True                                
+                                
+                        else:
 
+                            if madedir.get( targetdir, False )==False:
+                                pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
+                                INFO(f"mkdir {eval(outdir)}")
+                                madedir[targetdir]=True
+                                                            
             # submits the job to condor
             INFO("... submitting to condor")
 
