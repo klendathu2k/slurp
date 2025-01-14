@@ -49,37 +49,21 @@ arg_parser.add_argument( '--experiment-mode',dest="mode",help="Specifies the exp
 arg_parser.add_argument( '--test-mode',dest="test_mode",default=False,help="Sets testing mode, which will mangle DST names and directory paths.",action="store_true")
 arg_parser.add_argument( '--mangle-dstname',dest='mangle_dstname',help="Replaces 'DST' with the specified name.", default=None )
 arg_parser.add_argument( '--mangle-dirpath',dest='mangle_dirpath',help="Inserts string after sphnxpro/ (or tmp/) in the directory structure", default=None, type=int )
-
 arg_parser.add_argument( '--maxjobs',dest="maxjobs",help="Maximum number of jobs to pass to condor", default=None )
-
 arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query after parameter substitution and exit", action="store_true", default=False )
 
+arg_parser.add_argument( '--append-to-rsync', dest='append2rsync', default=None,help="Appends the argument to the list of rsync files to copy to the worker node" )
 
-# TODO: physics/run2pp/ana449_2024p008/”run range”/DST_TRKR_CLUSTER
-#_default_filesystem = {
-#        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
-#    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
-#    ,   'histdir' :       "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
-#    ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(name)/$(build)_$(tag)/run_$(rungroup)"
-#}
-
-
-# TODO: physics/run2pp/ana449_2024p008/”run range”/DST_TRKR_CLUSTER
-#       runtype runname build_tag  runrange DST
-#_default_filesystem = {
-#        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
-#    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
-#    ,   'histdir' :       "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
-#    ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/$(name)"
-#}
-
+#
+# Specifies the default directory layout for files.  Note that "production" will be replaced with "production-testbed" for the
+# testbed setups.
+#
 _default_filesystem = {
-        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
-    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}/log"
-    ,   'histdir' :        "/sphenix/data/data02/sphnxpro/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}/hist"
-    ,   'condor'  :                                 "/tmp/production/$(runtype)/$(runname)/$(build)_$(tag)/run_$(rungroup)/{leafdir}"
+        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)/dst"
+    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)/log"
+    ,   'histdir' :        "/sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)/hist"
+    ,   'condor'  :                                 "/tmp/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)"    
 }
-
 
 def sanity_checks( params, inputq ):
     result = True
@@ -100,9 +84,9 @@ def sanity_checks( params, inputq ):
     #
 
     # Name should be of the form DST_NAME_runXauau
-    if re.match( "[A-Z][A-Z][A-Z]_([A-Z]+_)+[a-z0-9]+", params['name'] ) == None:
-        logging.error( f'params.name {params["name"]} does not respect the sPHENIX convention:  DST_NAME_run<N>species' )
-        result = False
+    #if re.match( "[A-Z][A-Z][A-Z]_([A-Z]+_)+[a-z0-9]+", params['name'] ) == None:
+    #    logging.warn( f'params.name {params["name"]} does not respect the sPHENIX convention:  DST_NAME_run<N>species' )
+    #    result = False
 
     # Build and dbtag should not contain a "_"
     if re.match("_",params['build']):
@@ -115,14 +99,22 @@ def sanity_checks( params, inputq ):
         logging.error( f'params.dbtag {params["dbtag"]} cannot contain an underscore' )
         result = False
 
+    build = params['build']
+    rev   = params.get( 'version', None )
+
+    if rev is None:
+        params['version']=0
+        rev = 0
+
+    assert ( rev >= 0 )
     
-    # 
-    # The input query should be of the form
-    #
-    # select dummy as source, runnumber, segment (as segment), list of input files as files, list of file ranges as ranges
-    # it must not do any updates, writes, etc...
-    # 
-    
+    if rev==0 and build != 'new':
+        logging.error( f'production version must be nonzero for fixed builds' )
+        result = False
+
+    if rev!=0 and build == 'new':
+        logging.error( 'production version must be zero for new build' )
+        result = False
     
     return result
 
@@ -237,6 +229,8 @@ def main():
     elif len(args.segments)>=3:
         seg_condition = "and segment in ( %s )" % ','.join( args.segments )
 
+    #streamname = args.streamname
+    #streamfile = args.streamfile
 
     RUNFMT = slurp.RUNFMT
     SEGFMT = slurp.SEGFMT
@@ -256,8 +250,12 @@ def main():
 
     logging.info( f"Executing rule {args.rule} where ... {run_condition} {seg_condition} {limit_condition}" )
 
-    #
-    params        = config.get('params',None)
+    # Get  the user parameters and append additional payload
+    params          = config.get('params',None)
+    if args.append2rsync:
+        params['rsync'] = params['rsync']+','+args.append2rsync
+
+        
 
     # Input query specifies the source of the input files
     input_         = config.get('input')
@@ -276,6 +274,8 @@ def main():
     runlist_query = config.get('runlist_query','').format(**locals())
 
     if params:
+
+        params['name']=params['name'].format( **locals() )
 
         if args.mangle_dstname:
             params['name']=params['name'].replace('DST',args.mangle_dstname)
@@ -301,10 +301,27 @@ def main():
     for k,v in filesystem_.items():
         filesystem[k] = v
 
+            
     # Mangle directory path is specified.  Production is replaced with...
     if filesystem and args.mangle_dirpath:
         for key,val in filesystem.items():
             filesystem[key]=filesystem[key].replace("production",args.mangle_dirpath)
+
+    # Version number will default to zero
+    version_number = params.get('version',0)
+    if version_number is not None:
+        version_number = f"v{version_number:03d}"
+
+
+    # If we have a version number futher manipulate the directory structure...
+    if version_number is not None:
+        for key,val in filesystem.items():
+            filesystem[key]=filesystem[key].replace("{leafdir}","{leafdir}/"+f"{version_number}")        
+        
+        
+
+
+            
 
     if args.test_mode:
         print("[TESTMODE: print filesystem block]")
@@ -320,7 +337,6 @@ def main():
 
     # Do not submit if we fail sanity check on definition file
     if sanity_checks( params, input_ ) == False:        exit(1)
-
 
     if runlist_query =='': runlist_query = None
     if input_query   =='': input_query   = None
@@ -372,6 +388,7 @@ def main():
     # Perform job submission IFF we have the params, input_query, filesystem
     # and job blocks
     #
+        
     if args.submit and params and input_query and filesystem and job:
         dst_rule = Rule( name              = params['name'],
                          files             = input_query,
@@ -383,7 +400,8 @@ def main():
                          tag               = params['dbtag'],
                          payload           = params['payload'],
                          job               = job,
-                         limit             = args.limit
+                         limit             = args.limit,
+                         version          = version_number
                      )
 
 

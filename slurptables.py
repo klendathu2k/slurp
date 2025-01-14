@@ -24,6 +24,7 @@ CREATE TABLE if not exists PRODUCTION_SETUP
        repo     text             not null,   -- git repo used
        dir      text             not null,   -- directory relative to repo
        hash     varchar(8)       not null,   -- hash for the production setup
+       revision int,                         -- revision number
        primary key (name,build,dbtag,hash)
 )
 """
@@ -38,10 +39,9 @@ class SPhnxProductionSetup:
     repo:       str
     dir_:       str
     hash_:      str
-#   fromrun:    int
-#   lastrun:    int
     is_clean:   bool
     is_current: bool
+    version:   int = None
 
 
 
@@ -151,6 +151,23 @@ def sphnx_production_quality_table_def():
     );
     """
 
+#
+def sphnx_cups_stats():
+    return """
+    CREATE TABLE if not exists CUPS_STATS (
+       id        serial unique
+    ,  dstname   varchar(64) not null
+    ,  run       int         not null
+    ,  segment   int         not null
+    ,  update    varchar(32) not null
+    ,  started   timestamp   not null
+    ,  ended     timestamp   not null
+    ,  nattempts int         not null
+    ,  exception text        not null
+    ,  primary key(dstname,run,segment,update)
+    );
+    """
+#stat.write(f"{run},{seg},{dstname},{update},{upstart},{upend},{nattempts},{exception}\n") 
 
 #_____________________________________
 def sphnx_production_dataset():

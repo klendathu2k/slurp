@@ -16,7 +16,9 @@ import itertools
 from  glob import glob
 import math
 import platform
+from collections import defaultdict
 import random
+
 
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
@@ -174,6 +176,7 @@ verbose=0
 RUNFMT = "%08i"
 SEGFMT = "%05i"
 DSTFMT = "%s_%s_%s-" + RUNFMT + "-" + SEGFMT + ".root"
+DSTFMTv = "%s_%s_%s_%s-" + RUNFMT + "-" + SEGFMT + ".root"
 
 @dataclass
 class SPhnxCondorJob:
@@ -183,13 +186,10 @@ class SPhnxCondorJob:
     universe:              str = "vanilla"
     executable:            str = "jobwrapper.sh"    
     arguments:             str = "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
-    batch_name:            str = "$(name)_$(build)_$(tag)"
-    #output:                str = f"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).stdout"
-    #error:                 str = f"$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).stderr"
+    batch_name:            str = "$(name)_$(build)_$(tag)_$(version)"
     output:                str = None 
     error:                 str = None
     log:                   str = f"$(condor)/$(name)_$(build)_$(tag)-$INT(run,{RUNFMT})-$INT(seg,{SEGFMT}).condor"
-#   periodichold: 	   str = "(NumJobStarts>=1 && JobStatus == 1) || (NumJobStarts>=2 && JobStatus == 2)"
     periodichold: 	   str = "(NumJobStarts>=1 && JobStatus == 1)"
     priority:              str = "1958"
     job_lease_duration:    str = "3600"
@@ -198,13 +198,11 @@ class SPhnxCondorJob:
     request_memory:        str = "$(mem)"
     should_transfer_files: str = "YES"
     output_destination:    str = "file://./output/"
-    #output_destination:    str = "file:////sphenix/data/data02/sphnxpro/condorlog/$$($(run)/100)00"
     when_to_transfer_output: str = "ON_EXIT"
     request_disk:          str = None    
     initialdir:            str = None
     accounting_group:      str = None
     accounting_group_user: str = None
-#   transfer_output_files: str = "$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).out,$(name)_$(build)_$(tag)-$INT(run,%08d)-$INT(seg,%04d).err"
     transfer_output_files: str = '""'
     transfer_output_remaps: str = None
     
@@ -221,8 +219,7 @@ class SPhnxCondorJob:
 
     def __post_init__(self):
 
-        if args:
-            object.__setattr__( self, 'batch_name', args.batch_name )
+        pass
 
 @dataclass( frozen= __frozen__ )
 class SPhnxRule:
@@ -240,6 +237,7 @@ class SPhnxRule:
     payload:           str = "";      # Payload directory (condor transfers inputs from)
     limit:    int = 0                 # maximum number of matches to return 0=all
     runname:           str = None     # eg run2pp, extracted from name or ...
+    version:          str = None     # eg v001 
 
     def __eq__(self, that ):
         return self.name == that.name
@@ -264,6 +262,8 @@ class SPhnxRule:
         # Add to the global list of rules
         __rules__.append(self)
 
+        
+
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v is not None }        
         
@@ -281,7 +281,6 @@ class SPhnxMatch:
     mem:      str = None;        # Required memory
     disk:     str = None;        # Required disk space
     payload:  str = None;        # Payload directory (condor transfers inputs from)
-    #manifest: list[str] = field( default_factory=list );  # List of files in the payload directory
     stdout:   str = None; 
     stderr:   str = None; 
     condor:   str = None;
@@ -293,9 +292,9 @@ class SPhnxMatch:
     lastevent: str = None;
     runs_last_event: str = None;
     neventsper : str = None
-    #intputfile: str = None;
-    #outputfile: str = None;
-
+    streamname : str = None
+    streamfile : str = None
+    version: str = None
 
     def __eq__( self, that ):
         return self.run==that.run and self.seg==that.seg
@@ -308,17 +307,6 @@ class SPhnxMatch:
         object.__setattr__(self, 'build', b)                
         run = int(self.run)
         object.__setattr__(self, 'rungroup', f'{100*math.floor(run/100):08d}_{100*math.ceil((run+1)/100):08d}')
-
-        #sldir = "/tmp/slurp/%i"%( math.trunc(run/100)*100 )
-        #if self.condor == None: object.__setattr__(self, 'condor', sldir )
-        #sldir = "/sphenix/data/data02/sphnxpro/condorlogs/%i"%( math.trunc(run/100)*100 )            
-        #if self.stdout == None: object.__setattr__(self, 'stdout', sldir )
-        #if self.stderr == None: object.__setattr__(self, 'stderr', sldir )
-
-#    def __post_init__(self):
-#        if self.condor == None:
-#            a = int(self.run)
-#            self.condor = "/tmp/slurp/%i"%( math.trunc(a/100)*100 )
 
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
@@ -334,39 +322,24 @@ def table_exists( tablename ):
 
 
 
-def fetch_production_status( setup, runmn=0, runmx=-1, update=True, dstname=" " ):
+def fetch_production_status( setup, runmn=0, runmx=-1 ):
     """
     Given a production setup, returns the production status table....
     """
     result = [] # of SPhnxProductionStatus
 
-    name = "PRODUCTION_STATUS"
-    
-    if table_exists( name ):
+    query = f"select * from production_status where true"
+    if ( runmn>runmx ): 
+        query = query + f" and run>={runmn}"
+    else              : 
+        query = query + f" and run>={runmn} and run<={runmx}"
 
-        query = f"select * from {name} where true"
-        if ( runmn>runmx ): 
-            query = query + f" and run>={runmn}"
-        else              : 
-            query = query + f" and run>={runmn} and run<={runmx}"
+    query=query+";"
 
-        #if dstname is not None:
-        #    query = query + f" and dstfile like '{dstname}%'"
+    dbresult = dbQuery( cnxn_string_map['statusw'], query )
 
-        query=query+";"
-
-        dbresult = dbQuery( cnxn_string_map['statusw'], query )
-
-        # Transform the list of tuples from the db query to a list of prouction status dataclass objects
-        result = [ SPhnxProductionStatus( *db ) for db in dbresult if dstname in db.dstfile ]
-
-    elif update==True: # note: we should never reach this state ...  tables ought to exist already
-
-        create = sphnx_production_status_table_def( setup.name, setup.build, setup.dbtag )
-
-        statusdbw.execute(create) # 
-        statusdbw.commit()
-        
+    # Transform the list of tuples from the db query to a list of prouction status dataclass objects
+    result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
 
     return result
 
@@ -391,14 +364,6 @@ def fetch_invalid_run_entry( dstname, run, seg ):
         for db in 
                statusdbr.execute( query ).fetchall() 
     ]
-
-
-#def getLatestId( tablename, dstname, run, seg ):  # limited to status db
-#    query=f"""
-#    select id from {tablename} where dstname='{dstname}' and run={run} and segment={seg} order by id desc limit 1;
-#    """
-#    result = statusdbw.execute(query).fetchone()[0]
-#    return result
 
 def getLatestId( tablename, dstname, run, seg ):
 
@@ -447,13 +412,28 @@ def update_production_status( matching, setup, condor, state ):
 
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
 
-    name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
+    # TODO: version???  does setup get the v000 string or just 0?
+    name = sphenix_dstname( setup.name, setup.build, setup.dbtag, setup.version )
 
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
+        name    = str(m['name'])
+        version = m.get('version',None)
 
-        key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
+        streamname = m.get( 'streamname', None )
+        name_ = name
+        if streamname:
+            name_ = name.replace("$(streamname)",streamname)
+
+        # Does revison need to go into here???  YES YES YES.
+        dsttype = name_
+        dstname = dsttype +'_'+setup.build.replace(".","")+'_'+setup.dbtag
+        if setup.version is not None:
+            dstname = dstname + '_' + setup.version
+        dstfile = ( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
+
+        key     = dstfile
 
         try:
             cluster = condor_map[ key.lower() ][ 'ClusterId' ]
@@ -465,13 +445,9 @@ def update_production_status( matching, setup, condor, state ):
             cluster=0
             process=0
         
-        dsttype=setup.name
-        dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
-        dstfile=( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
 
         # 1s time resolution
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
-
         id_ = getLatestId( 'production_status', dstname, run, segment )
 
         update=f"""
@@ -486,9 +462,7 @@ def update_production_status( matching, setup, condor, state ):
 
 def insert_production_status( matching, setup, condor=[], state='submitting' ):
 
-    # Condor map contains a dictionary keyed on the "output" field of the job description.
-    # The map contains the cluster ID, the process ID, the arguments, and the output log.
-    # (This is the condor.stdout log...)
+    # Build the map of submitted jobs so that we can pull in the cluster and process id
     condor_map = {}
     for ad in condor:
         clusterId = ad['ClusterId']
@@ -496,27 +470,35 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         out       = ad['Out'].split('/')[-1]   # discard anything that looks like a filepath
         ulog      = ad['UserLog'].split('/')[-1] 
         key       = ulog.split('.')[0].lower()  # lowercase b/c referenced by file basename
-
         condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
 
-    # replace with sphenix_dstname( setup.name, setup.build, setup.dbtag )
-    name = sphenix_dstname( setup.name, setup.build, setup.dbtag )
-
+    # Prepare the insert for all matches that we are submitting to condor
     values = []
-
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
+        name    = m['name']
+        streamname = m.get( 'streamname', None )
+        name_ = name
+        if streamname:
+            name_ = name.replace("$(streamname)",streamname)
+
         dstfileinput = m['lfn'].split('.')[0]
 
-        # If the match contains a list of inputs... we will set it in the production status...
         if m['inputs']:
             dstfileinput=m['inputs']
-        key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment )
-        
-        dsttype=setup.name
-        dstname=setup.name+'_'+setup.build.replace(".","")+'_'+setup.dbtag
-        dstfile=( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)
+
+        # TODO: version ???
+        # TODO: is dstfile and key redundant ???
+        version = m.get('version',None)
+        dsttype = name_
+        dstname = dsttype +'_'+setup.build.replace(".","")+'_'+setup.dbtag
+        if version:
+            dstname = dstname + "_" + version  
+        dstfile = ( dstname + '-' + RUNFMT + '-' + SEGFMT ) % (run,segment)        
+
+        # TODO: version???
+        key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment, version )
         
         prod_id = setup.id
         try:
@@ -533,17 +515,16 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         # TODO: Handle conflict
         node=platform.node().split('.')[0]
 
-        insert=f"""
-        insert into production_status
-               (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents, submission_host )
+        value = f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" 
 
-        values ('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )
-        """
+        if streamname:
+            value = value.replace( '$(streamname)', streamname )
 
-        values.append( f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" )
-        
+        values.append( value )
+       
     insvals = ','.join(values)
 
+    # Inserts the production status lines for each match, returning the list of IDs associated with each match.
     insert = f"""
     insert into production_status
            (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents, submission_host )
@@ -552,10 +533,11 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
 
     returning id
     """
-    statusdbw.execute(insert)
-    # commit is deferred until the update succeeds
 
-    result=[ int(x.id) for x in statusdbw.fetchall() ]
+    # TODO: standardized query
+    statusdbw.execute(insert)    # commit is deferred until the update succeeds
+
+    result=[ int(x.id) for x in statusdbw ]
 
     return result
     
@@ -656,6 +638,7 @@ def submit( rule, maxjobs, **kwargs ):
         schedd = htcondor.Schedd()    
 
         runtypes = {}
+        streams  = {}
         # Strip out unused $(...) condor macros
         INFO("Converting matches to list of dictionaries for schedd...")
         mymatching = []
@@ -696,8 +679,9 @@ def submit( rule, maxjobs, **kwargs ):
                 if k in ['outdir','logdir','histdir','condor']:
                     m[k] = v.format( **locals() )
 
-                if k in str(submit_job):
+                if k in str(submit_job) or k=='streamname': # b/c it may not be declared in the arglist
                     d[k] = m[k]
+                    if k=='streamname': streams[ m[k] ] = 1
                
                 if args.dbinput: 
                     d['inputs']= 'dbinput'            
@@ -709,7 +693,7 @@ def submit( rule, maxjobs, **kwargs ):
                 
         run_submit_loop=30
         schedd_query = None
-        
+
         # Insert jobs into the production status table and add the ID to the dictionary
         INFO("... insert")
         cupsids = insert_production_status( matching, setup, [], state="submitting" ) 
@@ -734,18 +718,36 @@ def submit( rule, maxjobs, **kwargs ):
                 outdir = outdir.replace( '$(name)',     '{rule.name}' )
                 outdir = outdir.replace( '$(runname)',  '{rule.runname}' )
                 outdir = outdir.replace( '$(runtype)',  '{runtype}' )
-                                 
+
                 outdir = f'f"{outdir}"'
 
                 rungroups = {}
+                madedir = {}
                 for run in runlist:
                     mnrun = 100 * ( math.floor(run/100) )
                     mxrun = mnrun+100
                     rungroup=f'{mnrun:08d}_{mxrun:08d}'                
-                    for runtype in runtypes.keys():  # runtype is a possible KW in the yaml file that can be substituted
-                        pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
-                        INFO(f"mkdir {eval(outdir)}")
 
+                    for runtype in runtypes.keys():  # runtype is a possible KW in the yaml file that can be substituted
+                        targetdir = eval(outdir)
+                        
+                        if '$(streamname)' in targetdir: # ... 
+                            
+                            for mystreamname in streams.keys():
+                                
+                                if madedir.get( targetdir, False )==False:
+                                    td =  targetdir.replace('$(streamname)',mystreamname )
+                                    pathlib.Path( td ).mkdir( parents=True, exist_ok=True )            
+                                    INFO(f"mkdir {td}")
+                                    madedir[ td ]=True                                
+                                
+                        else:
+
+                            if madedir.get( targetdir, False )==False:
+                                pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
+                                INFO(f"mkdir {eval(outdir)}")
+                                madedir[targetdir]=True
+                                                            
             # submits the job to condor
             INFO("... submitting to condor")
 
@@ -796,39 +798,74 @@ def submit( rule, maxjobs, **kwargs ):
 
     return dispatched_runs
 
-def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
+def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, version=None ):
     """
     Fetches the production setup from the database for the given (name,build,dbtag,hash).
     If it doesn't exist in the DB it is created.  Queries the git repository to verify 
     that the local repo is clean and up to date with the remote.  Returns production setup
     object.
+
+    If provided, we look for a user-specified version number.
+
     """
+
+    # version is a string of the form v000... we need to convert in some places...
+    version_ = int(version.replace('v',''))
+
+    name=name_
+    if '$(streamname)' in name:
+        name = name.replace('$(streamname)','_X_')
 
     result = None # SPhnxProductionSetup
 
-    query="""
-    select id,hash from production_setup 
-           where name='%s'  and 
-                 build='%s' and 
-                 dbtag='%s' and 
-                 hash='%s'
-                 limit 1;
-    """%( name, build, dbtag, hash_ )
+    query = ""
+    if version is None:
+        query="""
+        select id,hash from production_setup 
+               where name='%s'  and 
+                   build='%s' and 
+                   dbtag='%s' and 
+                   hash='%s'
+                   limit 1;
+        """%( name, build, dbtag, hash_ )
+    else:
+
+
+        
+        query="""
+        select id,hash from production_setup 
+               where name='%s'  and 
+                   build='%s' and 
+                   dbtag='%s' and 
+                   hash='%s'  and
+                   revision=%i        
+                   limit 1;
+        """%( name, build, dbtag, hash_, version_ )        
     
-    #array = list( statusdbw.execute( query ).fetchall() )
     array = [ x for x in dbQuery( cnxn_string_map['statusw'], query ) ]
     assert( len(array)<2 )
 
     if   len(array)==0:
-        insert="""
-        insert into production_setup(name,build,dbtag,repo,dir,hash)
-               values('%s','%s','%s','%s','%s','%s');
-        """%(name,build,dbtag,repo,dir_,hash_)
+        insert=""
+        if version is None:
+            insert="""
+            insert into production_setup(name,build,dbtag,repo,dir,hash)
+                   values('%s','%s','%s','%s','%s','%s');
+            """%(name,build,dbtag,repo,dir_,hash_)
+        else:
+            insert="""
+            insert into production_setup(name,build,dbtag,repo,dir,hash,revision)
+                   values('%s','%s','%s','%s','%s','%s',%i);
+            """%(name,build,dbtag,repo,dir_,hash_,version_)
 
-        statusdbw.execute( insert )
-        statusdbw.commit()
+        try:
+            statusdbw.execute( insert )            
+            statusdbw.commit()
+        except Exception as e:
+            print(f"Could not execute: {insert}")
+            raise
 
-        result = fetch_production_setup(name, build, dbtag, repo, dir_, hash_)
+        result = fetch_production_setup(name, build, dbtag, repo, dir_, hash_, version)
 
     elif len(array)==1:
 
@@ -854,18 +891,25 @@ def fetch_production_setup( name, build, dbtag, repo, dir_, hash_ ):
         # 2) OR it exists... the repo and local directories do not matter... but if the hash
         #    has changed it is a problem...  
         # Should issue a warning before submitting in case clean or current is violated...
-        result=SPhnxProductionSetup( id_, name, build, dbtag, repo, dir_, hash_, is_clean, is_current )
+        result=SPhnxProductionSetup( id_, name, build, dbtag, repo, dir_, hash_, is_clean, is_current, version )
 
     return result
 
-        
-def sphenix_dstname( dsttype, build, dbtag ):
-    result = "%s_%s_%s"%( dsttype, build.replace(".",""), dbtag )
+
+def sphenix_dstname( dsttype, build, dbtag, version=None ):
+    if type(version)==int:
+        version_ = f'v{version:03d}'
+    else:
+        version_ = version
+    result = '_'.join( [x for x in [dsttype, build, dbtag, version_] if x] )
     return result
 
-def sphenix_base_filename( dsttype, build, dbtag, run, segment ):
-    #result = "%s-%08i-%04i" %( sphenix_dstname(dsttype, build, dbtag), int(run), int(segment) )
-    result = ("%s-" + RUNFMT + "-" + SEGFMT) % ( sphenix_dstname(dsttype, build, dbtag), int(run), int(segment) )
+def sphenix_base_filename( dsttype, build, dbtag, run, segment, version=None ):
+    if type(version)==int:
+        version_ = f'v{version:03d}'
+    else:
+        version_ = version    
+    result = ("%s-" + RUNFMT + "-" + SEGFMT) % ( sphenix_dstname(dsttype, build, dbtag, version), int(run), int(segment) )
     return result
     
 
@@ -881,7 +925,7 @@ def matches( rule, kwargs={} ):
 
     result = []
 
-    name      = kwargs.get('name',      rule.name)
+    name      = kwargs.get('name',      rule.name)       # Can we handle multiple names (eg DST_STREAMING_EVENT_TPCnn_run2pp) in a single submission?
     build     = kwargs.get('build',     rule.build)      # TODO... correct handling from submit.  build=ana.xyz --> build=anaxyz buildarg=ana.xyz
     buildarg  = kwargs.get('buildarg',  rule.buildarg)
     tag       = kwargs.get('tag',       rule.tag)
@@ -889,6 +933,8 @@ def matches( rule, kwargs={} ):
     resubmit  = kwargs.get('resubmit',  rule.resubmit)
     payload   = kwargs.get('payload',   rule.payload)
     update    = kwargs.get('update',    True ) # update the DB
+
+    version  = rule.version
 
     outputs = []
 
@@ -906,60 +952,125 @@ def matches( rule, kwargs={} ):
     runMin=999999
     runMax=0
     INFO("Building candidate inputs")
-    
+
+    dstnames = {}
+
     if rule.files:
         curs      = cursors[ rule.filesdb ]
 
         inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
 
         outputs = [] # WARNING: len(outputs) and len(fc_result) must be equal
-        
+
+        # This will hold the list of datasets which are present in the input query
         input_datasets = {}
 
+        # Matches the dsttype runtype 
+        regex_dset = re.compile( '(DST_[A-Z0-9_]+_[a-z0-9]+)_([a-z0-9]+_\d\d\d\dp\d\d\d)_*(v\d\d\d)*' )
+        
         INFO(f"... {len(fc_result)} inputs")
         for f in inputquery:
             fc_result.append(f) # cache the query
             run     = f.runnumber
             segment = f.segment
+            runsegkey = f"{run}-{segment}"
 
-            outputs.append( DSTFMT %(name,build,tag,int(run),int(segment)) )
+            streamname = getattr( f, 'streamname', None )
+            name_ = name
+            if streamname:
+                name_ = name.replace( '$(streamname)',streamname ) # hack in condor replacement
+                runsegkey = f"{run}-{segment}-{streamname}"
+
+
+            # This is where the candidate output filename is built...  
+            output_ = DSTFMT %(name_,build,tag,int(run),int(segment))
+
+            if version:
+                output_ = DSTFMTv %(name_,build,tag,str(version),int(run),int(segment))
+
+            outputs.append( output_ )
+
+            dstnames[ f"{name_}_{build}_{tag}" ] = (f'{name_}',f'{build}_{tag}')
+
 
             if run>runMax: runMax=run
             if run<runMin: runMin=run
+
             if lfn_lists.get(run,None) == None:
-                lfn_lists[ f"'{run}-{segment}'" ] = f.files.split()
-                rng_lists[ f"'{run}-{segment}'" ] = getattr( f, 'fileranges', '' ).split()
+                lfn_lists[ runsegkey ] = f.files.split()
+                rng_lists[ runsegkey ] = getattr( f, 'fileranges', '' ).split()
             else:
                 # If we hit this result, then the db query has resulted in two rows with identical
                 # run numbers.  Violating the implicit submission schema.
-                ERROR(f"Run number {run}-{segment} reached twice in this query...")
+                ERROR(f"Run number {runsegkey} reached twice in this query...")
                 ERROR(rule.files)
                 exit(1)
-                
-            # Drop the run and segment numbers and leading stuff and just pull the datasets
-            for fn in f.files.split():
-                base1 = fn.split('-')[0]
-                base2 = base1.split('_')[-2:]
-                input_datasets[ '_'.join(base2) ] = 1
+
+            #
+            # Drop the run and segment numbers and leading stuff and just pull the datasets.  Note.  When
+            # we switch up to versioning of the files, this will sweep up the version number as well.
+            # Do we want version to be part of the dataset, or a separate entity on its own?
+            #
+            # Additionally... we can no longer rely on just doing a split here UNLESS we are planning to
+            # have a complete break with backwards compatability... The dataset convention goes from
+            #
+            # anaIII_202JpKKK --> anaIII_202JpKKK_vMMM
+            #
+            # I can use a regex here instead.  But do we need to?  Do we want to?  I could see us making
+            # a complete break here... so that the old naming convention is just simply dropped dropped dropped
+            # and we reprocess.
+            #
+            # ... but we don't need to build this if we are using direct lookup
+            if rule.direct==None:            
+                for fn in f.files.split():
+                    base1 = fn.split('-')[0]
+                    rematch = regex_dset.match( base1 )
+                    dset = rematch.group(1)
+                    dtype = rematch.group(2)
+                    vnum = rematch.group(3)
+                    if vnum:
+                        dtype = dtype + '_' + vnum
+                        #input_datasets[ dset ] = 1
+                        input_datasets[ ( dset, dtype ) ] = 1
 
     
     if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
-    
+
+    #
     # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
     # we know that we do not have to produce it if it appears w/in the outputs list.
+    #
     dsttype="%s_%s_%s"%(name,build,tag)  # dsttype aka name above
     
     exists = {}
-    INFO("Building list of existing outputs")
-    chkq = f"select filename,runnumber,segment from datasets where runnumber>={runMin} and runnumber<={runMax} and filename like'"+dsttype+"%';"
-    for check in dbQuery( cnxn_string_map['fccro'], chkq ):
-        exists[ check.filename ] = ( check.runnumber, check.segment)  # key=filename, value=(run,seg)
+    INFO(f"Building list of existing outputs: # dstnames={len(dstnames.items())}")
+
+    for buildnametag, tuple_ in dstnames.items():
+        dt, ds = tuple_
+        exists.update( 
+            { 
+                c.filename : ( c.runnumber, c.segment ) for c in 
+                fccro.execute( f"select filename, runnumber, segment from datasets where runnumber>={runMin} and runnumber<={runMax} and dsttype='{dt}' and dataset='{ds}'" ) 
+            }
+        )
     INFO(f"... {len(exists.keys())} existing outputs")
 
 
 
-    # IF we are on a direct (disk) lookup for PFN lists, we will build a map of
-    # LFN to PFN here...
+    #
+    # lfn2pfn provides a mapping between physical files on disk and the corresponding lfn
+    # (i.e. the pfn with the directory path stripped off).
+    #
+    # A few notes.  This mapping will not be constrained to the set of input files provided
+    # by the query.  It will either be all files in the direct search path specified in the
+    # yaml file, OR it will be all files contained in the input data set(s).
+    #
+    # When running from the direct path there is the risk of duplicate entries... ymmv.
+    #
+    # When running from the file catalog... this will pull in all lfn/pfns from the
+    # datasets which appear in the input datasets.  We could extend this to use a
+    # tuple as the key, where the tuple is the dataset, dsttype pair.
+    #
     lfn2pfn = {}
     if rule.direct:
         INFO(f"Building lfn2pfn map from filesystem {rule.direct}")
@@ -969,13 +1080,21 @@ def matches( rule, kwargs={} ):
     else:
         INFO("Building lfn2pfn map from filecatalog")
 
-        for mydataset in input_datasets.keys():
+        for mydatasettuple in input_datasets.keys():
+
+            mydataset=mydatasettuple[0]
+            mydsttype=mydatasettuple[1]
         
             fcquery=f"""
 
             with lfnlist as (
    
-            select filename from datasets where runnumber>={runMin} and runnumber<={runMax} and dataset='{mydataset}'
+            select filename from datasets where 
+
+            runnumber>={runMin}   and 
+            runnumber<={runMax}   and 
+            dataset='{mydataset}' and 
+            dsttype='{mydsttype}'
 
             )
 
@@ -989,12 +1108,9 @@ def matches( rule, kwargs={} ):
 
                     
     # Build lists of PFNs available for each run
-    INFO("Building PFN lists")
+    INFO(f"Building PFN lists {len(lfn_lists)}")
     for runseg,lfns in lfn_lists.items():
 
-        runnumber, segment = runseg.strip("'").split('-')        
-        output = DSTFMT %(name,build,tag,int(runnumber),int(segment))
-        
         lfns_ = [ f"'{x}'" for x in lfns ]
         list_of_lfns = ','.join(lfns_)
 
@@ -1004,14 +1120,7 @@ def matches( rule, kwargs={} ):
 
         # Build list of PFNs via direct lookup and append the results
         try:
-            if rule.direct:
-
-                pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns] 
-
-                # Build list of PFNs via filecatalog lookup if direct path has not been specified
-            if rule.direct==None:            
-
-                pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns]
+            pfn_lists[runseg] = [lfn2pfn[lfn] for lfn in lfns] 
 
         except KeyError:
             print( "No PFN for all LFNs in the input query.")
@@ -1027,12 +1136,17 @@ def matches( rule, kwargs={} ):
     # The production setup will be unique based on (1) the specified analysis build, (2) the specified DB tag,
     # and (3) the hash of the local github repository where the payload scripts/macros are found.
     #
-    repo_dir  = payload #'/'.join(payload.split('/')[1:]) 
+    repo_dir  = payload 
     repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
     repo_url  = sh.git('config','--get','remote.origin.url',_cwd=payload ).rstrip()  # TODO: fix hardcoded directory
 
+    # Question is whether the production setup can / should have name replacement with the input stream.  
+    # Perhaps a placeholder substitution in the fetch / update / create methods.
+    #
+    # Version???
+    #
     INFO("Fetching production setup")
-    setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash )
+    setup = fetch_production_setup( name, buildarg, tag, repo_url, repo_dir, repo_hash, version )
     
     #
     # Returns the production status table from the database
@@ -1042,7 +1156,7 @@ def matches( rule, kwargs={} ):
         runMin=0
 
     INFO("Fetching production status")
-    prod_status = fetch_production_status ( setup, runMin, runMax, update, sphenix_dstname(setup.name,setup.build,setup.dbtag))  # between run min and run max inclusive
+    prod_status = fetch_production_status ( setup, runMin, runMax )  # between run min and run max inclusive
 
     #
     # Map the production status table onto the output filename.  We use this map later on to determine whether
@@ -1052,11 +1166,9 @@ def matches( rule, kwargs={} ):
     prod_status_map = {}
     INFO("Building production status map")    
     for stat in prod_status:
-        # replace with sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )
-        file_basename = sphenix_base_filename( setup.name, setup.build, setup.dbtag, stat.run, stat.segment )        # Not even sure how this was working???  This is the filename of the proposed job
-        fbn = stat.dstfile
-        prod_status_map[fbn] = stat.status  # supposed to be the map of the jobs which are in the production database to the filename of that job
+        prod_status_map[stat.dstfile] = stat.status 
 
+    INFO("Production status map")
 
     #
     # Build the list of matches.  We iterate over the fc_result zipped with the set of proposed outputs
@@ -1066,8 +1178,8 @@ def matches( rule, kwargs={} ):
     INFO("Building matches")
 
     assert( len(fc_result)==len(outputs) ) 
+    for (fc,dst) in zip(fc_result,outputs):
 
-    for (fc,dst) in zip(fc_result,outputs): # fcc.execute( rule.files ).fetchall():        
 
         lfn = fc.source
         run = fc.runnumber
@@ -1075,11 +1187,20 @@ def matches( rule, kwargs={} ):
         firstevent = getattr(fc,'firstevent',None)
         lastevent  = getattr(fc,'lastevent',None)
         runs_last_event = getattr(fc,'runs_last_event',None)
+        streamname = getattr(fc,'streamname',None)
+        streamfile = getattr(fc,'streamfile',None)
+
         if firstevent: firstevent=str(firstevent)
         if lastevent: lastevent=str(lastevent)
         if runs_last_event: runs_last_event=str(runs_last_event)
+        if streamname: streamname=str(streamname)
+        if streamfile: streamfile=str(streamfile)
 
         neventsper = getattr(fc,'neventsper',None)
+
+        runsegkey = f"{run}-{seg}"
+        if streamname:
+            runsegkey = f"{run}-{seg}-{streamname}"
                 
         #
         # Get the production status from the proposed output name
@@ -1111,31 +1232,29 @@ def matches( rule, kwargs={} ):
         # Check consistentcy between the LFN list (from input query) and PFN list (from file catalog query) 
         # for the current run.  Verify that the two lists are consistent.
         #
-        num_lfn = len( lfn_lists[f"'{run}-{seg}'"] )
-        num_pfn = len( pfn_lists[f"'{run}-{seg}'"] )
+        num_lfn = len( lfn_lists[ runsegkey ] )
+        num_pfn = len( pfn_lists[ runsegkey ] )
         sanity = True
-        pfn_check = [ x.split('/')[-1] for x in pfn_lists[f"'{run}-{seg}'"] ]
+        pfn_check = [ x.split('/')[-1] for x in pfn_lists[runsegkey] ]
         for x in pfn_check:
-            if x not in lfn_lists[f"'{run}-{seg}'"]:
+            if x not in lfn_lists[ runsegkey ]:
                 sanity = False
                 break
-
-        # TODO: Add MD5 check
 
         #
         # If there are more LFNs requested than exist on disk, OR if the lfn list does
         # not match the pfn list, then reject.
         #
         if num_lfn > num_pfn or sanity==False:
-            WARN(f"LFN list and PFN list are different.  Skipping this run {run} {seg}")
+            WARN(f"LFN list and PFN list are different.  Skipping this run {runsegkey}")
             WARN( f"{num_lfn} {num_pfn} {sanity}" )
-            for i in itertools.zip_longest( lfn_lists[f"'{run}-{seg}'"], pfn_lists[f"'{run}-{seg}'"] ):
+            for i in itertools.zip_longest( lfn_lists[runsegkey], pfn_lists[runsegkey] ):
                 print(i)
             continue
 
 
-        inputs_ = pfn_lists[f"'{run}-{seg}'"]
-        ranges_ = rng_lists[f"'{run}-{seg}'"]
+        inputs_ = pfn_lists[ runsegkey ]
+        ranges_ = rng_lists[ runsegkey ]
         
 
         #
@@ -1145,9 +1264,6 @@ def matches( rule, kwargs={} ):
         if test and resubmit:
             WARN("%s exists and will be overwritten"%dst)
 
-        #
-        #
-        #
         if True:
 
             if verbose>10:
@@ -1158,15 +1274,6 @@ def matches( rule, kwargs={} ):
 
             if inputs_:
                 myinputs = ' '.join(inputs_) ### ??????
-
-            # Direct lookup used in event builder jobs and implies we should obtain our
-            # inputs from the database
-            #
-            #if inputs_ and rule.direct:
-            #    myinputs = "dbinputs"
-            #
-
-
 
             if ranges_:
                 myranges = ' '.join(ranges_)
@@ -1194,6 +1301,9 @@ def matches( rule, kwargs={} ):
                 lastevent=lastevent,
                 runs_last_event=runs_last_event,
                 neventsper=neventsper,
+                streamname=streamname,
+                streamfile=streamfile,
+                version=version
                 )
 
             match = match.dict()
@@ -1230,7 +1340,7 @@ arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, act
 arg_parser.add_argument( "--dbinput", default=True, action="store_true",help="Passes input filelist through the production status db rather than the argument list of the production script." )
 arg_parser.add_argument( "--no-dbinput", dest="dbinput", action="store_false",help="Unsets dbinput flag." )
 
-arg_parser.add_argument( "--batch-name", dest="batch_name", default="$(name)_$(build)_$(tag)" )
+arg_parser.add_argument( "--batch-name", dest="batch_name", default=None ) #default="$(name)_$(build)_$(tag)_$(version)"
 
 def warn_options( args, userargs ):
     if args.dbinput==False:
