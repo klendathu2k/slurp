@@ -99,14 +99,22 @@ def sanity_checks( params, inputq ):
         logging.error( f'params.dbtag {params["dbtag"]} cannot contain an underscore' )
         result = False
 
+    build = params['build']
+    rev   = params.get( 'version', None )
+
+    if rev is None:
+        params['version']=0
+        rev = 0
+
+    assert ( rev >= 0 )
     
-    # 
-    # The input query should be of the form
-    #
-    # select dummy as source, runnumber, segment (as segment), list of input files as files, list of file ranges as ranges
-    # it must not do any updates, writes, etc...
-    # 
-    
+    if rev==0 and build != 'new':
+        logging.error( f'production version must be nonzero for fixed builds' )
+        result = False
+
+    if rev!=0 and build == 'new':
+        logging.error( 'production version must be zero for new build' )
+        result = False
     
     return result
 
@@ -293,10 +301,27 @@ def main():
     for k,v in filesystem_.items():
         filesystem[k] = v
 
+            
     # Mangle directory path is specified.  Production is replaced with...
     if filesystem and args.mangle_dirpath:
         for key,val in filesystem.items():
             filesystem[key]=filesystem[key].replace("production",args.mangle_dirpath)
+
+    # Version number will default to zero
+    version_number = params.get('version',0)
+    if version_number is not None:
+        version_number = f"v{version_number:03d}"
+
+
+    # If we have a version number futher manipulate the directory structure...
+    if version_number is not None:
+        for key,val in filesystem.items():
+            filesystem[key]=filesystem[key].replace("{leafdir}","{leafdir}/"+f"{version_number}")        
+        
+        
+
+
+            
 
     if args.test_mode:
         print("[TESTMODE: print filesystem block]")
@@ -312,7 +337,6 @@ def main():
 
     # Do not submit if we fail sanity check on definition file
     if sanity_checks( params, input_ ) == False:        exit(1)
-
 
     if runlist_query =='': runlist_query = None
     if input_query   =='': input_query   = None
@@ -364,6 +388,7 @@ def main():
     # Perform job submission IFF we have the params, input_query, filesystem
     # and job blocks
     #
+        
     if args.submit and params and input_query and filesystem and job:
         dst_rule = Rule( name              = params['name'],
                          files             = input_query,
@@ -375,7 +400,8 @@ def main():
                          tag               = params['dbtag'],
                          payload           = params['payload'],
                          job               = job,
-                         limit             = args.limit
+                         limit             = args.limit,
+                         version          = version_number
                      )
 
 
