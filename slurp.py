@@ -674,7 +674,6 @@ def submit( rule, maxjobs, **kwargs ):
             if m.get('ranges',None):
                 m['ranges']= ','.join( m['ranges'].split() )
 
-            #pprint.pprint(m)
             for k,v in m.items():
 
                 if k in ['outdir','logdir','histdir','condor']:
