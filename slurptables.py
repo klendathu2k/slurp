@@ -41,7 +41,7 @@ class SPhnxProductionSetup:
     hash_:      str
     is_clean:   bool
     is_current: bool
-    revision:   int = None
+    version:   int = None
 
 
 

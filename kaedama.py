@@ -101,7 +101,7 @@ def sanity_checks( params, inputq ):
 
 
     build = params['build']
-    rev   = params.get( 'revision', 0 )
+    rev   = params.get( 'version', 0 )
     assert ( rev >= 0 )
     
     if rev==0 and build != 'new':
@@ -303,15 +303,15 @@ def main():
         for key,val in filesystem.items():
             filesystem[key]=filesystem[key].replace("production",args.mangle_dirpath)
 
-    revision_number = params.get('revision',None)
-    if revision_number is not None:
-        revision_number = f"v{revision_number:03d}"
+    version_number = params.get('version',None)
+    if version_number is not None:
+        version_number = f"v{version_number:03d}"
 
 
-    # If we have a revision number futher manipulate the directory structure...
-    if revision_number is not None:
+    # If we have a version number futher manipulate the directory structure...
+    if version_number is not None:
         for key,val in filesystem.items():
-            filesystem[key]=filesystem[key].replace("{leafdir}","{leafdir}/"+f"{revision_number}")        
+            filesystem[key]=filesystem[key].replace("{leafdir}","{leafdir}/"+f"{version_number}")        
         
         
 
@@ -397,7 +397,7 @@ def main():
                          payload           = params['payload'],
                          job               = job,
                          limit             = args.limit,
-                         revision          = revision_number
+                         version          = version_number
                      )
 
 
