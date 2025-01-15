@@ -59,10 +59,10 @@ arg_parser.add_argument( '--append-to-rsync', dest='append2rsync', default=None,
 # testbed setups.
 #
 _default_filesystem = {
-        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)/dst"
-    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)/log"
-    ,   'histdir' :        "/sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)/hist"
-    ,   'condor'  :                                 "/tmp/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)"    
+        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/dst"
+    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/log"
+    ,   'histdir' :        "/sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/hist"
+    ,   'condor'  :                                 "/tmp/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)"    
 }
 
 def sanity_checks( params, inputq ):
@@ -314,9 +314,9 @@ def main():
 
 
     # If we have a version number futher manipulate the directory structure...
-    if version_number is not None:
-        for key,val in filesystem.items():
-            filesystem[key]=filesystem[key].replace("{leafdir}","{leafdir}/"+f"{version_number}")        
+    #if version_number is not None:
+    #    for key,val in filesystem.items():
+    #        filesystem[key]=filesystem[key].replace("{leafdir}","{leafdir}/"+f"{version_number}")        
         
         
 

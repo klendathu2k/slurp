@@ -709,6 +709,7 @@ def submit( rule, maxjobs, **kwargs ):
 
                 outdir=kwargs.get(outname,None)
                 if outdir==None: continue
+
                 outdir = outdir.replace('file:/','')
                 outdir = outdir.replace('//','/')
 
@@ -716,6 +717,7 @@ def submit( rule, maxjobs, **kwargs ):
                 outdir = outdir.replace( '$(build)',    '{rule.build}' )
                 outdir = outdir.replace( '$(tag)',      '{rule.tag}' )
                 outdir = outdir.replace( '$(name)',     '{rule.name}' )
+                outdir = outdir.replace( '$(version)',  '{rule.version}' )
                 outdir = outdir.replace( '$(runname)',  '{rule.runname}' )
                 outdir = outdir.replace( '$(runtype)',  '{runtype}' )
 
@@ -730,7 +732,7 @@ def submit( rule, maxjobs, **kwargs ):
 
                     for runtype in runtypes.keys():  # runtype is a possible KW in the yaml file that can be substituted
                         targetdir = eval(outdir)
-                        
+
                         if '$(streamname)' in targetdir: # ... 
                             
                             for mystreamname in streams.keys():
@@ -747,7 +749,7 @@ def submit( rule, maxjobs, **kwargs ):
                                 pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
                                 INFO(f"mkdir {eval(outdir)}")
                                 madedir[targetdir]=True
-                                                            
+
             # submits the job to condor
             INFO("... submitting to condor")
 
