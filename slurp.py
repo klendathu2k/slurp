@@ -76,9 +76,9 @@ except pyodbc.Error as e:
     print(e)
     exit(0)
 
-fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
-fccro = fcro.cursor()
-printDbInfo( fcro, "File Catalog [reads]" )
+#fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
+#fccro = fcro.cursor()
+#printDbInfo( fcro, "File Catalog [reads]" )
 
 try:
     daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;READONLY=True");
@@ -1021,7 +1021,7 @@ def matches( rule, kwargs={} ):
         exists.update( 
             { 
                 c.filename : ( c.runnumber, c.segment ) for c in 
-                fccro.execute( f"select filename, runnumber, segment from datasets where runnumber>={runMin} and runnumber<={runMax} and dsttype='{dt}' and dataset='{ds}'" ) 
+                dbQuery( cnxn_string_map['fccro'], f"select filename, runnumber, segment from datasets where runnumber>={runMin} and runnumber<={runMax} and dsttype='{dt}' and dataset='{ds}'" )
             }
         )
     INFO(f"... {len(exists.keys())} existing outputs")
