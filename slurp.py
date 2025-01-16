@@ -54,28 +54,6 @@ def printDbInfo( cnxn, title ):
     serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
     print(f"Connected {name} from {serv} as {title}")
 
-
-try:
-    statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
-    statusdbw = statusdbw_.cursor()
-    printDbInfo( statusdbw_, "Production Status Table [writes]" )
-
-except (pyodbc.InterfaceError) as e:
-    for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
-        print(f"Could not connect to DB... retry in {s}s")
-        time.sleep(s)
-        try:
-            statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
-            statusdbw = statusdbw_.cursor()
-            break
-        except:
-            pass
-    else:
-        exit(0) # no break in for loop
-except pyodbc.Error as e:
-    print(e)
-    exit(0)
-
 #fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
 #fccro = fcro.cursor()
 #printDbInfo( fcro, "File Catalog [reads]" )
