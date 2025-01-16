@@ -107,12 +107,9 @@ except:
     daqdb = None
     daqc = None
 
-
-
-rawdr_ = pyodbc.connect("DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True")
-rawdr  = rawdr_.cursor()
-printDbInfo( rawdr_, "RAW database [reads]" )
-
+#rawdr_ = pyodbc.connect("DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True")
+#rawdr  = rawdr_.cursor()
+#printDbInfo( rawdr_, "RAW database [reads]" )
 
 cnxn_string_map = {
     'daq'         : 'DSN=daq;UID=phnxrc;READONLY=True',
