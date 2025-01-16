@@ -107,11 +107,11 @@ cnxn_string_map = {
 
 def dbQuery( cnxn_string, query, ntries=10 ):
 
-    # Some guard rails
+    # A guard rail
     assert( 'delete' not in query.lower() )    
-    assert( 'insert' not in query.lower() )    
-    assert( 'update' not in query.lower() )    
-    assert( 'select'     in query.lower() )
+    #assert( 'insert' not in query.lower() )    
+    #assert( 'update' not in query.lower() )    
+    #assert( 'select'     in query.lower() )
 
     lastException = None
     
