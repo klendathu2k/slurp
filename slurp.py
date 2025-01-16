@@ -430,7 +430,7 @@ def update_production_status( matching, setup, condor, state ):
     curs = dbQuery( cnxn_string_map[ 'statusw' ], ';'.join(updates)  )
     curs.commit()
 
-def insert_production_status( matching, setup, condor=[], state='submitting' ):
+def insert_production_status( matching, setup, condor=[], state='submitting', cursor=statusdbw ):
 
     # Prepare the insert for all matches that we are submitting to condor
     values = []
@@ -493,7 +493,7 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
     """
 
     # TODO: standardized query
-    statusdbw.execute(insert)    # commit is deferred until the update succeeds
+    cursor.execute(insert)    # commit is deferred until the update succeeds
 
     result=[ int(x.id) for x in statusdbw ]
 
