@@ -430,7 +430,9 @@ def update_production_status( matching, setup, condor, state ):
     curs = dbQuery( cnxn_string_map[ 'statusw' ], ';'.join(updates)  )
     curs.commit()
 
-def insert_production_status( matching, setup, condor=[], state='submitting', cursor=statusdbw ):
+def insert_production_status( matching, setup, cursor ):
+
+    state='submitting'
 
     # Prepare the insert for all matches that we are submitting to condor
     values = []
@@ -659,7 +661,7 @@ def submit( rule, maxjobs, **kwargs ):
         cursorips = dbQuery( cnxn_string_map['statusw'], 'select id from production_status where false;' )
 
         # Perform the insert
-        cupsids = insert_production_status( matching, setup, condor=[], state="submitting", cursor=cursorips ) 
+        cupsids = insert_production_status( matching, setup, cursor=cursorips ) 
         for i,m in zip(cupsids,mymatching):
             m['cupsid']=str(i)
 
