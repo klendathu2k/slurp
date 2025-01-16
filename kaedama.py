@@ -119,13 +119,13 @@ def sanity_checks( params, inputq ):
     return result
 
 
-def dbconsistency():
-    try:
-        idw = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
-        idr = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
-    except:
-        logging.warn( "Read and write instance of status db are out of sync / or could not connect to one or both." )
-    return (idr,idw)
+#def dbconsistency():
+#    try:
+#        idw = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
+#        idr = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
+#    except:
+#        logging.warn( "Read and write instance of status db are out of sync / or could not connect to one or both." )
+#    return (idr,idw)
 
 def checkRequiredParams( params ):
 
@@ -183,20 +183,20 @@ def main():
     )
 
 
-    # require consistent database
-    (idr, idw) = dbconsistency()
-    count=0
-    while idr < idw:
-        logging.warning(f"DB inconsistency.  Master at {idw} replica at {idr}.")
-        if count==5: 
-            logging.warning("Timeout after 5 min")
-            return
-        count=count+1
-        time.sleep(60)
-        (idr, idw) = dbconsistency()        
+#    # require consistent database
+#    (idr, idw) = dbconsistency()
+#    count=0
+#    while idr < idw:
+#        logging.warning(f"DB inconsistency.  Master at {idw} replica at {idr}.")
+#        if count==5: 
+#            logging.warning("Timeout after 5 min")
+#            return
+#        count=count+1
+#        time.sleep(60)
+#        (idr, idw) = dbconsistency()        
 
-    logging.info(f"Executing kaedama on {platform.node()} pid {os.getpid()}")
-    logging.info(f"DB consistency.  Master at {idw} replica at {idr}.")
+#    logging.info(f"Executing kaedama on {platform.node()} pid {os.getpid()}")
+#    logging.info(f"DB consistency.  Master at {idw} replica at {idr}.")
 
     config={}
     with open(args.config,"r") as stream:
