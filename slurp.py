@@ -384,6 +384,7 @@ def update_production_status( matching, setup, condor, state ):
     # TODO: version???  does setup get the v000 string or just 0?
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag, setup.version )
 
+    updates = []
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
@@ -422,11 +423,11 @@ def update_production_status( matching, setup, condor, state ):
         update=f"""
         update  production_status
         set     status='{state}',{state}='{timestamp}',cluster={cluster},process={process}
-        where id={id_}
+        where id={id_};
         """
-        
-        statusdbw.execute(update)
+        updates.append( update )
 
+    statusdbw.execute( ';' . join( updates ) )
     statusdbw.commit()
 
 def insert_production_status( matching, setup, condor=[], state='submitting' ):
