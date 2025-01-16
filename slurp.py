@@ -830,12 +830,8 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, version=None
                    values('%s','%s','%s','%s','%s','%s',%i);
             """%(name,build,dbtag,repo,dir_,hash_,version_)
 
-        try:
-            statusdbw.execute( insert )            
-            statusdbw.commit()
-        except Exception as e:
-            print(f"Could not execute: {insert}")
-            raise
+        curs = dbQuery( cnxn_string_map['statusw'], insert )
+        curs.commit()
 
         result = fetch_production_setup(name, build, dbtag, repo, dir_, hash_, version)
 
