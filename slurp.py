@@ -495,7 +495,7 @@ def insert_production_status( matching, setup, condor=[], state='submitting', cu
     # TODO: standardized query
     cursor.execute(insert)    # commit is deferred until the update succeeds
 
-    result=[ int(x.id) for x in statusdbw ]
+    result=[ int(x.id) for x in cursor ]
 
     return result
     
@@ -654,7 +654,12 @@ def submit( rule, maxjobs, **kwargs ):
 
         # Insert jobs into the production status table and add the ID to the dictionary
         INFO("... insert")
-        cupsids = insert_production_status( matching, setup, condor=[], state="submitting" ) 
+
+        # Grab a cursor
+        cursorips = dbQuery( cnxn_string_map['statusw'], 'select id from production_status where false;' )
+
+        # Perform the insert
+        cupsids = insert_production_status( matching, setup, condor=[], state="submitting", cursor=cursorips ) 
         for i,m in zip(cupsids,mymatching):
             m['cupsid']=str(i)
 
@@ -713,11 +718,11 @@ def submit( rule, maxjobs, **kwargs ):
 
             submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
             # commits the insert done above
-            statusdbw.commit()
+            cursorips.commit()
 
         except:
             # if condor did not accept the jobs, rollback to the previous state and 
-            statusdbw.rollback()
+            cursorips.rollback()
             raise
             
         INFO("Getting back the cluster and process IDs")
