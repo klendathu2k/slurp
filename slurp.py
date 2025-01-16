@@ -427,8 +427,8 @@ def update_production_status( matching, setup, condor, state ):
         """
         updates.append( update )
 
-    statusdbw.execute( ';' . join( updates ) )
-    statusdbw.commit()
+    curs = dbQuery( cnxn_string_map[ 'statusw' ], ';'.join(updates)  )
+    curs.commit()
 
 def insert_production_status( matching, setup, condor=[], state='submitting' ):
 
