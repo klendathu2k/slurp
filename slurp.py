@@ -43,33 +43,10 @@ userargs = None
 __frozen__ = True
 __rules__  = []
 
-# File Catalog (and file catalog cursor)
-# TODO: exception handling... if we can't connect, retry at some randomized point in the future.
-# ... and set a limit on the number of retries before we bomb out ...
-#fc = pyodbc.connect("DSN=FileCatalog")
-#fcc = fc.cursor()
-
 def printDbInfo( cnxn, title ):
     name=cnxn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
     serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
     print(f"Connected {name} from {serv} as {title}")
-
-#fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
-#fccro = fcro.cursor()
-#printDbInfo( fcro, "File Catalog [reads]" )
-
-#try:
-#    daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;READONLY=True");
-#    daqc = daqdb.cursor()
-#    printDbInfo( daqdb, "DAQ database [reads]" )
-#
-#except:
-#    daqdb = None
-#    daqc = None
-
-#rawdr_ = pyodbc.connect("DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True")
-#rawdr  = rawdr_.cursor()
-#printDbInfo( rawdr_, "RAW database [reads]" )
 
 cnxn_string_map = {
     'daq'         : 'DSN=daq;UID=phnxrc;READONLY=True',
