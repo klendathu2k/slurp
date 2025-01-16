@@ -66,9 +66,9 @@ def sphnx_production_status_table_def( dsttype=None, build=None, dbtag=None ):
 CREATE TABLE if not exists PRODUCTION_STATUS
 (
        id        serial          unique  ,   -- unique identifier
-       dsttype   varchar(16)     not null,   -- dst type eg DST_CALO
-       dstname   varchar(32)     not null,   -- dst name eg DST_CALO_auau1_ana387_2023p003
-       dstfile   varchar(64)     not null,   --          eg DST_CALO_auau1_ana387_2023p003-12345678-1234.root
+       dsttype   varchar(32)     not null,   -- dst type eg DST_CALO
+       dstname   varchar(64)     not null,   -- dst name eg DST_CALO_auau1_ana387_2023p003
+       dstfile   varchar(128)    not null,   --          eg DST_CALO_auau1_ana387_2023p003-12345678-1234.root
        run       int             not null,   -- runnumber
        segment   int             not null,   -- segment number
        nsegments int             not null,   -- number of produced segments
@@ -233,3 +233,4 @@ class SPhnxInvalidRunList:
     created_at: str
     expires_at: str
     
+

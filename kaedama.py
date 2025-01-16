@@ -13,8 +13,6 @@ from slurp import matches
 from slurp import submit
 
 from slurp import arg_parser
-from slurp import fccro as fcc  # production status DB cursor
-from slurp import daqc 
 
 #from slurp import RUNFMT
 #from slurp import SEGFMT
@@ -26,7 +24,7 @@ import os
 
 import platform
 
-from slurp import cursors
+#from slurp import cursors
 
 import logging
 from logging.handlers import RotatingFileHandler
@@ -59,10 +57,10 @@ arg_parser.add_argument( '--append-to-rsync', dest='append2rsync', default=None,
 # testbed setups.
 #
 _default_filesystem = {
-        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)/dst"
-    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)/log"
-    ,   'histdir' :        "/sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)/hist"
-    ,   'condor'  :                                 "/tmp/production/$(runname)/$(runtype)/$(build)_$(tag)/{leafdir}/run_$(rungroup)"    
+        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/dst"
+    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/log"
+    ,   'histdir' :        "/sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/hist"
+    ,   'condor'  :                                 "/tmp/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)"    
 }
 
 def sanity_checks( params, inputq ):
@@ -119,13 +117,13 @@ def sanity_checks( params, inputq ):
     return result
 
 
-def dbconsistency():
-    try:
-        idw = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
-        idr = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
-    except:
-        logging.warn( "Read and write instance of status db are out of sync / or could not connect to one or both." )
-    return (idr,idw)
+#def dbconsistency():
+#    try:
+#        idw = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
+#        idr = slurp.statusdbw.execute( "select id from production_status order by id desc limit 1" ).fetchone().id
+#    except:
+#        logging.warn( "Read and write instance of status db are out of sync / or could not connect to one or both." )
+#    return (idr,idw)
 
 def checkRequiredParams( params ):
 
@@ -183,20 +181,20 @@ def main():
     )
 
 
-    # require consistent database
-    (idr, idw) = dbconsistency()
-    count=0
-    while idr < idw:
-        logging.warning(f"DB inconsistency.  Master at {idw} replica at {idr}.")
-        if count==5: 
-            logging.warning("Timeout after 5 min")
-            return
-        count=count+1
-        time.sleep(60)
-        (idr, idw) = dbconsistency()        
+#    # require consistent database
+#    (idr, idw) = dbconsistency()
+#    count=0
+#    while idr < idw:
+#        logging.warning(f"DB inconsistency.  Master at {idw} replica at {idr}.")
+#        if count==5: 
+#            logging.warning("Timeout after 5 min")
+#            return
+#        count=count+1
+#        time.sleep(60)
+#        (idr, idw) = dbconsistency()        
 
-    logging.info(f"Executing kaedama on {platform.node()} pid {os.getpid()}")
-    logging.info(f"DB consistency.  Master at {idw} replica at {idr}.")
+#    logging.info(f"Executing kaedama on {platform.node()} pid {os.getpid()}")
+#    logging.info(f"DB consistency.  Master at {idw} replica at {idr}.")
 
     config={}
     with open(args.config,"r") as stream:
@@ -314,9 +312,9 @@ def main():
 
 
     # If we have a version number futher manipulate the directory structure...
-    if version_number is not None:
-        for key,val in filesystem.items():
-            filesystem[key]=filesystem[key].replace("{leafdir}","{leafdir}/"+f"{version_number}")        
+    #if version_number is not None:
+    #    for key,val in filesystem.items():
+    #        filesystem[key]=filesystem[key].replace("{leafdir}","{leafdir}/"+f"{version_number}")        
         
         
 
@@ -346,18 +344,18 @@ def main():
     # Pre Submission Phase... execute the action script on the results of the 
     # specified query to the specified database.
     #__________________________________________________________________________________
-    if presubmit:
-        cursor=cursors[ presubmit.get('db','fcc') ]
-        pre_query  = presubmit.get('query', '').format(**locals())
-        result_ = [ list(x) 
-            for x in  cursor.execute(pre_query).fetchall() 
-        ]
-        for result in result_:
-            query      = ' '.join([ str(x) for x in result ])
-            pre_action = presubmit.get('action','').format( **locals())
-            pre_action = pre_action.split()
-            actor=sh.Command( pre_action[0] )
-            actor( *pre_action[1:], _out=sys.stdout )
+    #if presubmit:
+    #    cursor=cursors[ presubmit.get('db','fcc') ]
+    #    pre_query  = presubmit.get('query', '').format(**locals())
+    #    result_ = [ list(x) 
+    #        for x in  cursor.execute(pre_query).fetchall() 
+    #    ]
+    #    for result in result_:
+    #        query      = ' '.join([ str(x) for x in result ])
+    #        pre_action = presubmit.get('action','').format( **locals())
+    #        pre_action = pre_action.split()
+    #        actor=sh.Command( pre_action[0] )
+    #        actor( *pre_action[1:], _out=sys.stdout )
 
 
     #__________________________________________________________________________________

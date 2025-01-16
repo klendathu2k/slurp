@@ -43,86 +43,10 @@ userargs = None
 __frozen__ = True
 __rules__  = []
 
-# File Catalog (and file catalog cursor)
-# TODO: exception handling... if we can't connect, retry at some randomized point in the future.
-# ... and set a limit on the number of retries before we bomb out ...
-#fc = pyodbc.connect("DSN=FileCatalog")
-#fcc = fc.cursor()
-
 def printDbInfo( cnxn, title ):
     name=cnxn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
     serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
     print(f"Connected {name} from {serv} as {title}")
-
-try:
-    statusdbr_ = pyodbc.connect("DSN=ProductionStatus")    
-    statusdbr = statusdbr_.cursor()
-    printDbInfo( statusdbr_, "Production Status Table [reads]" )
-
-except pyodbc.InterfaceError:
-    for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
-        print(f"Could not connect to DB... retry in {s}s")
-        time.sleep(s)
-        try:
-            statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
-            statusdbr = statusdbr_.cursor()
-        except:
-            exit(0)
-except pyodbc.Error as e:
-    print(e)
-    exit(0)
-
-
-try:
-    statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
-    statusdbw = statusdbw_.cursor()
-    printDbInfo( statusdbw_, "Production Status Table [writes]" )
-
-except (pyodbc.InterfaceError) as e:
-    for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
-        print(f"Could not connect to DB... retry in {s}s")
-        time.sleep(s)
-        try:
-            statusdbw_ = pyodbc.connect("DSN=ProductionStatusWrite")
-            statusdbw = statusdbw_.cursor()
-            break
-        except:
-            pass
-    else:
-        exit(0) # no break in for loop
-except pyodbc.Error as e:
-    print(e)
-    exit(0)
-
-fcro  = pyodbc.connect("DSN=FileCatalog;READONLY=True")
-fccro = fcro.cursor()
-printDbInfo( fcro, "File Catalog [reads]" )
-
-try:
-    daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;READONLY=True");
-    daqc = daqdb.cursor()
-    printDbInfo( daqdb, "DAQ database [reads]" )
-
-except:
-    daqdb = None
-    daqc = None
-
-
-
-rawdr_ = pyodbc.connect("DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True")
-rawdr  = rawdr_.cursor()
-printDbInfo( rawdr_, "RAW database [reads]" )
-
-cursors = { 
-    'daq':rawdr,
-    'fc':fccro,
-    'fccro':fccro,
-    'daqdb':rawdr,
-    'filecatalog': fccro,
-    'status' : statusdbr,
-    'raw':rawdr,
-    'rawdr':rawdr,
-}
 
 cnxn_string_map = {
     'daq'         : 'DSN=daq;UID=phnxrc;READONLY=True',
@@ -138,11 +62,11 @@ cnxn_string_map = {
 
 def dbQuery( cnxn_string, query, ntries=10 ):
 
-    # Some guard rails
+    # A guard rail
     assert( 'delete' not in query.lower() )    
-    assert( 'insert' not in query.lower() )    
-    assert( 'update' not in query.lower() )    
-    assert( 'select'     in query.lower() )
+    #assert( 'insert' not in query.lower() )    
+    #assert( 'update' not in query.lower() )    
+    #assert( 'select'     in query.lower() )
 
     lastException = None
     
@@ -312,13 +236,13 @@ class SPhnxMatch:
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
 
-def table_exists( tablename ):
-    """
-    """ 
-    result = False
-    if statusdbr.tables( table=tablename.lower(), tableType='TABLE' ).fetchone():
-        result = True
-    return result
+#def table_exists( tablename ):
+#    """
+#    """ 
+#    result = False
+#    if statusdbr.tables( table=tablename.lower(), tableType='TABLE' ).fetchone():
+#        result = True
+#    return result
 
 
 
@@ -343,27 +267,27 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
 
     return result
 
-def fetch_invalid_run_entry( dstname, run, seg ):
-    query = f"""
-    select 
-    ,   id
-    ,   dstname
-    ,   first_run
-    ,   last_run
-    ,   first_segment
-    ,   last_segment
-        expires_at at time zone 'utc' as expires 
-        from invalid_run_list
-    where 
-        (dstname='{dstname}' or dstname='all' or dstname='ALL' ) and first_run<={run} and ( last_run>={run} or last_run=-1 ) and first_segment<={segment} and last_segment>={segment};       
-    """
-
-
-    return [ 
-        SPhnxInvalidRunList(*db) 
-        for db in 
-               statusdbr.execute( query ).fetchall() 
-    ]
+#def fetch_invalid_run_entry( dstname, run, seg ):
+#    query = f"""
+#    select 
+#    ,   id
+#    ,   dstname
+#    ,   first_run
+#    ,   last_run
+#    ,   first_segment
+#    ,   last_segment
+#        expires_at at time zone 'utc' as expires 
+#        from invalid_run_list
+#    where 
+#        (dstname='{dstname}' or dstname='all' or dstname='ALL' ) and first_run<={run} and ( last_run>={run} or last_run=-1 ) and first_segment<={segment} and last_segment>={segment};       
+#    """
+#
+#
+#    return [ 
+#        SPhnxInvalidRunList(*db) 
+#        for db in 
+#               statusdbr.execute( query ).fetchall() 
+#    ]
 
 def getLatestId( tablename, dstname, run, seg ):
 
@@ -415,6 +339,7 @@ def update_production_status( matching, setup, condor, state ):
     # TODO: version???  does setup get the v000 string or just 0?
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag, setup.version )
 
+    updates = []
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
@@ -453,24 +378,16 @@ def update_production_status( matching, setup, condor, state ):
         update=f"""
         update  production_status
         set     status='{state}',{state}='{timestamp}',cluster={cluster},process={process}
-        where id={id_}
+        where id={id_};
         """
-        
-        statusdbw.execute(update)
+        updates.append( update )
 
-    statusdbw.commit()
+    curs = dbQuery( cnxn_string_map[ 'statusw' ], ';'.join(updates)  )
+    curs.commit()
 
-def insert_production_status( matching, setup, condor=[], state='submitting' ):
+def insert_production_status( matching, setup, cursor ):
 
-    # Build the map of submitted jobs so that we can pull in the cluster and process id
-    condor_map = {}
-    for ad in condor:
-        clusterId = ad['ClusterId']
-        procId    = ad['ProcId']
-        out       = ad['Out'].split('/')[-1]   # discard anything that looks like a filepath
-        ulog      = ad['UserLog'].split('/')[-1] 
-        key       = ulog.split('.')[0].lower()  # lowercase b/c referenced by file basename
-        condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
+    state='submitting'
 
     # Prepare the insert for all matches that we are submitting to condor
     values = []
@@ -501,12 +418,10 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment, version )
         
         prod_id = setup.id
-        try:
-            cluster = condor_map[ key.lower() ][ 'ClusterId' ]
-            process = condor_map[ key.lower() ][ 'ProcId'    ]
-        except KeyError:
-            cluster = 0
-            process = 0
+
+        # Cluster and process are unset during at this pint
+        cluster = 0
+        process = 0
 
         status  = state        
 
@@ -535,9 +450,9 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
     """
 
     # TODO: standardized query
-    statusdbw.execute(insert)    # commit is deferred until the update succeeds
+    cursor.execute(insert)    # commit is deferred until the update succeeds
 
-    result=[ int(x.id) for x in statusdbw ]
+    result=[ int(x.id) for x in cursor ]
 
     return result
     
@@ -696,7 +611,12 @@ def submit( rule, maxjobs, **kwargs ):
 
         # Insert jobs into the production status table and add the ID to the dictionary
         INFO("... insert")
-        cupsids = insert_production_status( matching, setup, [], state="submitting" ) 
+
+        # Grab a cursor
+        cursorips = dbQuery( cnxn_string_map['statusw'], 'select id from production_status where false;' )
+
+        # Perform the insert
+        cupsids = insert_production_status( matching, setup, cursor=cursorips ) 
         for i,m in zip(cupsids,mymatching):
             m['cupsid']=str(i)
 
@@ -709,6 +629,7 @@ def submit( rule, maxjobs, **kwargs ):
 
                 outdir=kwargs.get(outname,None)
                 if outdir==None: continue
+
                 outdir = outdir.replace('file:/','')
                 outdir = outdir.replace('//','/')
 
@@ -716,6 +637,7 @@ def submit( rule, maxjobs, **kwargs ):
                 outdir = outdir.replace( '$(build)',    '{rule.build}' )
                 outdir = outdir.replace( '$(tag)',      '{rule.tag}' )
                 outdir = outdir.replace( '$(name)',     '{rule.name}' )
+                outdir = outdir.replace( '$(version)',  '{rule.version}' )
                 outdir = outdir.replace( '$(runname)',  '{rule.runname}' )
                 outdir = outdir.replace( '$(runtype)',  '{runtype}' )
 
@@ -730,7 +652,7 @@ def submit( rule, maxjobs, **kwargs ):
 
                     for runtype in runtypes.keys():  # runtype is a possible KW in the yaml file that can be substituted
                         targetdir = eval(outdir)
-                        
+
                         if '$(streamname)' in targetdir: # ... 
                             
                             for mystreamname in streams.keys():
@@ -747,17 +669,17 @@ def submit( rule, maxjobs, **kwargs ):
                                 pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
                                 INFO(f"mkdir {eval(outdir)}")
                                 madedir[targetdir]=True
-                                                            
+
             # submits the job to condor
             INFO("... submitting to condor")
 
             submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
             # commits the insert done above
-            statusdbw.commit()
+            cursorips.commit()
 
         except:
             # if condor did not accept the jobs, rollback to the previous state and 
-            statusdbw.rollback()
+            cursorips.rollback()
             raise
             
         INFO("Getting back the cluster and process IDs")
@@ -858,12 +780,8 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, version=None
                    values('%s','%s','%s','%s','%s','%s',%i);
             """%(name,build,dbtag,repo,dir_,hash_,version_)
 
-        try:
-            statusdbw.execute( insert )            
-            statusdbw.commit()
-        except Exception as e:
-            print(f"Could not execute: {insert}")
-            raise
+        curs = dbQuery( cnxn_string_map['statusw'], insert )
+        curs.commit()
 
         result = fetch_production_setup(name, build, dbtag, repo, dir_, hash_, version)
 
@@ -956,7 +874,7 @@ def matches( rule, kwargs={} ):
     dstnames = {}
 
     if rule.files:
-        curs      = cursors[ rule.filesdb ]
+        # curs      = cursors[ rule.filesdb ]
 
         inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
 
@@ -1050,7 +968,7 @@ def matches( rule, kwargs={} ):
         exists.update( 
             { 
                 c.filename : ( c.runnumber, c.segment ) for c in 
-                fccro.execute( f"select filename, runnumber, segment from datasets where runnumber>={runMin} and runnumber<={runMax} and dsttype='{dt}' and dataset='{ds}'" ) 
+                dbQuery( cnxn_string_map['fccro'], f"select filename, runnumber, segment from datasets where runnumber>={runMin} and runnumber<={runMax} and dsttype='{dt}' and dataset='{ds}'" )
             }
         )
     INFO(f"... {len(exists.keys())} existing outputs")
