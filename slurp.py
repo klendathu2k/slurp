@@ -113,16 +113,16 @@ rawdr_ = pyodbc.connect("DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True")
 rawdr  = rawdr_.cursor()
 printDbInfo( rawdr_, "RAW database [reads]" )
 
-cursors = { 
-    'daq':rawdr,
-    'fc':fccro,
-    'fccro':fccro,
-    'daqdb':rawdr,
-    'filecatalog': fccro,
-    'status' : statusdbr,
-    'raw':rawdr,
-    'rawdr':rawdr,
-}
+#cursors = { 
+#    'daq':rawdr,
+#    'fc':fccro,
+#    'fccro':fccro,
+#    'daqdb':rawdr,
+#    'filecatalog': fccro,
+#    'status' : statusdbr,
+#    'raw':rawdr,
+#    'rawdr':rawdr,
+#}
 
 cnxn_string_map = {
     'daq'         : 'DSN=daq;UID=phnxrc;READONLY=True',
@@ -958,7 +958,7 @@ def matches( rule, kwargs={} ):
     dstnames = {}
 
     if rule.files:
-        curs      = cursors[ rule.filesdb ]
+        # curs      = cursors[ rule.filesdb ]
 
         inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
 
