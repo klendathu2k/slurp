@@ -26,7 +26,7 @@ import os
 
 import platform
 
-from slurp import cursors
+#from slurp import cursors
 
 import logging
 from logging.handlers import RotatingFileHandler
@@ -346,18 +346,18 @@ def main():
     # Pre Submission Phase... execute the action script on the results of the 
     # specified query to the specified database.
     #__________________________________________________________________________________
-    if presubmit:
-        cursor=cursors[ presubmit.get('db','fcc') ]
-        pre_query  = presubmit.get('query', '').format(**locals())
-        result_ = [ list(x) 
-            for x in  cursor.execute(pre_query).fetchall() 
-        ]
-        for result in result_:
-            query      = ' '.join([ str(x) for x in result ])
-            pre_action = presubmit.get('action','').format( **locals())
-            pre_action = pre_action.split()
-            actor=sh.Command( pre_action[0] )
-            actor( *pre_action[1:], _out=sys.stdout )
+    #if presubmit:
+    #    cursor=cursors[ presubmit.get('db','fcc') ]
+    #    pre_query  = presubmit.get('query', '').format(**locals())
+    #    result_ = [ list(x) 
+    #        for x in  cursor.execute(pre_query).fetchall() 
+    #    ]
+    #    for result in result_:
+    #        query      = ' '.join([ str(x) for x in result ])
+    #        pre_action = presubmit.get('action','').format( **locals())
+    #        pre_action = pre_action.split()
+    #        actor=sh.Command( pre_action[0] )
+    #        actor( *pre_action[1:], _out=sys.stdout )
 
 
     #__________________________________________________________________________________
