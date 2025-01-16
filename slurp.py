@@ -58,14 +58,14 @@ def printDbInfo( cnxn, title ):
 #fccro = fcro.cursor()
 #printDbInfo( fcro, "File Catalog [reads]" )
 
-try:
-    daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;READONLY=True");
-    daqc = daqdb.cursor()
-    printDbInfo( daqdb, "DAQ database [reads]" )
-
-except:
-    daqdb = None
-    daqc = None
+#try:
+#    daqdb = pyodbc.connect("DSN=daq;UID=phnxrc;READONLY=True");
+#    daqc = daqdb.cursor()
+#    printDbInfo( daqdb, "DAQ database [reads]" )
+#
+#except:
+#    daqdb = None
+#    daqc = None
 
 #rawdr_ = pyodbc.connect("DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True")
 #rawdr  = rawdr_.cursor()

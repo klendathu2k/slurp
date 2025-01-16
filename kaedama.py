@@ -13,7 +13,6 @@ from slurp import matches
 from slurp import submit
 
 from slurp import arg_parser
-from slurp import daqc 
 
 #from slurp import RUNFMT
 #from slurp import SEGFMT
