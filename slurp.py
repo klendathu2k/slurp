@@ -299,13 +299,13 @@ class SPhnxMatch:
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
 
-def table_exists( tablename ):
-    """
-    """ 
-    result = False
-    if statusdbr.tables( table=tablename.lower(), tableType='TABLE' ).fetchone():
-        result = True
-    return result
+#def table_exists( tablename ):
+#    """
+#    """ 
+#    result = False
+#    if statusdbr.tables( table=tablename.lower(), tableType='TABLE' ).fetchone():
+#        result = True
+#    return result
 
 
 
