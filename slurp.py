@@ -432,16 +432,6 @@ def update_production_status( matching, setup, condor, state ):
 
 def insert_production_status( matching, setup, condor=[], state='submitting' ):
 
-    # Build the map of submitted jobs so that we can pull in the cluster and process id
-    condor_map = {}
-    for ad in condor:
-        clusterId = ad['ClusterId']
-        procId    = ad['ProcId']
-        out       = ad['Out'].split('/')[-1]   # discard anything that looks like a filepath
-        ulog      = ad['UserLog'].split('/')[-1] 
-        key       = ulog.split('.')[0].lower()  # lowercase b/c referenced by file basename
-        condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
-
     # Prepare the insert for all matches that we are submitting to condor
     values = []
     for m in matching:
@@ -471,12 +461,10 @@ def insert_production_status( matching, setup, condor=[], state='submitting' ):
         key = sphenix_base_filename( setup.name, setup.build, setup.dbtag, run, segment, version )
         
         prod_id = setup.id
-        try:
-            cluster = condor_map[ key.lower() ][ 'ClusterId' ]
-            process = condor_map[ key.lower() ][ 'ProcId'    ]
-        except KeyError:
-            cluster = 0
-            process = 0
+
+        # Cluster and process are unset during at this pint
+        cluster = 0
+        process = 0
 
         status  = state        
 
