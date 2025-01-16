@@ -666,7 +666,7 @@ def submit( rule, maxjobs, **kwargs ):
 
         # Insert jobs into the production status table and add the ID to the dictionary
         INFO("... insert")
-        cupsids = insert_production_status( matching, setup, [], state="submitting" ) 
+        cupsids = insert_production_status( matching, setup, condor=[], state="submitting" ) 
         for i,m in zip(cupsids,mymatching):
             m['cupsid']=str(i)
 
