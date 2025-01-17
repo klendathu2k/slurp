@@ -1087,22 +1087,22 @@ def matches( rule, kwargs={} ):
             INFO( f"Local and remote hash are {localhash} {remothash} ... we are running under new, so go for it!" )
         else:
             WARN( f"""
-
+        
             Jobs will not be submitted.
-
+            
             Local and remote hash DO NOT match in the payload directory {localhash} {remothash}.
             
             You are running in a production environment.  In order to ensure reproducibility of results
             we require that the payload area is under version control (git), and that the local and remote
             git hashes match.  
-
+            
             If you need to test a small change, you should place them on a branch.  (Do a git stash, 
             create the new branch, do a git stash pop and add your codes to the branch.  Push to
             the remote and run your jobs).
-
+            
             If you are making a significant change that needs to be tracked, consider also incrementing
             the version number of the production.
-            """
+            """ )
             exit(0)
 
 
