@@ -884,7 +884,7 @@ def matches( rule, kwargs={} ):
         input_datasets = {}
 
         # Matches the dsttype runtype 
-        regex_dset = re.compile( '(DST_[A-Z0-9_]+_[a-z0-9]+)_([a-z0-9]+_\d\d\d\dp\d\d\d)_*(v\d\d\d)*' )
+        regex_dset = re.compile( '(DST_[A-Z0-9_]+_[a-z0-9]+)_([a-z0-9]+_(\d\d\d\dp\d\d\d|nocdbtag))_*(v\d\d\d)*' )
         
         INFO(f"... {len(fc_result)} inputs")
         for f in inputquery:
@@ -945,7 +945,7 @@ def matches( rule, kwargs={} ):
                     rematch = regex_dset.match( base1 )
                     dset = rematch.group(1)
                     dtype = rematch.group(2)
-                    vnum = rematch.group(3)
+                    vnum = rematch.group(4)
                     if vnum:
                         dtype = dtype + '_' + vnum
                         #input_datasets[ dset ] = 1
@@ -1000,9 +1000,9 @@ def matches( rule, kwargs={} ):
 
         for mydatasettuple in input_datasets.keys():
 
-            mydataset=mydatasettuple[0]
-            mydsttype=mydatasettuple[1]
-        
+            mydataset=mydatasettuple[1]
+            mydsttype=mydatasettuple[0]
+
             fcquery=f"""
 
             with lfnlist as (
