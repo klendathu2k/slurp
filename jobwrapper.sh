@@ -1,5 +1,8 @@
 #!/usr/bin/bash 
 
+# Jobwrapper will set an alma9 container when the ana build is alma9.  Otherwise
+# it runs the SL7 container.
+
 # Create an initialization script on the worker node to get around singularity
 cat <<EOF > sPHENIX_INIT
 
@@ -26,12 +29,19 @@ echo $@
 container=/cvmfs/sphenix.sdcc.bnl.gov/singularity/rhic_sl7.sif
 #container=/cvmfs/sphenix.sdcc.bnl.gov/singularity/sdcc_a9.sif
 
-export userscript=$1       # this is the executable script
-export cupsid=${@: -1:1}                         # this is the ID of the job on the production system
+export userscript=$1                               # this is the executable script
+export cupsid=${@: -1:1}                           # this is the ID of the job on the production system
+                                                   # payload and subdir are nominally specified in the yaml file
 export payload=( `echo ${@: -2:1} | tr ","  " "` ) # comma sep list --> array of files to stage in
-export subdir=${@: -3:1}                         # ... relative to the submission directory
+export subdir=${@: -3:1}                           # ... relative to the submission directory
 
-
+if [[ $subdir  =~ "*testbed*" ]]; then
+    echo "Running in a testbed environment"
+    export CUPS_TESTBED_MODE=true
+else
+    echo "Running in a production environment"
+    export CUPS_PRODUCTION_MODE=true    
+fi
 
 myArgs=( "$@")
 shift

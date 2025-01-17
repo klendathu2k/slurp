@@ -21,17 +21,27 @@ import platform
 
 MAXDSTNAMES = 100
 
+if ( os.environ.get('CUPS_PRODUCTION_MODE',False) ):
+    dsnprodr = 'ProductionStatus'
+    dsnprodw = 'ProductionStatusWrite'
+    dsnfiler = 'FileCatalog'
+    dsnfilew = 'FileCatalog'
+else:
+    dsnprodr = 'ProductionStatus'
+    dsnprodw = 'ProductionStatusWrite'
+    dsnfiler = 'FileCatalog'
+    dsnfilew = 'FileCatalog'        
+
 def printDbInfo( cnxn, title ):
     name=cnxn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
     serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
     print(f"Connected {name} from {serv} as {title}")
 
-
 cnxn_string_map = {
-    'fcw'         : 'DSN=FileCatalog;UID=phnxrc',
-    'fcr'         : 'DSN=FileCatalog;READONLY=True;UID=phnxrc',
-    'statr'       : 'DSN=ProductionStatus',
-    'statw'       : 'DSN=ProductionStatusWrite',
+    'fcw'         : f'DSN={dsnfilew};UID=phnxrc',
+    'fcr'         : f'DSN={dsnfiler};READONLY=True;UID=phnxrc',
+    'statr'       : f'DSN={dsnprodr}',
+    'statw'       : f'DSN={dsnprodw}',
 }    
 
 def dbQuery( cnxn_string, query, ntries=10 ):
