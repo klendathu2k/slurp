@@ -50,12 +50,15 @@ def printDbInfo( cnxn, title ):
 
 
 # Check if we are running within a testbed area
+PRODUCTION_MODE=False
+
 if 'testbed' in str(pathlib.Path(".").absolute()).lower():
     dsnprodr = 'ProductionStatus'
     dsnprodw = 'ProductionStatusWrite'
     dsnfiler = 'FileCatalog'
     dsnfilew = 'FileCatalog'
 else:
+    PRODUCTION_MODE=True
     dsnprodr = 'ProductionStatus'
     dsnprodw = 'ProductionStatusWrite'
     dsnfiler = 'FileCatalog'
@@ -802,7 +805,6 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, version=None
 
     elif len(array)==1:
 
-
         # Check to see if the payload has any local modifications
         is_clean = len( sh.git("-c","color.status=no","status","-uno","--short",_cwd=dir_).strip().split('\n') ) == 0;
 
@@ -1072,6 +1074,39 @@ def matches( rule, kwargs={} ):
     repo_dir  = payload 
     repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
     repo_url  = sh.git('config','--get','remote.origin.url',_cwd=payload ).rstrip()  # TODO: fix hardcoded directory
+
+
+    if PRODUCTION_MODE:
+
+        localhash = sh.git('show','origin/master','--format=%h','-s',_cwd=payload).rstrip()
+        remothash = sh.git('show',                '--format=%h','-s',_cwd=payload).rstrip()
+
+        if localhash==remothash:
+            INFO( f"Local and remote hash match in the payload directory {localhash} {remothash}" )
+        elif build=='new': 
+            INFO( f"Local and remote hash are {localhash} {remothash} ... we are running under new, so go for it!" )
+        else:
+            WARN( f"""
+
+            Jobs will not be submitted.
+
+            Local and remote hash DO NOT match in the payload directory {localhash} {remothash}.
+            
+            You are running in a production environment.  In order to ensure reproducibility of results
+            we require that the payload area is under version control (git), and that the local and remote
+            git hashes match.  
+
+            If you need to test a small change, you should place them on a branch.  (Do a git stash, 
+            create the new branch, do a git stash pop and add your codes to the branch.  Push to
+            the remote and run your jobs).
+
+            If you are making a significant change that needs to be tracked, consider also incrementing
+            the version number of the production.
+            """
+            exit(0)
+
+
+    
 
     # Question is whether the production setup can / should have name replacement with the input stream.  
     # Perhaps a placeholder substitution in the fetch / update / create methods.
