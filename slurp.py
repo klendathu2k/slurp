@@ -48,17 +48,35 @@ def printDbInfo( cnxn, title ):
     serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
     print(f"Connected {name} from {serv} as {title}")
 
+
+# Check if we are running within a testbed area
+PRODUCTION_MODE=False
+
+if 'testbed' in str(pathlib.Path(".").absolute()).lower():
+    dsnprodr = 'ProductionStatus'
+    dsnprodw = 'ProductionStatusWrite'
+    dsnfiler = 'FileCatalog'
+    dsnfilew = 'FileCatalog'
+else:
+    PRODUCTION_MODE=True
+    dsnprodr = 'ProductionStatus'
+    dsnprodw = 'ProductionStatusWrite'
+    dsnfiler = 'FileCatalog'
+    dsnfilew = 'FileCatalog'    
+    
 cnxn_string_map = {
-    'daq'         : 'DSN=daq;UID=phnxrc;READONLY=True',
-    'daqdb'       : 'DSN=daq;UID=phnxrc;READONLY=True',
-    'fc'          : 'DSN=FileCatalog;READONLY=True',
-    'fccro'       : 'DSN=FileCatalog;READONLY=True',
-    'filecatalog' : 'DSN=FileCatalog;READONLY=True',
-    'status'      : 'DSN=ProductionStatus',
-    'statusw'     : 'DSN=ProductionStatusWrite',
-    'raw'         : 'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
-    'rawdr'       : 'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
+    'daq'         :  'DSN=daq;UID=phnxrc;READONLY=True',
+    'daqdb'       :  'DSN=daq;UID=phnxrc;READONLY=True',
+    'fc'          : f'DSN={dsnfiler};READONLY=True',
+    'fccro'       : f'DSN={dsnfiler};READONLY=True',
+    'filecatalog' : f'DSN={dsnfiler};READONLY=True',
+    'status'      : f'DSN={dsnprodr}',
+    'statusw'     : f'DSN={dsnprodw}',
+    'raw'         :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
+    'rawdr'       :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
 }
+
+pprint.pprint( cnxn_string_map )
 
 def dbQuery( cnxn_string, query, ntries=10 ):
 
@@ -787,7 +805,6 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, version=None
 
     elif len(array)==1:
 
-
         # Check to see if the payload has any local modifications
         is_clean = len( sh.git("-c","color.status=no","status","-uno","--short",_cwd=dir_).strip().split('\n') ) == 0;
 
@@ -884,7 +901,7 @@ def matches( rule, kwargs={} ):
         input_datasets = {}
 
         # Matches the dsttype runtype 
-        regex_dset = re.compile( '(DST_[A-Z0-9_]+_[a-z0-9]+)_([a-z0-9]+_\d\d\d\dp\d\d\d)_*(v\d\d\d)*' )
+        regex_dset = re.compile( '(DST_[A-Z0-9_]+_[a-z0-9]+)_([a-z0-9]+_(\d\d\d\dp\d\d\d|nocdbtag))_*(v\d\d\d)*' )
         
         INFO(f"... {len(fc_result)} inputs")
         for f in inputquery:
@@ -945,7 +962,7 @@ def matches( rule, kwargs={} ):
                     rematch = regex_dset.match( base1 )
                     dset = rematch.group(1)
                     dtype = rematch.group(2)
-                    vnum = rematch.group(3)
+                    vnum = rematch.group(4)
                     if vnum:
                         dtype = dtype + '_' + vnum
                         #input_datasets[ dset ] = 1
@@ -1000,9 +1017,9 @@ def matches( rule, kwargs={} ):
 
         for mydatasettuple in input_datasets.keys():
 
-            mydataset=mydatasettuple[0]
-            mydsttype=mydatasettuple[1]
-        
+            mydataset=mydatasettuple[1]
+            mydsttype=mydatasettuple[0]
+
             fcquery=f"""
 
             with lfnlist as (
@@ -1057,6 +1074,39 @@ def matches( rule, kwargs={} ):
     repo_dir  = payload 
     repo_hash = sh.git('rev-parse','--short','HEAD',_cwd=payload).rstrip()
     repo_url  = sh.git('config','--get','remote.origin.url',_cwd=payload ).rstrip()  # TODO: fix hardcoded directory
+
+
+    if PRODUCTION_MODE:
+
+        localhash = sh.git('show','origin/master','--format=%h','-s',_cwd=payload).rstrip()
+        remothash = sh.git('show',                '--format=%h','-s',_cwd=payload).rstrip()
+
+        if localhash==remothash:
+            INFO( f"Local and remote hash match in the payload directory {localhash} {remothash}" )
+        elif build=='new': 
+            INFO( f"Local and remote hash are {localhash} {remothash} ... we are running under new, so go for it!" )
+        else:
+            WARN( f"""
+        
+            Jobs will not be submitted.
+            
+            Local and remote hash DO NOT match in the payload directory {localhash} {remothash}.
+            
+            You are running in a production environment.  In order to ensure reproducibility of results
+            we require that the payload area is under version control (git), and that the local and remote
+            git hashes match.  
+            
+            If you need to test a small change, you should place them on a branch.  (Do a git stash, 
+            create the new branch, do a git stash pop and add your codes to the branch.  Push to
+            the remote and run your jobs).
+            
+            If you are making a significant change that needs to be tracked, consider also incrementing
+            the version number of the production.
+            """ )
+            exit(0)
+
+
+    
 
     # Question is whether the production setup can / should have name replacement with the input stream.  
     # Perhaps a placeholder substitution in the fetch / update / create methods.
