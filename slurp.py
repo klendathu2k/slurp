@@ -48,17 +48,32 @@ def printDbInfo( cnxn, title ):
     serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
     print(f"Connected {name} from {serv} as {title}")
 
+
+# Check if we are running within a testbed area
+if 'testbed' in str(pathlib.Path(".").absolute()).lower():
+    dsnprodr = 'ProductionStatus'
+    dsnprodw = 'ProductionStatusWrite'
+    dsnfiler = 'FileCatalog'
+    dsnfilew = 'FileCatalog'
+else:
+    dsnprodr = 'ProductionStatus'
+    dsnprodw = 'ProductionStatusWrite'
+    dsnfiler = 'FileCatalog'
+    dsnfilew = 'FileCatalog'    
+    
 cnxn_string_map = {
-    'daq'         : 'DSN=daq;UID=phnxrc;READONLY=True',
-    'daqdb'       : 'DSN=daq;UID=phnxrc;READONLY=True',
-    'fc'          : 'DSN=FileCatalog;READONLY=True',
-    'fccro'       : 'DSN=FileCatalog;READONLY=True',
-    'filecatalog' : 'DSN=FileCatalog;READONLY=True',
-    'status'      : 'DSN=ProductionStatus',
-    'statusw'     : 'DSN=ProductionStatusWrite',
-    'raw'         : 'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
-    'rawdr'       : 'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
+    'daq'         :  'DSN=daq;UID=phnxrc;READONLY=True',
+    'daqdb'       :  'DSN=daq;UID=phnxrc;READONLY=True',
+    'fc'          : f'DSN={dsnfiler};READONLY=True',
+    'fccro'       : f'DSN={dsnfiler};READONLY=True',
+    'filecatalog' : f'DSN={dsnfiler};READONLY=True',
+    'status'      : f'DSN={dsnprodr}',
+    'statusw'     : f'DSN={dsnprodw}',
+    'raw'         :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
+    'rawdr'       :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
 }
+
+pprint.pprint( cnxn_string_map )
 
 def dbQuery( cnxn_string, query, ntries=10 ):
 
