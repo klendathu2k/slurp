@@ -27,10 +27,10 @@ if ( os.environ.get('CUPS_PRODUCTION_MODE',False) ):
     dsnfiler = 'FileCatalog'
     dsnfilew = 'FileCatalog'
 else:
-    dsnprodr = 'ProductionStatus'
-    dsnprodw = 'ProductionStatusWrite'
+    dsnprodr = 'Production_read'
+    dsnprodw = 'Production_write'
     dsnfiler = 'FileCatalog'
-    dsnfilew = 'FileCatalog'        
+    dsnfilew = 'FileCatalog'    
 
 def printDbInfo( cnxn, title ):
     name=cnxn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
@@ -40,8 +40,8 @@ def printDbInfo( cnxn, title ):
 cnxn_string_map = {
     'fcw'         : f'DSN={dsnfilew};UID=phnxrc',
     'fcr'         : f'DSN={dsnfiler};READONLY=True;UID=phnxrc',
-    'statr'       : f'DSN={dsnprodr}',
-    'statw'       : f'DSN={dsnprodw}',
+    'statr'       : f'DSN={dsnprodr};UID=argouser',
+    'statw'       : f'DSN={dsnprodw};UID=argouser',
 }    
 
 def dbQuery( cnxn_string, query, ntries=10 ):
