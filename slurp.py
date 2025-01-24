@@ -968,7 +968,6 @@ def matches( rule, kwargs={} ):
                     vnum = rematch.group(4)
                     if vnum:
                         dtype = dtype + '_' + vnum
-                        #input_datasets[ dset ] = 1
                         input_datasets[ ( dset, dtype ) ] = 1
 
     
