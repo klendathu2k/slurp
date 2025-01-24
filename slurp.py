@@ -59,8 +59,8 @@ if 'testbed' in str(pathlib.Path(".").absolute()).lower():
     dsnfilew = 'FileCatalog'
 else:
     PRODUCTION_MODE=True
-    dsnprodr = 'ProductionStatus'
-    dsnprodw = 'ProductionStatusWrite'
+    dsnprodr = 'Production_read'
+    dsnprodw = 'Production_write'
     dsnfiler = 'FileCatalog'
     dsnfilew = 'FileCatalog'    
     
