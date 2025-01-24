@@ -18,19 +18,22 @@ import hashlib
 import os
 import shutil
 import platform
+from pathlib import Path
 
 MAXDSTNAMES = 100
 
 if ( os.environ.get('CUPS_PRODUCTION_MODE',False) ):
-    dsnprodr = 'ProductionStatus'
-    dsnprodw = 'ProductionStatusWrite'
-    dsnfiler = 'FileCatalog'
-    dsnfilew = 'FileCatalog'
-else:
     dsnprodr = 'Production_read'
     dsnprodw = 'Production_write'
     dsnfiler = 'FileCatalog'
     dsnfilew = 'FileCatalog'    
+else:
+    dsnprodr = 'ProductionStatus'
+    dsnprodw = 'ProductionStatusWrite'
+    dsnfiler = 'FileCatalog'
+    dsnfilew = 'FileCatalog'
+
+
 
 def printDbInfo( cnxn, title ):
     name=cnxn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
