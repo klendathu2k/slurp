@@ -960,6 +960,7 @@ def matches( rule, kwargs={} ):
             #
             # ... but we don't need to build this if we are using direct lookup
             if rule.direct==None:            
+
                 for fn in f.files.split():
                     base1 = fn.split('-')[0]
                     rematch = regex_dset.match( base1 )
@@ -1022,6 +1023,8 @@ def matches( rule, kwargs={} ):
             mydataset=mydatasettuple[1]
             mydsttype=mydatasettuple[0]
 
+            INFO( f'lfn map query for {mydataset} {mydsttype}' )
+
             fcquery=f"""
 
             with lfnlist as (
@@ -1079,33 +1082,42 @@ def matches( rule, kwargs={} ):
 
 
     if PRODUCTION_MODE:
+        # git branch --show-current
+        localbranch = sh.git( 'branch', '--show-current', _cwd=payload ).strip()
 
-        localhash = sh.git('show','origin/master','--format=%h','-s',_cwd=payload).rstrip()
-        remothash = sh.git('show',                '--format=%h','-s',_cwd=payload).rstrip()
+        #localhash = sh.git('show','--format=%H','-s','--no-abbrev-commit',_cwd=payload).strip()[:40]
+        localhash    = sh.git('rev-parse','HEAD', _cwd=payload).strip()[:40]
+        remotehashes = [ f.strip()[:40] for f in sh.git('rev-list','--all',f'origin/{localbranch}', _cwd=payload) ]
 
-        if localhash==remothash:
-            INFO( f"Local and remote hash match in the payload directory {localhash} {remothash}" )
+        if localhash.strip() in remotehashes:
+            INFO( f"Local and remote hash match in the payload directory {localhash}.  You may proceed." )
         elif build=='new': 
-            INFO( f"Local and remote hash are {localhash} {remothash} ... we are running under new, so go for it!" )
+            INFO( f"Local hash not found in remote {localhash} ... we are running under new, so go for it!" )
         else:
             WARN( f"""
-        
-            Jobs will not be submitted.
+
+            YOU ARE IN A PRODUCTION ENVIRONMENT.
+
+            Local hash DOES NOT match any hash on the remote for the payload directory.
+
+            {localhash}
             
-            Local and remote hash DO NOT match in the payload directory {localhash} {remothash}.
-            
-            You are running in a production environment.  In order to ensure reproducibility of results
-            we require that the payload area is under version control (git), and that the local and remote
-            git hashes match.  
+            In order to ensure reproducibility of results we require that the payload area is under 
+            version control (git), and that the local hash is found in the remote repo.
             
             If you need to test a small change, you should place them on a branch.  (Do a git stash, 
             create the new branch, do a git stash pop and add your codes to the branch.  Push to
             the remote and run your jobs).
-            
-            If you are making a significant change that needs to be tracked, consider also incrementing
-            the version number of the production.
+
+            If you are making a physics-analysis-meaningful change that needs to be tracked, consider 
+            also incrementing the version number of the production and reproducing the data sample.
+                        
             """ )
             exit(0)
+
+    else:
+
+        WARN("You are running in testbed mode... so no consistency with the remote is required.")
 
 
     
