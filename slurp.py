@@ -968,8 +968,8 @@ def matches( rule, kwargs={} ):
                     vnum = rematch.group(4)
                     if vnum:
                         dtype = dtype + '_' + vnum
-                        input_datasets[ ( dset, dtype ) ] = 1
-
+                    input_datasets[ ( dset, dtype ) ] = 1
+                        
     
     if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
 
