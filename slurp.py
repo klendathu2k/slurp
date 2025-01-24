@@ -76,7 +76,10 @@ cnxn_string_map = {
     'rawdr'       :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
 }
 
-pprint.pprint( cnxn_string_map )
+if 0:
+    pprint.pprint( cnxn_string_map )
+    for k,v in cnxn_string_map.items():
+        printDbInfo( pyodbc.connect(v), k )
 
 def dbQuery( cnxn_string, query, ntries=10 ):
 
