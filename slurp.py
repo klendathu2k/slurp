@@ -70,8 +70,8 @@ cnxn_string_map = {
     'fc'          : f'DSN={dsnfiler};READONLY=True',
     'fccro'       : f'DSN={dsnfiler};READONLY=True',
     'filecatalog' : f'DSN={dsnfiler};READONLY=True',
-    'status'      : f'DSN={dsnprodr}',
-    'statusw'     : f'DSN={dsnprodw}',
+    'status'      : f'DSN={dsnprodr};UID=argouser',
+    'statusw'     : f'DSN={dsnprodw};UID=argouser',
     'raw'         :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
     'rawdr'       :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
 }
