@@ -1087,7 +1087,7 @@ def matches( rule, kwargs={} ):
 
         #localhash = sh.git('show','--format=%H','-s','--no-abbrev-commit',_cwd=payload).strip()[:40]
         localhash    = sh.git('rev-parse','HEAD', _cwd=payload).strip()[:40]
-        remotehashes = [ f.strip()[:40] for f in sh.git('rev-list','--all',f'origin/{localbranch}', _cwd=payload) ]
+        remotehashes = [ f[:40] for f in sh.git('rev-list','--all',f'origin/{localbranch}', _cwd=payload).split('\n') ]
 
         if localhash.strip() in remotehashes:
             INFO( f"Local and remote hash match in the payload directory {localhash}.  You may proceed." )
