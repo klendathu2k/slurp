@@ -419,7 +419,6 @@ def getinputs(args):
     query = f"""
     select inputs from {tablename} where id={id_} limit 1
     """
-
     curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], query )
     if curs:
         for result in curs:
