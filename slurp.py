@@ -159,6 +159,8 @@ class SPhnxCondorJob:
     transferout:           str = "false"
     transfererr:           str = "false"
 
+    periodicremove:        str = None
+
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
