@@ -460,7 +460,7 @@ def insert_production_status( matching, setup, cursor ):
 
         values.append( value )
        
-    insvals = ','.join(values)
+    insvals = ','.join(values)    
 
     # Inserts the production status lines for each match, returning the list of IDs associated with each match.
     insert = f"""
