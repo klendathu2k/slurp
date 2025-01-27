@@ -1095,6 +1095,8 @@ def matches( rule, kwargs={} ):
             INFO( f"Local and remote hash match in the payload directory {localhash}.  You may proceed." )
         elif build=='new': 
             INFO( f"Local hash not found in remote {localhash} ... we are running under new, so go for it!" )
+        elif args.doit:
+            WARN("The darkside is a pathway to many abilities that some consider unnatural...")
         else:
             WARN( f"""
 
@@ -1325,6 +1327,7 @@ arg_parser.add_argument( "--dbinput", default=True, action="store_true",help="Pa
 arg_parser.add_argument( "--no-dbinput", dest="dbinput", action="store_false",help="Unsets dbinput flag." )
 
 arg_parser.add_argument( "--batch-name", dest="batch_name", default=None ) #default="$(name)_$(build)_$(tag)_$(version)"
+arg_parser.add_argument( "--doit", dest="doit", action="store_true", default=False )
 
 def warn_options( args, userargs ):
     if args.dbinput==False:
