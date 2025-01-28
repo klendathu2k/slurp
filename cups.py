@@ -25,19 +25,19 @@ MAXDSTNAMES = 100
 prod_mode = Path("CUPS_PRODUCTION_MODE").is_file()
 test_mode = Path("CUPS_TESTBED_MODE").is_file()
 if ( prod_mode ):
-    print("Found production mode")
+    #print("Found production mode")
     dsnprodr = 'Production_read'
     dsnprodw = 'Production_write'
     dsnfiler = 'FileCatalog'
     dsnfilew = 'FileCatalog'    
 elif ( test_mode ):
-    print("Found testbed mode")
+    #print("Found testbed mode")
     dsnprodr = 'ProductionStatus'
     dsnprodw = 'ProductionStatusWrite'
     dsnfiler = 'FileCatalog'
     dsnfilew = 'FileCatalog'
 else:
-    print("NOTICE: Neither production nor testbed mode set.  Default to testbed.  YMMV.")
+    #print("NOTICE: Neither production nor testbed mode set.  Default to testbed.  YMMV.")
     dsnprodr = 'ProductionStatus'
     dsnprodw = 'ProductionStatusWrite'
     dsnfiler = 'FileCatalog'
