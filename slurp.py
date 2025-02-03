@@ -59,8 +59,8 @@ if 'testbed' in str(pathlib.Path(".").absolute()).lower():
     dsnfilew = 'FileCatalog'
 else:
     PRODUCTION_MODE=True
-    dsnprodr = 'ProductionStatus'
-    dsnprodw = 'ProductionStatusWrite'
+    dsnprodr = 'Production_read'
+    dsnprodw = 'Production_write'
     dsnfiler = 'FileCatalog'
     dsnfilew = 'FileCatalog'    
     
@@ -70,13 +70,16 @@ cnxn_string_map = {
     'fc'          : f'DSN={dsnfiler};READONLY=True',
     'fccro'       : f'DSN={dsnfiler};READONLY=True',
     'filecatalog' : f'DSN={dsnfiler};READONLY=True',
-    'status'      : f'DSN={dsnprodr}',
-    'statusw'     : f'DSN={dsnprodw}',
+    'status'      : f'DSN={dsnprodr};UID=argouser',
+    'statusw'     : f'DSN={dsnprodw};UID=argouser',
     'raw'         :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
     'rawdr'       :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
 }
 
-pprint.pprint( cnxn_string_map )
+if 0:
+    pprint.pprint( cnxn_string_map )
+    for k,v in cnxn_string_map.items():
+        printDbInfo( pyodbc.connect(v), k )
 
 def dbQuery( cnxn_string, query, ntries=10 ):
 
@@ -155,6 +158,8 @@ class SPhnxCondorJob:
 
     transferout:           str = "false"
     transfererr:           str = "false"
+
+    periodicremove:        str = None
 
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
@@ -455,7 +460,7 @@ def insert_production_status( matching, setup, cursor ):
 
         values.append( value )
        
-    insvals = ','.join(values)
+    insvals = ','.join(values)    
 
     # Inserts the production status lines for each match, returning the list of IDs associated with each match.
     insert = f"""
@@ -957,6 +962,7 @@ def matches( rule, kwargs={} ):
             #
             # ... but we don't need to build this if we are using direct lookup
             if rule.direct==None:            
+
                 for fn in f.files.split():
                     base1 = fn.split('-')[0]
                     rematch = regex_dset.match( base1 )
@@ -965,9 +971,8 @@ def matches( rule, kwargs={} ):
                     vnum = rematch.group(4)
                     if vnum:
                         dtype = dtype + '_' + vnum
-                        #input_datasets[ dset ] = 1
-                        input_datasets[ ( dset, dtype ) ] = 1
-
+                    input_datasets[ ( dset, dtype ) ] = 1
+                        
     
     if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
 
@@ -1019,6 +1024,8 @@ def matches( rule, kwargs={} ):
 
             mydataset=mydatasettuple[1]
             mydsttype=mydatasettuple[0]
+
+            INFO( f'lfn map query for {mydataset} {mydsttype}' )
 
             fcquery=f"""
 
@@ -1077,33 +1084,44 @@ def matches( rule, kwargs={} ):
 
 
     if PRODUCTION_MODE:
+        # git branch --show-current
+        localbranch = sh.git( 'branch', '--show-current', _cwd=payload ).strip()
 
-        localhash = sh.git('show','origin/master','--format=%h','-s',_cwd=payload).rstrip()
-        remothash = sh.git('show',                '--format=%h','-s',_cwd=payload).rstrip()
+        #localhash = sh.git('show','--format=%H','-s','--no-abbrev-commit',_cwd=payload).strip()[:40]
+        localhash    = sh.git('rev-parse','HEAD', _cwd=payload).strip()[:40]
+        remotehashes = [ f[:40] for f in sh.git('rev-list','--all',f'origin/{localbranch}', _cwd=payload).split('\n') ]
 
-        if localhash==remothash:
-            INFO( f"Local and remote hash match in the payload directory {localhash} {remothash}" )
+        if localhash.strip() in remotehashes:
+            INFO( f"Local and remote hash match in the payload directory {localhash}.  You may proceed." )
         elif build=='new': 
-            INFO( f"Local and remote hash are {localhash} {remothash} ... we are running under new, so go for it!" )
+            INFO( f"Local hash not found in remote {localhash} ... we are running under new, so go for it!" )
+        elif args.doit:
+            WARN("The darkside is a pathway to many abilities that some consider unnatural...")
         else:
             WARN( f"""
-        
-            Jobs will not be submitted.
+
+            YOU ARE IN A PRODUCTION ENVIRONMENT.
+
+            Local hash DOES NOT match any hash on the remote for the payload directory.
+
+            {localhash}
             
-            Local and remote hash DO NOT match in the payload directory {localhash} {remothash}.
-            
-            You are running in a production environment.  In order to ensure reproducibility of results
-            we require that the payload area is under version control (git), and that the local and remote
-            git hashes match.  
+            In order to ensure reproducibility of results we require that the payload area is under 
+            version control (git), and that the local hash is found in the remote repo.
             
             If you need to test a small change, you should place them on a branch.  (Do a git stash, 
             create the new branch, do a git stash pop and add your codes to the branch.  Push to
             the remote and run your jobs).
-            
-            If you are making a significant change that needs to be tracked, consider also incrementing
-            the version number of the production.
+
+            If you are making a physics-analysis-meaningful change that needs to be tracked, consider 
+            also incrementing the version number of the production and reproducing the data sample.
+                        
             """ )
             exit(0)
+
+    else:
+
+        WARN("You are running in testbed mode... so no consistency with the remote is required.")
 
 
     
@@ -1309,6 +1327,7 @@ arg_parser.add_argument( "--dbinput", default=True, action="store_true",help="Pa
 arg_parser.add_argument( "--no-dbinput", dest="dbinput", action="store_false",help="Unsets dbinput flag." )
 
 arg_parser.add_argument( "--batch-name", dest="batch_name", default=None ) #default="$(name)_$(build)_$(tag)_$(version)"
+arg_parser.add_argument( "--doit", dest="doit", action="store_true", default=False )
 
 def warn_options( args, userargs ):
     if args.dbinput==False:

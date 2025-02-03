@@ -38,9 +38,11 @@ export subdir=${@: -3:1}                           # ... relative to the submiss
 if [[ $subdir  =~ "*testbed*" ]]; then
     echo "Running in a testbed environment"
     export CUPS_TESTBED_MODE=true
+    touch CUPS_TESTBED_MODE
 else
     echo "Running in a production environment"
-    export CUPS_PRODUCTION_MODE=true    
+    export CUPS_PRODUCTION_MODE=true
+    touch CUPS_PRODUCTION_MODE
 fi
 
 myArgs=( "$@")
