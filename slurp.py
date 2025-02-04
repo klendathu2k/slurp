@@ -547,6 +547,9 @@ def submit( rule, maxjobs, **kwargs ):
     leafdir = rule.name.replace( f'_{rule.runname}', "" )
     jobd['arguments'] = jobd['arguments'].replace( '{leafdir}', leafdir )
 
+    # And b/c the condor log is special...
+    jobd['log'] = jobd['log'].replace( '{leafdir}', leafdir )
+
 
     INFO("Passing job to htcondor.Submit")
     submit_job = htcondor.Submit( jobd )
