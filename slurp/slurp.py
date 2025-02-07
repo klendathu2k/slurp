@@ -18,8 +18,9 @@ import math
 import platform
 from collections import defaultdict
 import random
+import inspect
 
-
+import slurptables
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
 from slurptables import SPhnxInvalidRunList
@@ -30,6 +31,8 @@ from dataclasses import dataclass, asdict, field
 from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
 
 import logging
+
+SLURPPATH=os.path.dirname( inspect.getfile( slurptables ) )
 
 # This is the maximum number of DST names / types that will be in production at any one time
 MAXDSTNAMES = 100
@@ -129,7 +132,7 @@ class SPhnxCondorJob:
     Condor submission job template.
     """
     universe:              str = "vanilla"
-    executable:            str = "jobwrapper.sh"    
+    executable:            str = f"{SLURPPATH}/jobwrapper.sh"    
     arguments:             str = "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
     batch_name:            str = "$(name)_$(build)_$(tag)_$(version)"
     output:                str = None 
@@ -536,7 +539,7 @@ def submit( rule, maxjobs, **kwargs ):
     jobd = rule.job.dict()
 
     # If we are using a wrapper, the user script becomes the first argument
-    if jobd['executable']=='jobwrapper.sh':
+    if jobd['executable']==f'{SLURPPATH}/jobwrapper.sh':
         INFO(f"Setting up general jobwrapper script.  Adding user script {rule.script} as first argument")
         jobd['arguments']= rule.script + ' ' + jobd['arguments']
         INFO(f"  {jobd['arguments']}")
