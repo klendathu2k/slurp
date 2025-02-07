@@ -2,7 +2,7 @@ OS=$( hostnamectl | awk '/Operating System/{ print $3" "$4 }' )
 echo "Setting up SLURP for ${OS}"
 
 source /opt/sphenix/core/bin/sphenix_setup.sh -n new
-export PATH=${PATH}:${HOME}/bin
+export PATH=${PATH}:${HOME}/bin:./bin
 export ODBCINI=./odbc.ini
 
 if [[ $OS =~ "Alma" ]]; then
@@ -11,7 +11,9 @@ if [[ $OS =~ "Alma" ]]; then
    alias python=/usr/bin/python
    alias pip=/opt/sphenix/core/bin/pip3.9
 fi
- 
+
+export PYTHONPATH=${PYTHONPATH}:./slurp
+
 echo Using $(python --version)
 
 
