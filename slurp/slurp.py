@@ -51,11 +51,16 @@ def printDbInfo( cnxn, title ):
     serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
     print(f"Connected {name} from {serv} as {title}")
 
-
 # Check if we are running within a testbed area
 PRODUCTION_MODE=False
-
-if 'testbed' in str(pathlib.Path(".").absolute()).lower():
+if pathlib.Path(".slurp/testbed").is_file():
+    print("Testbed mode by config")    
+    dsnprodr = 'ProductionStatus'
+    dsnprodw = 'ProductionStatusWrite'
+    dsnfiler = 'FileCatalog'
+    dsnfilew = 'FileCatalog'
+elif 'testbed' in str(pathlib.Path(".").absolute()).lower():   
+    print("Testbed mode by path")
     dsnprodr = 'ProductionStatus'
     dsnprodw = 'ProductionStatusWrite'
     dsnfiler = 'FileCatalog'
@@ -65,7 +70,8 @@ else:
     dsnprodr = 'Production_read'
     dsnprodw = 'Production_write'
     dsnfiler = 'FileCatalog'
-    dsnfilew = 'FileCatalog'    
+    dsnfilew = 'FileCatalog'        
+
     
 cnxn_string_map = {
     'daq'         :  'DSN=daq;UID=phnxrc;READONLY=True',
