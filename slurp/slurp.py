@@ -33,6 +33,10 @@ from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
 import logging
 
 SLURPPATH=os.path.dirname( inspect.getfile( slurptables ) )
+pathlib.Path( '.slurp' ).mkdir( exist_ok=True )
+with open('.slurp/slurppath.sh', 'w' ) as sp:
+    sp.write( f'export SLURPPATH={SLURPPATH}\n' )
+
 
 # This is the maximum number of DST names / types that will be in production at any one time
 MAXDSTNAMES = 100
@@ -694,7 +698,7 @@ def submit( rule, maxjobs, **kwargs ):
                                 
                                 if madedir.get( targetdir, False )==False:
                                     td =  targetdir.replace('$(streamname)',mystreamname )
-                                    pathlib.Path( td ).mkdir( parents=True, exist_ok=True )            
+                                    pathlib.Path( td ).mkdir( parents=True, exist_ok=True )
                                     INFO(f"mkdir {td}")
                                     madedir[ td ]=True                                
                                 

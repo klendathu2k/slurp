@@ -4,6 +4,7 @@
 # it runs the SL7 container.
 
 # Create an initialization script on the worker node to get around singularity
+#  ... deprecated ???
 cat <<EOF > sPHENIX_INIT
 
     echo "Executing sPHENIX_INIT: build ${1}"
@@ -73,6 +74,9 @@ for i in ${payload[@]}; do
     cp --verbose -r $subdir/$i . 
 done
 
+source .slurp/slurppath.sh
+cp ${SLURPPATH}/cups.py .
+
 
 # Test if we are in testbed mode
 if [[ $subdir  =~ "*testbed*" ]]; then
@@ -92,7 +96,6 @@ else
     export CUPS_PRODUCTION_MODE=true
     touch CUPS_PRODUCTION_MODE
 fi
-
 
 
 
