@@ -35,16 +35,6 @@ export cupsid=${@: -1:1}                           # this is the ID of the job o
 export payload=( `echo ${@: -2:1} | tr ","  " "` ) # comma sep list --> array of files to stage in
 export subdir=${@: -3:1}                           # ... relative to the submission directory
 
-if [[ $subdir  =~ "*testbed*" ]]; then
-    echo "Running in a testbed environment"
-    export CUPS_TESTBED_MODE=true
-    touch CUPS_TESTBED_MODE
-else
-    echo "Running in a production environment"
-    export CUPS_PRODUCTION_MODE=true
-    touch CUPS_PRODUCTION_MODE
-fi
-
 myArgs=( "$@")
 shift
 userArgs=( "$@" )
@@ -82,6 +72,29 @@ echo subdir:     ${subdir}
 for i in ${payload[@]}; do
     cp --verbose $subdir/$i . 
 done
+
+
+# Test if we are in testbed mode
+if [[ $subdir  =~ "*testbed*" ]]; then
+    echo "Running in a testbed environment [subdir]"
+    export CUPS_TESTBED_MODE=true
+    touch CUPS_TESTBED_MODE
+elif [[ $subdir  =~ "*Testbed*" ]]; then
+    echo "Running in a testbed environment [subdir]"
+    export CUPS_TESTBED_MODE=true
+    touch CUPS_TESTBED_MODE
+elif [[ -e ".slurp/testbed" ]]; then
+    echo "Running in a testbed environment [.slurp/testbed]"
+    export CUPS_TESTBED_MODE=true
+    touch CUPS_TESTBED_MODE    
+else
+    echo "Running in a production environment"
+    export CUPS_PRODUCTION_MODE=true
+    touch CUPS_PRODUCTION_MODE
+fi
+
+
+
 
 # user has supplied an odbc.ini file.  use it.
 if [ -e odbc.ini ]; then

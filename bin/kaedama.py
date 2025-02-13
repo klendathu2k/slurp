@@ -252,6 +252,7 @@ def main():
     params          = config.get('params',None)
     if args.append2rsync:
         params['rsync'] = params['rsync']+','+args.append2rsync
+    params['rsync'] = params['rsync'] + ".slurp/"
 
         
 
