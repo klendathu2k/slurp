@@ -70,7 +70,7 @@ echo subdir:     ${subdir}
 
 # stage in the payload files
 for i in ${payload[@]}; do
-    cp --verbose $subdir/$i . 
+    cp --verbose -r $subdir/$i . 
 done
 
 
