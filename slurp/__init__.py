@@ -1,1 +1,4 @@
-__all__ = [ "slurp", "slurptables" ]
+#__all__ = [ "slurp", "slurptables" ]
+import slurp.slurptables
+import slurp.slurp
+

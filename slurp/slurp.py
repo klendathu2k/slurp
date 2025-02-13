@@ -20,11 +20,21 @@ from collections import defaultdict
 import random
 import inspect
 
-import slurptables
+#from slurp import slurptables
+#from slurp.slurptables import SPhnxProductionSetup
+#from slurp.slurptables import SPhnxProductionStatus
+#from slurp.slurptables import SPhnxInvalidRunList
+#from slurp.slurptables import sphnx_production_status_table_def
+
+#import slurptables.SPhnxProductionSetup
+#import slurptables.SPhnxProductionStatus
+#import slurptables.SPhnxInvalidRunList
+#from slurp.slurptables import sphnx_production_status_table_def
+
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
 from slurptables import SPhnxInvalidRunList
-from slurptables import sphnx_production_status_table_def
+
 
 from dataclasses import dataclass, asdict, field
 
@@ -32,7 +42,7 @@ from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
 
 import logging
 
-SLURPPATH=os.path.dirname( inspect.getfile( slurptables ) )
+SLURPPATH=os.path.dirname( inspect.getfile( SPhnxProductionSetup ) )
 pathlib.Path( '.slurp' ).mkdir( exist_ok=True )
 with open('.slurp/slurppath.sh', 'w' ) as sp:
     sp.write( f'export SLURPPATH={SLURPPATH}\n' )

@@ -1,7 +1,7 @@
 #!/usr/bin/env python 
 
 import cProfile
-import slurp
+#import slurp
 import yaml
 import datetime
 import pathlib
@@ -10,12 +10,13 @@ from slurp import SPhnxRule  as Rule
 from slurp import SPhnxMatch as Match
 from slurp import SPhnxCondorJob as Job
 from slurp import matches
-from slurp import submit
+from slurp import submit 
 
 from slurp import arg_parser
+from slurp import parse_command_line 
 
-#from slurp import RUNFMT
-#from slurp import SEGFMT
+from slurp import RUNFMT as RUNFMT_
+from slurp import SEGFMT as SEGFMT_
 
 import sh
 import sys
@@ -141,7 +142,7 @@ def checkRequiredParams( params ):
 def main():
 
     # parse command line options
-    args, userargs = slurp.parse_command_line()
+    args, userargs = parse_command_line()
 
     mycwd = pathlib.Path(".")
     if 'testbed' in str(mycwd.absolute()).lower():
@@ -230,8 +231,8 @@ def main():
     #streamname = args.streamname
     #streamfile = args.streamfile
 
-    RUNFMT = slurp.RUNFMT
-    SEGFMT = slurp.SEGFMT
+    RUNFMT = RUNFMT_
+    SEGFMT = SEGFMT_
     PWD    = str(pathlib.Path(".").absolute())
 
     limit_condition=""
