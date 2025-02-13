@@ -840,7 +840,7 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, version=None
         is_clean = len( sh.git("-c","color.status=no","status","-uno","--short",_cwd=dir_).strip().split('\n') ) == 0;
 
         # git show origin/main --format=%h -s
-        remote_hash = sh.git("show","origin/main","--format=%h","-s").strip()
+        remote_hash = sh.git("show","origin","--format=%h","-s", _cwd=dir_).strip()
         is_current = (hash_ == remote_hash)
 
         id_ = int( array[0][0] )
