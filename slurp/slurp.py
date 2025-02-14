@@ -496,7 +496,11 @@ def insert_production_status( matching, setup, cursor ):
     """
 
     # TODO: standardized query
-    cursor.execute(insert)    # commit is deferred until the update succeeds
+    try:
+        cursor.execute(insert)    # commit is deferred until the update succeeds
+    except Exception as E:
+        print(insert)
+        raise(E)
 
     result=[ int(x.id) for x in cursor ]
 

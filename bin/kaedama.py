@@ -18,6 +18,8 @@ from slurp import parse_command_line
 from slurp import RUNFMT as RUNFMT_
 from slurp import SEGFMT as SEGFMT_
 
+from slurp import PRODUCTION_MODE
+
 import sh
 import sys
 import re
@@ -145,7 +147,7 @@ def main():
     args, userargs = parse_command_line()
 
     mycwd = pathlib.Path(".")
-    if 'testbed' in str(mycwd.absolute()).lower():
+    if 'testbed' in str(mycwd.absolute()).lower() or pathlib.Path(".slurp/testbed").is_file():
         args.test_mode = True
         logging.info("Running in testbed mode.")
 
