@@ -55,6 +55,8 @@ arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query
 
 arg_parser.add_argument( '--append-to-rsync', dest='append2rsync', default=None,help="Appends the argument to the list of rsync files to copy to the worker node" )
 
+arg_parser.add_argument( '--logdir', dest='logdir', default=None, help="Directory for kaedama logging (defaults under /tmp)" )
+
 #
 # Specifies the default directory layout for files.  Note that "production" will be replaced with "production-testbed" for the
 # testbed setups.
@@ -159,7 +161,10 @@ def main():
         mylogdir=f"/tmp/testbed/kaedama/{args.rule}"; #{str(datetime.datetime.today().date())}.log",
     else:
         mylogdir=f"/tmp/kaedama/kaedama/{args.rule}"; #{str(datetime.datetime.today().date())}.log",
-    pathlib.Path(mylogdir).mkdir( parents=True, exist_ok=True )            
+    pathlib.Path(mylogdir).mkdir( parents=True, exist_ok=True )
+
+    if args.logdir:
+        mylogdir=args.logdir
 
     RotFileHandler = RotatingFileHandler(
     #    filename='kaedama.log', 
