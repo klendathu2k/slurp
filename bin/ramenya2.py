@@ -1,4 +1,4 @@
-xf#!/usr/bin/env python
+#!/usr/bin/env python
 import sh
 from time import sleep
 from contextlib import redirect_stdout
