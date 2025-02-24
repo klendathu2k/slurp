@@ -272,6 +272,8 @@ def main():
     if input_query_direct is not None:
         input_query_direct = input_query_direct.format( **vars( args ) )
 
+    input_query_lfn2pfn = input_.get('lfn2pfn','lfn2pfn')        
+
 
     if args.printquery:
         print(input_query)
@@ -401,6 +403,7 @@ def main():
                          files             = input_query,
                          filesdb           = input_query_db,
                          direct            = input_query_direct,
+                         lfn2pfn           = input_query_lfn2pfn,
                          runlist           = runlist_query,            # deprecated TODO
                          script            = params['script'],
                          build             = params['build'],

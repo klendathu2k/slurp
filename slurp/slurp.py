@@ -201,6 +201,7 @@ class SPhnxRule:
     filesdb:           str  = None    # Input files DB to query
     runlist:           str  = None    # Input run list query from daq
     direct:            str  = None    # Direct path to input files (supercedes filecatalog)
+    lfn2pfn:           str  = "lfn2pfn"  # could be lfn2lfn
     job:               SPhnxCondorJob = SPhnxCondorJob()
     resubmit:          bool = False   # Set true if job should overwrite existing job
     buildarg:          str  = ""      # The build tag passed as an argument (leaves the "." in place).
@@ -308,8 +309,14 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
 
     dbresult = dbQuery( cnxn_string_map['statusw'], query )
 
+    #print( cnxn_string_map['statusw'] )
+    #print( query )
+    #for db in dbresult:
+    #    pprint.pprint(db)
+    
     # Transform the list of tuples from the db query to a list of prouction status dataclass objects
     result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
+
 
     return result
 
@@ -1031,6 +1038,11 @@ def matches( rule, kwargs={} ):
     # lfn2pfn provides a mapping between physical files on disk and the corresponding lfn
     # (i.e. the pfn with the directory path stripped off).
     #
+    # It is possible to run sPHENIX software such that it is responsible for looking up the
+    # pfn... in which case we can omit building the lfn2pfn mapping and pass down just the
+    # logical filenames.  (Note that this requires that there can only be a 1:1 mapping
+    # between LFN and PFN)...
+    #    
     # A few notes.  This mapping will not be constrained to the set of input files provided
     # by the query.  It will either be all files in the direct search path specified in the
     # yaml file, OR it will be all files contained in the input data set(s).
@@ -1048,6 +1060,7 @@ def matches( rule, kwargs={} ):
         INFO(f"done {len(lfn2pfn)}")
 
     else:
+
         INFO("Building lfn2pfn map from filecatalog")
 
         for mydatasettuple in input_datasets.keys():
@@ -1076,7 +1089,11 @@ def matches( rule, kwargs={} ):
 
             on lfnlist.filename=files.lfn;        
             """
-            lfn2pfn.update( { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) } )
+
+            if rule.lfn2pfn=="lfn2pfn":
+                lfn2pfn.update( { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) } )
+            elif rule.lfn2pfn=="lfn2lfn":
+                lfn2pfn.update( { r.lfn : r.lfn } )
 
                     
     # Build lists of PFNs available for each run
