@@ -664,13 +664,15 @@ def main():
     result = args.func(args)
 
     with open( 'cups.stat', 'a' ) as stats:
-
         for r in [result[i:i + 7] for i in range(0, len(result), 7)]:
             stats.write( f"{args.subcommand},{cupsid},{args.dstname},{args.run},{args.segment},{platform.node()}" )
             for x in r:
                 stats.write(",")
                 stats.write(str(x))
             stats.write("\n")
+
+    with open( 'cups.history', 'a' ) as replay:
+        replay.write( ' '.join( sys.argv ) )
 
 if __name__ == '__main__':
     main()
