@@ -97,43 +97,6 @@ def dbQuery( cnxn_string, query, ntries=10 ):
     return curs, ntries, start, finish, lastException, name, serv
             
 
-#
-# Production status connection
-#
-#try:
-#    statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
-#    statusdbc = statusdb.cursor()
-#except (pyodbc.InterfaceError,pyodbc.OperationalError) as e:
-#    for s in [ 10*random.random(), 20*random.random(), 30*random.random(), 60*random.random(), 120*random.random() ]:
-#        print(f"Could not connect to DB... retry in {s}s")
-#        time.sleep(s)
-#        try:
-#            statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
-#            statusdbc = statusdb.cursor()
-#            break
-#        except:
-#            pass
-#    else:
-#        print(sys.argv())
-#        print(e)
-#        exit(1)
-
-#try:
-#    statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
-#    statusdbr = statusdbr_.cursor()
-#except pyodbc.InterfaceError:
-#    for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
-#        print(f"Could not connect to DB... retry in {s}s")
-#        time.sleep(s)
-#        try:
-#            statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
-#            statusdbr = statusdbr_.cursor()
-#        except:
-#            exit(0)
-#except pyodbc.Error as e:
-#    print(e)
-#    exit(1)
-
 def md5sum( filename ):
     file_hash=None
     with open( filename, "rb") as f:
