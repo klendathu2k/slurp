@@ -492,10 +492,12 @@ def stageout(args):
 
     # Copy the file
     try:
-        shutil.copy2( f"{args.filename}", f"{args.outdir}" )
+        #shutil.copy2( f"{args.filename}", f"{args.outdir}" )
+        sh.cp( f"{args.filename}", f"{args.outdir}" )
         print(".... copy back finished ....")
     except Exception as e:
-        print(f"ERROR: Failed to copy file {args.filename} to {args.outdir}.  Aborting stageout.")
+        print(f"ERROR: Failed to copy file {args.filename} to {args.outdir}.  Abort stageout.  Remove failed transfer.")
+        sh.rm( f"{args.outdir}/{args.filename}" )
         return
 
     sz  = int( os.path.getsize(f"{args.outdir}/{args.filename}") ) 
