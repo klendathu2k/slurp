@@ -18,18 +18,35 @@ import math
 import platform
 from collections import defaultdict
 import random
+import inspect
 
+#from slurp import slurptables
+#from slurp.slurptables import SPhnxProductionSetup
+#from slurp.slurptables import SPhnxProductionStatus
+#from slurp.slurptables import SPhnxInvalidRunList
+#from slurp.slurptables import sphnx_production_status_table_def
+
+#import slurptables.SPhnxProductionSetup
+#import slurptables.SPhnxProductionStatus
+#import slurptables.SPhnxInvalidRunList
+#from slurp.slurptables import sphnx_production_status_table_def
 
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
 from slurptables import SPhnxInvalidRunList
-from slurptables import sphnx_production_status_table_def
+
 
 from dataclasses import dataclass, asdict, field
 
 from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
 
 import logging
+
+SLURPPATH=os.path.dirname( inspect.getfile( SPhnxProductionSetup ) )
+pathlib.Path( '.slurp' ).mkdir( exist_ok=True )
+with open('.slurp/slurppath.sh', 'w' ) as sp:
+    sp.write( f'export SLURPPATH={SLURPPATH}\n' )
+
 
 # This is the maximum number of DST names / types that will be in production at any one time
 MAXDSTNAMES = 100
@@ -48,11 +65,16 @@ def printDbInfo( cnxn, title ):
     serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
     print(f"Connected {name} from {serv} as {title}")
 
-
 # Check if we are running within a testbed area
 PRODUCTION_MODE=False
-
-if 'testbed' in str(pathlib.Path(".").absolute()).lower():
+if pathlib.Path(".slurp/testbed").is_file():
+    print("Testbed mode by config")    
+    dsnprodr = 'ProductionStatus'
+    dsnprodw = 'ProductionStatusWrite'
+    dsnfiler = 'FileCatalog'
+    dsnfilew = 'FileCatalog'
+elif 'testbed' in str(pathlib.Path(".").absolute()).lower():   
+    print("Testbed mode by path")
     dsnprodr = 'ProductionStatus'
     dsnprodw = 'ProductionStatusWrite'
     dsnfiler = 'FileCatalog'
@@ -62,7 +84,8 @@ else:
     dsnprodr = 'Production_read'
     dsnprodw = 'Production_write'
     dsnfiler = 'FileCatalog'
-    dsnfilew = 'FileCatalog'    
+    dsnfilew = 'FileCatalog'        
+
     
 cnxn_string_map = {
     'daq'         :  'DSN=daq;UID=phnxrc;READONLY=True',
@@ -129,7 +152,7 @@ class SPhnxCondorJob:
     Condor submission job template.
     """
     universe:              str = "vanilla"
-    executable:            str = "jobwrapper.sh"    
+    executable:            str = f"{SLURPPATH}/jobwrapper.sh"    
     arguments:             str = "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
     batch_name:            str = "$(name)_$(build)_$(tag)_$(version)"
     output:                str = None 
@@ -178,6 +201,7 @@ class SPhnxRule:
     filesdb:           str  = None    # Input files DB to query
     runlist:           str  = None    # Input run list query from daq
     direct:            str  = None    # Direct path to input files (supercedes filecatalog)
+    lfn2pfn:           str  = "lfn2pfn"  # could be lfn2lfn
     job:               SPhnxCondorJob = SPhnxCondorJob()
     resubmit:          bool = False   # Set true if job should overwrite existing job
     buildarg:          str  = ""      # The build tag passed as an argument (leaves the "." in place).
@@ -285,8 +309,14 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
 
     dbresult = dbQuery( cnxn_string_map['statusw'], query )
 
+    #print( cnxn_string_map['statusw'] )
+    #print( query )
+    #for db in dbresult:
+    #    pprint.pprint(db)
+    
     # Transform the list of tuples from the db query to a list of prouction status dataclass objects
     result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
+
 
     return result
 
@@ -473,7 +503,11 @@ def insert_production_status( matching, setup, cursor ):
     """
 
     # TODO: standardized query
-    cursor.execute(insert)    # commit is deferred until the update succeeds
+    try:
+        cursor.execute(insert)    # commit is deferred until the update succeeds
+    except Exception as E:
+        print(insert)
+        raise(E)
 
     result=[ int(x.id) for x in cursor ]
 
@@ -536,7 +570,7 @@ def submit( rule, maxjobs, **kwargs ):
     jobd = rule.job.dict()
 
     # If we are using a wrapper, the user script becomes the first argument
-    if jobd['executable']=='jobwrapper.sh':
+    if jobd['executable']==f'{SLURPPATH}/jobwrapper.sh':
         INFO(f"Setting up general jobwrapper script.  Adding user script {rule.script} as first argument")
         jobd['arguments']= rule.script + ' ' + jobd['arguments']
         INFO(f"  {jobd['arguments']}")
@@ -685,7 +719,7 @@ def submit( rule, maxjobs, **kwargs ):
                                 
                                 if madedir.get( targetdir, False )==False:
                                     td =  targetdir.replace('$(streamname)',mystreamname )
-                                    pathlib.Path( td ).mkdir( parents=True, exist_ok=True )            
+                                    pathlib.Path( td ).mkdir( parents=True, exist_ok=True )
                                     INFO(f"mkdir {td}")
                                     madedir[ td ]=True                                
                                 
@@ -817,7 +851,7 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, version=None
         is_clean = len( sh.git("-c","color.status=no","status","-uno","--short",_cwd=dir_).strip().split('\n') ) == 0;
 
         # git show origin/main --format=%h -s
-        remote_hash = sh.git("show","origin/main","--format=%h","-s").strip()
+        remote_hash = sh.git("show","origin","--format=%h","-s", _cwd=dir_).strip()
         is_current = (hash_ == remote_hash)
 
         id_ = int( array[0][0] )
@@ -1004,6 +1038,11 @@ def matches( rule, kwargs={} ):
     # lfn2pfn provides a mapping between physical files on disk and the corresponding lfn
     # (i.e. the pfn with the directory path stripped off).
     #
+    # It is possible to run sPHENIX software such that it is responsible for looking up the
+    # pfn... in which case we can omit building the lfn2pfn mapping and pass down just the
+    # logical filenames.  (Note that this requires that there can only be a 1:1 mapping
+    # between LFN and PFN)...
+    #    
     # A few notes.  This mapping will not be constrained to the set of input files provided
     # by the query.  It will either be all files in the direct search path specified in the
     # yaml file, OR it will be all files contained in the input data set(s).
@@ -1021,6 +1060,7 @@ def matches( rule, kwargs={} ):
         INFO(f"done {len(lfn2pfn)}")
 
     else:
+
         INFO("Building lfn2pfn map from filecatalog")
 
         for mydatasettuple in input_datasets.keys():
@@ -1049,7 +1089,11 @@ def matches( rule, kwargs={} ):
 
             on lfnlist.filename=files.lfn;        
             """
-            lfn2pfn.update( { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) } )
+
+            if rule.lfn2pfn=="lfn2pfn":
+                lfn2pfn.update( { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) } )
+            elif rule.lfn2pfn=="lfn2lfn":
+                lfn2pfn.update( { r.lfn : r.lfn } )
 
                     
     # Build lists of PFNs available for each run
