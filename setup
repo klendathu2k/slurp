@@ -22,16 +22,13 @@ export PATH=${PATH}:${SCRIPT_DIR}/bin
 echo Using $(python --version)
 
 parse_git_branch() {
-  cd ${SCRIPT_DIR}
-  git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/(\1)/'
-  cd -
+  git -C ${SCRIPT_DIR} branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/(\1)/'
 }
 
 #PS1="\[\e[36m\]\u@\h \[\e[32m\]\w\[\e[33m\]\$(parse_git_branch)\[\e[0m\] $ "
 #PS1="\[\e[36m\]\u \[\e[32m\]\w \[\e[33m\] slurp:\$(parse_git_branch)\[\e[0m\] $ "
+PS1="\[\e[36m\]\u \[\e[33m\]slurp:\$(parse_git_branch)\[\e[32m\] \[\e[34m\][\W]> \[\e[0m\]"
 
-PS1="\[\e[36m\]\u  \[\e[33m\] slurp:\$(parse_git_branch)\[\e[32m\] $ \[\e[0m\]"
-PS2="\[\e[0m\] >"
 
 
 
