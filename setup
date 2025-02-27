@@ -25,7 +25,7 @@ parse_git_branch() {
   branch=$( git -C ${SCRIPT_DIR} branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/(\1)/' )
   status=" \e[31mDIRTY"
   if [ -z "$(git -C ${SCRIPT_DIR} status --porcelain)" ]; then
-      status=""
+      status=" \e[32mclean"
   fi
   echo -e ${branch}${status}
 }
