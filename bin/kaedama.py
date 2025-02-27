@@ -1,7 +1,7 @@
 #!/usr/bin/env python 
 
 import cProfile
-import slurp
+#import slurp
 import yaml
 import datetime
 import pathlib
@@ -10,12 +10,15 @@ from slurp import SPhnxRule  as Rule
 from slurp import SPhnxMatch as Match
 from slurp import SPhnxCondorJob as Job
 from slurp import matches
-from slurp import submit
+from slurp import submit 
 
 from slurp import arg_parser
+from slurp import parse_command_line 
 
-#from slurp import RUNFMT
-#from slurp import SEGFMT
+from slurp import RUNFMT as RUNFMT_
+from slurp import SEGFMT as SEGFMT_
+
+from slurp import PRODUCTION_MODE
 
 import sh
 import sys
@@ -52,6 +55,8 @@ arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query
 
 arg_parser.add_argument( '--append-to-rsync', dest='append2rsync', default=None,help="Appends the argument to the list of rsync files to copy to the worker node" )
 
+arg_parser.add_argument( '--logdir', dest='logdir', default=None, help="Directory for kaedama logging (defaults under /tmp)" )
+
 #
 # Specifies the default directory layout for files.  Note that "production" will be replaced with "production-testbed" for the
 # testbed setups.
@@ -60,7 +65,7 @@ _default_filesystem = {
         'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/dst"
     ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/log"
     ,   'histdir' :        "/sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/hist"
-    ,   'condor'  :                                 "/tmp/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)"    
+    ,   'condor'  :                                 "/tmp/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/log"    
 }
 
 def sanity_checks( params, inputq ):
@@ -141,10 +146,10 @@ def checkRequiredParams( params ):
 def main():
 
     # parse command line options
-    args, userargs = slurp.parse_command_line()
+    args, userargs = parse_command_line()
 
     mycwd = pathlib.Path(".")
-    if 'testbed' in str(mycwd.absolute()).lower():
+    if 'testbed' in str(mycwd.absolute()).lower() or pathlib.Path(".slurp/testbed").is_file():
         args.test_mode = True
         logging.info("Running in testbed mode.")
 
@@ -156,7 +161,10 @@ def main():
         mylogdir=f"/tmp/testbed/kaedama/{args.rule}"; #{str(datetime.datetime.today().date())}.log",
     else:
         mylogdir=f"/tmp/kaedama/kaedama/{args.rule}"; #{str(datetime.datetime.today().date())}.log",
-    pathlib.Path(mylogdir).mkdir( parents=True, exist_ok=True )            
+    pathlib.Path(mylogdir).mkdir( parents=True, exist_ok=True )
+
+    if args.logdir:
+        mylogdir=args.logdir
 
     RotFileHandler = RotatingFileHandler(
     #    filename='kaedama.log', 
@@ -230,8 +238,8 @@ def main():
     #streamname = args.streamname
     #streamfile = args.streamfile
 
-    RUNFMT = slurp.RUNFMT
-    SEGFMT = slurp.SEGFMT
+    RUNFMT = RUNFMT_
+    SEGFMT = SEGFMT_
     PWD    = str(pathlib.Path(".").absolute())
 
     limit_condition=""
@@ -252,6 +260,7 @@ def main():
     params          = config.get('params',None)
     if args.append2rsync:
         params['rsync'] = params['rsync']+','+args.append2rsync
+    params['rsync'] = params['rsync'] + ",.slurp/"
 
         
 
@@ -262,6 +271,8 @@ def main():
     input_query_direct = input_.get('direct_path',None)
     if input_query_direct is not None:
         input_query_direct = input_query_direct.format( **vars( args ) )
+
+    input_query_lfn2pfn = input_.get('lfn2pfn','lfn2pfn')        
 
 
     if args.printquery:
@@ -392,6 +403,7 @@ def main():
                          files             = input_query,
                          filesdb           = input_query_db,
                          direct            = input_query_direct,
+                         lfn2pfn           = input_query_lfn2pfn,
                          runlist           = runlist_query,            # deprecated TODO
                          script            = params['script'],
                          build             = params['build'],

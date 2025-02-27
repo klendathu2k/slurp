@@ -18,18 +18,35 @@ import math
 import platform
 from collections import defaultdict
 import random
+import inspect
 
+#from slurp import slurptables
+#from slurp.slurptables import SPhnxProductionSetup
+#from slurp.slurptables import SPhnxProductionStatus
+#from slurp.slurptables import SPhnxInvalidRunList
+#from slurp.slurptables import sphnx_production_status_table_def
+
+#import slurptables.SPhnxProductionSetup
+#import slurptables.SPhnxProductionStatus
+#import slurptables.SPhnxInvalidRunList
+#from slurp.slurptables import sphnx_production_status_table_def
 
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatus
 from slurptables import SPhnxInvalidRunList
-from slurptables import sphnx_production_status_table_def
+
 
 from dataclasses import dataclass, asdict, field
 
 from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
 
 import logging
+
+SLURPPATH=os.path.dirname( inspect.getfile( SPhnxProductionSetup ) )
+pathlib.Path( '.slurp' ).mkdir( exist_ok=True )
+with open('.slurp/slurppath.sh', 'w' ) as sp:
+    sp.write( f'export SLURPPATH={SLURPPATH}\n' )
+
 
 # This is the maximum number of DST names / types that will be in production at any one time
 MAXDSTNAMES = 100
@@ -48,21 +65,27 @@ def printDbInfo( cnxn, title ):
     serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
     print(f"Connected {name} from {serv} as {title}")
 
-
 # Check if we are running within a testbed area
 PRODUCTION_MODE=False
-
-if 'testbed' in str(pathlib.Path(".").absolute()).lower():
+if pathlib.Path(".slurp/testbed").is_file():
+    print("Testbed mode by config")    
+    dsnprodr = 'ProductionStatus'
+    dsnprodw = 'ProductionStatusWrite'
+    dsnfiler = 'FileCatalog'
+    dsnfilew = 'FileCatalog'
+elif 'testbed' in str(pathlib.Path(".").absolute()).lower():   
+    print("Testbed mode by path")
     dsnprodr = 'ProductionStatus'
     dsnprodw = 'ProductionStatusWrite'
     dsnfiler = 'FileCatalog'
     dsnfilew = 'FileCatalog'
 else:
     PRODUCTION_MODE=True
-    dsnprodr = 'ProductionStatus'
-    dsnprodw = 'ProductionStatusWrite'
+    dsnprodr = 'Production_read'
+    dsnprodw = 'Production_write'
     dsnfiler = 'FileCatalog'
-    dsnfilew = 'FileCatalog'    
+    dsnfilew = 'FileCatalog'        
+
     
 cnxn_string_map = {
     'daq'         :  'DSN=daq;UID=phnxrc;READONLY=True',
@@ -70,13 +93,16 @@ cnxn_string_map = {
     'fc'          : f'DSN={dsnfiler};READONLY=True',
     'fccro'       : f'DSN={dsnfiler};READONLY=True',
     'filecatalog' : f'DSN={dsnfiler};READONLY=True',
-    'status'      : f'DSN={dsnprodr}',
-    'statusw'     : f'DSN={dsnprodw}',
+    'status'      : f'DSN={dsnprodr};UID=argouser',
+    'statusw'     : f'DSN={dsnprodw};UID=argouser',
     'raw'         :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
     'rawdr'       :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
 }
 
-pprint.pprint( cnxn_string_map )
+if 0:
+    pprint.pprint( cnxn_string_map )
+    for k,v in cnxn_string_map.items():
+        printDbInfo( pyodbc.connect(v), k )
 
 def dbQuery( cnxn_string, query, ntries=10 ):
 
@@ -126,7 +152,7 @@ class SPhnxCondorJob:
     Condor submission job template.
     """
     universe:              str = "vanilla"
-    executable:            str = "jobwrapper.sh"    
+    executable:            str = f"{SLURPPATH}/jobwrapper.sh"    
     arguments:             str = "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
     batch_name:            str = "$(name)_$(build)_$(tag)_$(version)"
     output:                str = None 
@@ -156,6 +182,8 @@ class SPhnxCondorJob:
     transferout:           str = "false"
     transfererr:           str = "false"
 
+    periodicremove:        str = None
+
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
@@ -173,6 +201,7 @@ class SPhnxRule:
     filesdb:           str  = None    # Input files DB to query
     runlist:           str  = None    # Input run list query from daq
     direct:            str  = None    # Direct path to input files (supercedes filecatalog)
+    lfn2pfn:           str  = "lfn2pfn"  # could be lfn2lfn
     job:               SPhnxCondorJob = SPhnxCondorJob()
     resubmit:          bool = False   # Set true if job should overwrite existing job
     buildarg:          str  = ""      # The build tag passed as an argument (leaves the "." in place).
@@ -280,8 +309,14 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
 
     dbresult = dbQuery( cnxn_string_map['statusw'], query )
 
+    #print( cnxn_string_map['statusw'] )
+    #print( query )
+    #for db in dbresult:
+    #    pprint.pprint(db)
+    
     # Transform the list of tuples from the db query to a list of prouction status dataclass objects
     result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
+
 
     return result
 
@@ -455,7 +490,7 @@ def insert_production_status( matching, setup, cursor ):
 
         values.append( value )
        
-    insvals = ','.join(values)
+    insvals = ','.join(values)    
 
     # Inserts the production status lines for each match, returning the list of IDs associated with each match.
     insert = f"""
@@ -468,7 +503,11 @@ def insert_production_status( matching, setup, cursor ):
     """
 
     # TODO: standardized query
-    cursor.execute(insert)    # commit is deferred until the update succeeds
+    try:
+        cursor.execute(insert)    # commit is deferred until the update succeeds
+    except Exception as E:
+        print(insert)
+        raise(E)
 
     result=[ int(x.id) for x in cursor ]
 
@@ -531,7 +570,7 @@ def submit( rule, maxjobs, **kwargs ):
     jobd = rule.job.dict()
 
     # If we are using a wrapper, the user script becomes the first argument
-    if jobd['executable']=='jobwrapper.sh':
+    if jobd['executable']==f'{SLURPPATH}/jobwrapper.sh':
         INFO(f"Setting up general jobwrapper script.  Adding user script {rule.script} as first argument")
         jobd['arguments']= rule.script + ' ' + jobd['arguments']
         INFO(f"  {jobd['arguments']}")
@@ -541,6 +580,9 @@ def submit( rule, maxjobs, **kwargs ):
 
     leafdir = rule.name.replace( f'_{rule.runname}', "" )
     jobd['arguments'] = jobd['arguments'].replace( '{leafdir}', leafdir )
+
+    # And b/c the condor log is special...
+    jobd['log'] = jobd['log'].replace( '{leafdir}', leafdir )
 
 
     INFO("Passing job to htcondor.Submit")
@@ -677,7 +719,7 @@ def submit( rule, maxjobs, **kwargs ):
                                 
                                 if madedir.get( targetdir, False )==False:
                                     td =  targetdir.replace('$(streamname)',mystreamname )
-                                    pathlib.Path( td ).mkdir( parents=True, exist_ok=True )            
+                                    pathlib.Path( td ).mkdir( parents=True, exist_ok=True )
                                     INFO(f"mkdir {td}")
                                     madedir[ td ]=True                                
                                 
@@ -809,7 +851,7 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, version=None
         is_clean = len( sh.git("-c","color.status=no","status","-uno","--short",_cwd=dir_).strip().split('\n') ) == 0;
 
         # git show origin/main --format=%h -s
-        remote_hash = sh.git("show","origin/main","--format=%h","-s").strip()
+        remote_hash = sh.git("show","origin","--format=%h","-s", _cwd=dir_).strip()
         is_current = (hash_ == remote_hash)
 
         id_ = int( array[0][0] )
@@ -957,6 +999,7 @@ def matches( rule, kwargs={} ):
             #
             # ... but we don't need to build this if we are using direct lookup
             if rule.direct==None:            
+
                 for fn in f.files.split():
                     base1 = fn.split('-')[0]
                     rematch = regex_dset.match( base1 )
@@ -965,9 +1008,8 @@ def matches( rule, kwargs={} ):
                     vnum = rematch.group(4)
                     if vnum:
                         dtype = dtype + '_' + vnum
-                        #input_datasets[ dset ] = 1
-                        input_datasets[ ( dset, dtype ) ] = 1
-
+                    input_datasets[ ( dset, dtype ) ] = 1
+                        
     
     if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
 
@@ -996,6 +1038,11 @@ def matches( rule, kwargs={} ):
     # lfn2pfn provides a mapping between physical files on disk and the corresponding lfn
     # (i.e. the pfn with the directory path stripped off).
     #
+    # It is possible to run sPHENIX software such that it is responsible for looking up the
+    # pfn... in which case we can omit building the lfn2pfn mapping and pass down just the
+    # logical filenames.  (Note that this requires that there can only be a 1:1 mapping
+    # between LFN and PFN)...
+    #    
     # A few notes.  This mapping will not be constrained to the set of input files provided
     # by the query.  It will either be all files in the direct search path specified in the
     # yaml file, OR it will be all files contained in the input data set(s).
@@ -1013,12 +1060,15 @@ def matches( rule, kwargs={} ):
         INFO(f"done {len(lfn2pfn)}")
 
     else:
+
         INFO("Building lfn2pfn map from filecatalog")
 
         for mydatasettuple in input_datasets.keys():
 
             mydataset=mydatasettuple[1]
             mydsttype=mydatasettuple[0]
+
+            INFO( f'lfn map query for {mydataset} {mydsttype}' )
 
             fcquery=f"""
 
@@ -1039,7 +1089,11 @@ def matches( rule, kwargs={} ):
 
             on lfnlist.filename=files.lfn;        
             """
-            lfn2pfn.update( { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) } )
+
+            if rule.lfn2pfn=="lfn2pfn":
+                lfn2pfn.update( { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) } )
+            elif rule.lfn2pfn=="lfn2lfn":
+                lfn2pfn.update( { r.lfn : r.lfn } )
 
                     
     # Build lists of PFNs available for each run
@@ -1077,33 +1131,44 @@ def matches( rule, kwargs={} ):
 
 
     if PRODUCTION_MODE:
+        # git branch --show-current
+        localbranch = sh.git( 'branch', '--show-current', _cwd=payload ).strip()
 
-        localhash = sh.git('show','origin/master','--format=%h','-s',_cwd=payload).rstrip()
-        remothash = sh.git('show',                '--format=%h','-s',_cwd=payload).rstrip()
+        #localhash = sh.git('show','--format=%H','-s','--no-abbrev-commit',_cwd=payload).strip()[:40]
+        localhash    = sh.git('rev-parse','HEAD', _cwd=payload).strip()[:40]
+        remotehashes = [ f[:40] for f in sh.git('rev-list','--all',f'origin/{localbranch}', _cwd=payload).split('\n') ]
 
-        if localhash==remothash:
-            INFO( f"Local and remote hash match in the payload directory {localhash} {remothash}" )
+        if localhash.strip() in remotehashes:
+            INFO( f"Local and remote hash match in the payload directory {localhash}.  You may proceed." )
         elif build=='new': 
-            INFO( f"Local and remote hash are {localhash} {remothash} ... we are running under new, so go for it!" )
+            INFO( f"Local hash not found in remote {localhash} ... we are running under new, so go for it!" )
+        elif args.doit:
+            WARN("The darkside is a pathway to many abilities that some consider unnatural...")
         else:
             WARN( f"""
-        
-            Jobs will not be submitted.
+
+            YOU ARE IN A PRODUCTION ENVIRONMENT.
+
+            Local hash DOES NOT match any hash on the remote for the payload directory.
+
+            {localhash}
             
-            Local and remote hash DO NOT match in the payload directory {localhash} {remothash}.
-            
-            You are running in a production environment.  In order to ensure reproducibility of results
-            we require that the payload area is under version control (git), and that the local and remote
-            git hashes match.  
+            In order to ensure reproducibility of results we require that the payload area is under 
+            version control (git), and that the local hash is found in the remote repo.
             
             If you need to test a small change, you should place them on a branch.  (Do a git stash, 
             create the new branch, do a git stash pop and add your codes to the branch.  Push to
             the remote and run your jobs).
-            
-            If you are making a significant change that needs to be tracked, consider also incrementing
-            the version number of the production.
+
+            If you are making a physics-analysis-meaningful change that needs to be tracked, consider 
+            also incrementing the version number of the production and reproducing the data sample.
+                        
             """ )
             exit(0)
+
+    else:
+
+        WARN("You are running in testbed mode... so no consistency with the remote is required.")
 
 
     
@@ -1309,6 +1374,7 @@ arg_parser.add_argument( "--dbinput", default=True, action="store_true",help="Pa
 arg_parser.add_argument( "--no-dbinput", dest="dbinput", action="store_false",help="Unsets dbinput flag." )
 
 arg_parser.add_argument( "--batch-name", dest="batch_name", default=None ) #default="$(name)_$(build)_$(tag)_$(version)"
+arg_parser.add_argument( "--doit", dest="doit", action="store_true", default=False )
 
 def warn_options( args, userargs ):
     if args.dbinput==False:

@@ -4,6 +4,7 @@
 # it runs the SL7 container.
 
 # Create an initialization script on the worker node to get around singularity
+#  ... deprecated ???
 cat <<EOF > sPHENIX_INIT
 
     echo "Executing sPHENIX_INIT: build ${1}"
@@ -34,14 +35,6 @@ export cupsid=${@: -1:1}                           # this is the ID of the job o
                                                    # payload and subdir are nominally specified in the yaml file
 export payload=( `echo ${@: -2:1} | tr ","  " "` ) # comma sep list --> array of files to stage in
 export subdir=${@: -3:1}                           # ... relative to the submission directory
-
-if [[ $subdir  =~ "*testbed*" ]]; then
-    echo "Running in a testbed environment"
-    export CUPS_TESTBED_MODE=true
-else
-    echo "Running in a production environment"
-    export CUPS_PRODUCTION_MODE=true    
-fi
 
 myArgs=( "$@")
 shift
@@ -78,8 +71,33 @@ echo subdir:     ${subdir}
 
 # stage in the payload files
 for i in ${payload[@]}; do
-    cp --verbose $subdir/$i . 
+    cp --verbose -r $subdir/$i . 
 done
+
+source .slurp/slurppath.sh
+cp ${SLURPPATH}/cups.py .
+
+
+# Test if we are in testbed mode
+if [[ $subdir  =~ "*testbed*" ]]; then
+    echo "Running in a testbed environment [subdir]"
+    export CUPS_TESTBED_MODE=true
+    touch CUPS_TESTBED_MODE
+elif [[ $subdir  =~ "*Testbed*" ]]; then
+    echo "Running in a testbed environment [subdir]"
+    export CUPS_TESTBED_MODE=true
+    touch CUPS_TESTBED_MODE
+elif [[ -e ".slurp/testbed" ]]; then
+    echo "Running in a testbed environment [.slurp/testbed]"
+    export CUPS_TESTBED_MODE=true
+    touch CUPS_TESTBED_MODE    
+else
+    echo "Running in a production environment"
+    export CUPS_PRODUCTION_MODE=true
+    touch CUPS_PRODUCTION_MODE
+fi
+
+
 
 # user has supplied an odbc.ini file.  use it.
 if [ -e odbc.ini ]; then
