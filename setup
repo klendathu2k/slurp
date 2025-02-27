@@ -22,7 +22,12 @@ export PATH=${PATH}:${SCRIPT_DIR}/bin
 echo Using $(python --version)
 
 parse_git_branch() {
-  git -C ${SCRIPT_DIR} branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/(\1)/'
+  branch=$( git -C ${SCRIPT_DIR} branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/(\1)/' )
+  status=" \e[31mDIRTY"
+  if [ -z "$(git -C ${SCRIPT_DIR} status --porcelain)" ]; then
+      status=""
+  fi
+  echo -e ${branch}${status}
 }
 
 #PS1="\[\e[36m\]\u@\h \[\e[32m\]\w\[\e[33m\]\$(parse_git_branch)\[\e[0m\] $ "
