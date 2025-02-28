@@ -447,11 +447,40 @@ def catalog(args):
     print("[CUPS WARNING: catalog is deprecated")
     return
     
+_error_messages = {
+    'none'            : 0, # no error message is set
+    'success'         : 0, # ...
+
+    #
+    # Error codes and flags related to configuration
+    #
+    'payload-stagein-failed'  :   2** 0, # payload file stagein failed
+    'dst-stagein-failed'      :   2** 1, # DST file stagein failed    
+    'dst-stageout-failed'     :   2** 2, # DST file staeout failed
+    'hist-stageout-failed'    :   2** 3, # histogram file staeout failed
+
+    'failed-input-list'       :   2** 8, # failed to get correct input list
+    'no-gl1-files'            :   2** 9, # ...
+    'no-intt-files'           :   2**10, # ...
+    'no-mvtx-files'           :   2**11, # ...
+    'no-tpc-files'            :   2**12, # ...
+    'no-seb-files'            :   2**13, # ...
+    
+    'sighup'                 :   2**16, # SIGSTOP recieved
+    'sigint'                 :   2**17, # SIGINT  recieved
+    'sigkill'                :   2**18, # SIGKILL recieved
+    'sigpipe'                :   2**19, # SIGPIPE recieved
+    'sigusr1'                :   2**20, # SIGUSR1 recieved
+    'sigusr2'                :   2**21, # SIGUSR1 recieved    
+    
+    
+}
 
 @subcommand([
     argument( "message", help="Message to be appended to the production status entry" ),
     argument( "--flag",    help="Adds a value to the flags", default='0' ),
     argument( "--logsize", help="Sets the log file size", default='0' ),
+    argument( "--error", help="Sets a specific error condition", default="none", choices=_error_messages.keys() ),
 ])
 def message(args):
     """
