@@ -447,11 +447,18 @@ def catalog(args):
     print("[CUPS WARNING: catalog is deprecated")
     return
     
+_error_messages = {
+    'none'            : 0, # no error message is set
+    'success'         : 0, # ...
+    'stagein-failed'  : 1, # file stagein failed
+    'stageout-failed' : 2, # file staeout failed    
+}
 
 @subcommand([
     argument( "message", help="Message to be appended to the production status entry" ),
     argument( "--flag",    help="Adds a value to the flags", default='0' ),
     argument( "--logsize", help="Sets the log file size", default='0' ),
+    argument( "--error", help="Sets a specific error condition", default="none", choices=_error_messages.keys() ),
 ])
 def message(args):
     """
