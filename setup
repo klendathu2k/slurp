@@ -36,7 +36,11 @@ parse_git_branch() {
      if [ -z "$(git -C ./ProdFlow status --porcelain)" ]; then
         pstatus="\e[32m"     
      fi
+  else
+     pbranch="NONE"
+     pstatus="\e[31m"
   fi
+  
   echo -e " ${status}[slurp:${branch}] ${pstatus}[prodflow:${pbranch}] "
 }
 
