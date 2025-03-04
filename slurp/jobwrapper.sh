@@ -23,31 +23,31 @@ cat <<EOF > sPHENIX_INIT
 
 EOF
 
-#onsighup ()  {
-#    ./cups.py -r 0 -s 0 -d xxx message "SIGHUP" --sighup
-#}
-#onsigint ()  {
-#    ./cups.py -r 0 -s 0 -d xxx message "SIGINT" --sigint
-#}
-#onsigkill () {
-#    ./cups.py -r 0 -s 0 -d xxx message "SIGKILL" --sigkill
-#}
-#onsigpipe () {
-#    ./cups.py -r 0 -s 0 -d xxx message "SIGPIPE" --sigpipe
-#}
-#onsigusr1 () {
-#    ./cups.py -r 0 -s 0 -d xxx message "SIGUSR1" --sigusr1
-#}
-#onsigusr2 () {
-#    ./cups.py -r 0 -s 0 -d xxx message "SIGUSR2" --sigusr2
-#}
-#
-#trap onsighup SIGHUP
-#trap onsigint SIGINT
-#trap onsigkill SIGKILL
-#trap onsigpipe SIGPIPE
-#trap onsigusr1 SIGUSR1
-#trap onsigusr2 SIGUSR2
+onsighup ()  {
+    ./cups.py -r 0 -s 0 -d xxx message "SIGHUP" --sighup
+}
+onsigint ()  {
+    ./cups.py -r 0 -s 0 -d xxx message "SIGINT" --sigint
+}
+onsigkill () {
+    ./cups.py -r 0 -s 0 -d xxx message "SIGKILL" --sigkill
+}
+onsigpipe () {
+    ./cups.py -r 0 -s 0 -d xxx message "SIGPIPE" --sigpipe
+}
+onsigusr1 () {
+    ./cups.py -r 0 -s 0 -d xxx message "SIGUSR1" --sigusr1
+}
+onsigusr2 () {
+    ./cups.py -r 0 -s 0 -d xxx message "SIGUSR2" --sigusr2
+}
+
+trap onsighup SIGHUP
+trap onsigint SIGINT
+trap onsigkill SIGKILL
+trap onsigpipe SIGPIPE
+trap onsigusr1 SIGUSR1
+trap onsigusr2 SIGUSR2
 
 hostname
 echo $@
