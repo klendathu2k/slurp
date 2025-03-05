@@ -431,7 +431,7 @@ def update_production_status( matching, setup, condor, state ):
         update=f"""
         update  production_status
         set     status='{state}',{state}='{timestamp}',cluster={cluster},process={process}
-        where id={id_};
+        where id={id_} and status<'started';
         """
         updates.append( update )
 
