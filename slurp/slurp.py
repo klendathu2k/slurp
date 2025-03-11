@@ -376,6 +376,57 @@ def getLatestId( tablename, dstname, run, seg ):
 
     return result
 
+def set_production_cursor( dsttype, build, tag, version, torun, schedd_query ):
+
+    if version is None:
+        version=0
+
+    if isinstance(version,str):
+        version=int( version.replace('v','') )
+    
+    query=f"""    
+    insert into production_cursor (dsttype,build,tag,version,lastrun) 
+    values ( '{dsttype}', '{build}', '{tag}', {version}, {torun} )
+    on conflict
+    on constraint production_cursor_pkey
+    do update set
+    lastrun=EXCLUDED.lastrun;
+    """
+    result=dbQuery( cnxn_string_map[ 'statusw' ], query )
+    result.commit()
+    return
+
+def get_production_cursor( name_, build, tag, version=None ):
+    name=name_
+    if '$(streamname)' in name:
+        name = name.replace('$(streamname)','_X_')
+
+    query=f"""
+    select lastrun from production_cursor where
+    dsttype='{name}' and
+    build='{build}'  and
+    tag='{tag}'      and
+    version={version} 
+    """
+    print(query)
+
+    array = [ int(r.lastrun) for r in dbQuery( cnxn_string_map[ 'status' ], query ) ]
+
+    result = 0
+    
+    if len(array)==0:
+        WARN( f"There is no production cursor found for {name_} {build} {tag} {version}.  Default to zero.")
+        result = 0
+    elif len(array)>1:
+        WARN( f"There are multiple production cursors found for {name_} {build} {tag} {version}.  Returning maximum.")
+        result= max(array)
+    else:
+        result= array[0]
+
+    INFO(f"Production cursor starts from run {result}")
+            
+    return result
+
 def update_production_status( matching, setup, condor, state ):
 
     # Condor map contains a dictionary keyed on the "output" field of the job description.
