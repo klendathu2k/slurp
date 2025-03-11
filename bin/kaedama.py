@@ -273,7 +273,15 @@ def main():
         params['rsync'] = params['rsync']+','+args.append2rsync
     params['rsync'] = params['rsync'] + ",.slurp/"
 
-        
+    # if the keyword 'cursor' appears, we will lookup the production cursor and replace it here
+    if 'cursor' in run_condition:
+        print( params['name'] )
+        print( params['build_name'] )
+        print( params['dbtag'] )
+        print( params.get('version',None) )
+        runcursor=get_production_cursor( params['name'], params['build_name'], params['dbtag'], params['version'] )
+        run_condition=run_condition.replace('cursor',str(runcursor))
+    
 
     # Input query specifies the source of the input files
     input_         = config.get('input')
