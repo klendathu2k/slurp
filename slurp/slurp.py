@@ -129,6 +129,8 @@ def dbQuery( cnxn_string, query, ntries=10 ):
             delay = (itry + 1 ) * random.random()
             time.sleep(delay)
 
+    print(cnxn_string)
+    print(query)
     print(lastException)
     exit(0)
             
