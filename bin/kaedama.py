@@ -57,6 +57,9 @@ arg_parser.add_argument( '--append-to-rsync', dest='append2rsync', default=None,
 
 arg_parser.add_argument( '--logdir', dest='logdir', default=None, help="Directory for kaedama logging (defaults under /tmp)" )
 
+arg_parser.add_argument( '--advance-cursor', dest='advance_cursor', default=False, action="store_true", help="Advances the production run cursor to the last run submitted")
+arg_parser.add_argument( '--set-cursor', dest='set_cursor', default=None, help="Sets the production run cursor to the provided value.")
+
 #
 # Specifies the default directory layout for files.  Note that "production" will be replaced with "production-testbed" for the
 # testbed setups.
