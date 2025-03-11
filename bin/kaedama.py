@@ -216,8 +216,10 @@ def main():
             print(exc)
 
     run_condition = ""
-    if len(args.runs)==1:
-        run_condition = f"and runnumber={args.runs[0]}"
+    if len(args.runs)==1 and args.runs[0] != 'cursor':
+        run_condition = f"and runnumber={args.runs[0]} "
+    elif len(args.runs)==1 and args.runs[0] == 'cursor':
+        run_condition = f"and runnumber>={args.runs[0]} "        
     elif len(args.runs)==2:
         run_condition = f"and runnumber>={args.runs[0]} and runnumber<={args.runs[1]}"
     elif len(args.runs)>=3 and args.runlist==None:
