@@ -647,6 +647,7 @@ def submit( rule, maxjobs, **kwargs ):
                 pprint.pprint(m)
 
     dispatched_runs = []
+    last_run = -1
 
 
     #
@@ -716,8 +717,13 @@ def submit( rule, maxjobs, **kwargs ):
                     d['ranges']= 'dbranges'
 
 
-            mymatching.append(d)        
-            dispatched_runs.append( (d['run'],d['seg']) )
+            mymatching.append(d)
+
+            run_ = d['run']
+            dispatched_runs.append( (run_,d['seg']) )
+
+            if int(run_) > last_run:
+                last_run = int(run_)
                 
         run_submit_loop=30
         schedd_query = None
