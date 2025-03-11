@@ -19,6 +19,7 @@ from slurp import RUNFMT as RUNFMT_
 from slurp import SEGFMT as SEGFMT_
 
 from slurp import PRODUCTION_MODE
+from slurp import get_production_cursor
 
 import sh
 import sys
