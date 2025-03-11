@@ -812,9 +812,11 @@ def submit( rule, maxjobs, **kwargs ):
         if ( schedd_query ):
             
 
+            # Get the result from submitting the jobs
             INFO("... result")
             result = submit_result.cluster()            
 
+            # Update the production status table
             INFO("... update")
             update_production_status( matching, setup, schedd_query, state="submitted" )
 
