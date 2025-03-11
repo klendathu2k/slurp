@@ -19,6 +19,7 @@ from slurp import RUNFMT as RUNFMT_
 from slurp import SEGFMT as SEGFMT_
 
 from slurp import PRODUCTION_MODE
+from slurp import get_production_cursor
 
 import sh
 import sys
@@ -40,7 +41,7 @@ arg_parser.add_argument( '--rule', help="Submit against specified rule", default
 arg_parser.add_argument( '--limit', help="Maximum number of jobs to submit", default=0, type=int )
 arg_parser.add_argument( '--submit',help="Job will be submitted", dest="submit", default="True", action="store_true")
 arg_parser.add_argument( '--no-submit', help="Job will not be submitted... print things", dest="submit", action="store_false")
-arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=['26022'] )
+arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list.  If cursor is provided as the first argument, start from the last run wholly or partially submitted.  The second argument is interpreted as a window, i.e. submit runs cursor to cursor+N inclusive.", default=['cursor'] )
 arg_parser.add_argument( '--runlist', default=None, help="Flat text file containing list of runs to process, separated by whitespace / newlines." )
 arg_parser.add_argument( '--segments', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[] )
 arg_parser.add_argument( '--config',help="Specifies the yaml configuration file")
@@ -56,6 +57,9 @@ arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query
 arg_parser.add_argument( '--append-to-rsync', dest='append2rsync', default=None,help="Appends the argument to the list of rsync files to copy to the worker node" )
 
 arg_parser.add_argument( '--logdir', dest='logdir', default=None, help="Directory for kaedama logging (defaults under /tmp)" )
+
+arg_parser.add_argument( '--advance-cursor', dest='advance_cursor', default=False, action="store_true", help="Advances the production run cursor to the last run submitted")
+arg_parser.add_argument( '--set-cursor', dest='set_cursor', default=None, help="Sets the production run cursor to the provided value.")
 
 #
 # Specifies the default directory layout for files.  Note that "production" will be replaced with "production-testbed" for the
@@ -212,10 +216,17 @@ def main():
             print(exc)
 
     run_condition = ""
-    if len(args.runs)==1:
-        run_condition = f"and runnumber={args.runs[0]}"
-    elif len(args.runs)==2:
-        run_condition = f"and runnumber>={args.runs[0]} and runnumber<={args.runs[1]}"
+    if len(args.runs)==1 and args.runs[0] != 'cursor':
+        run_condition = f"and runnumber={args.runs[0]} "
+    elif len(args.runs)==1 and args.runs[0] == 'cursor':
+        run_condition = f"and runnumber>={args.runs[0]} "        
+
+    elif len(args.runs)==2 and args.runs[0] != 'cursor':
+        run_condition = f"and runnumber>={args.runs[0]} and runnumber<={args.runs[1]} "
+    elif len(args.runs)==2 and args.runs[0] == 'cursor':
+        run_condition = f"and runnumber>=cursor and runnumber<=cursor+{args.runs[1]} "
+
+        
     elif len(args.runs)>=3 and args.runlist==None:
         run_condition = "and runnumber in ( %s )" % ','.join( args.runs )
     elif args.runlist:
@@ -262,7 +273,15 @@ def main():
         params['rsync'] = params['rsync']+','+args.append2rsync
     params['rsync'] = params['rsync'] + ",.slurp/"
 
-        
+    # if the keyword 'cursor' appears, we will lookup the production cursor and replace it here
+    if 'cursor' in run_condition:
+        print( params['name'] )
+        print( params['build_name'] )
+        print( params['dbtag'] )
+        print( params.get('version',None) )
+        runcursor=get_production_cursor( params['name'], params['build_name'], params['dbtag'], params['version'] )
+        run_condition=run_condition.replace('cursor',str(runcursor))
+    
 
     # Input query specifies the source of the input files
     input_         = config.get('input')
