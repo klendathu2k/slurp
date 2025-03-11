@@ -811,7 +811,6 @@ def submit( rule, maxjobs, **kwargs ):
         INFO("Insert and update the production_status")
         if ( schedd_query ):
             
-
             # Get the result from submitting the jobs
             INFO("... result")
             result = submit_result.cluster()            
@@ -882,10 +881,7 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, version=None
                    hash='%s'
                    limit 1;
         """%( name, build, dbtag, hash_ )
-    else:
-
-
-        
+    else:        
         query="""
         select id,hash from production_setup 
                where name='%s'  and 
