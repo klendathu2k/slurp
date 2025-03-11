@@ -73,7 +73,7 @@ CREATE TABLE if not exists PRODUCTION_CURSOR
        version   int             not null,   -- version/revision number
        lastrun   int             not null,   -- runnumber
        
-       primary key ( id, dsttype, build, tag, version, lastrun )
+       primary key ( dsttype, build, tag, version )
 
 );       
     """
