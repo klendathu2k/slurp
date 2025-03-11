@@ -41,7 +41,7 @@ arg_parser.add_argument( '--rule', help="Submit against specified rule", default
 arg_parser.add_argument( '--limit', help="Maximum number of jobs to submit", default=0, type=int )
 arg_parser.add_argument( '--submit',help="Job will be submitted", dest="submit", default="True", action="store_true")
 arg_parser.add_argument( '--no-submit', help="Job will not be submitted... print things", dest="submit", action="store_false")
-arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=['26022'] )
+arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list.  If cursor is provided as the first argument, start from the last run wholly or partially submitted.  The second argument is interpreted as a window, i.e. submit runs cursor to cursor+N inclusive.", default=['cursor'] )
 arg_parser.add_argument( '--runlist', default=None, help="Flat text file containing list of runs to process, separated by whitespace / newlines." )
 arg_parser.add_argument( '--segments', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[] )
 arg_parser.add_argument( '--config',help="Specifies the yaml configuration file")
