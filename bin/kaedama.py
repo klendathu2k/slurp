@@ -220,8 +220,13 @@ def main():
         run_condition = f"and runnumber={args.runs[0]} "
     elif len(args.runs)==1 and args.runs[0] == 'cursor':
         run_condition = f"and runnumber>={args.runs[0]} "        
-    elif len(args.runs)==2:
-        run_condition = f"and runnumber>={args.runs[0]} and runnumber<={args.runs[1]}"
+
+    elif len(args.runs)==2 and args.runs[0] != 'cursor':
+        run_condition = f"and runnumber>={args.runs[0]} and runnumber<={args.runs[1]} "
+    elif len(args.runs)==2 and args.runs[0] == 'cursor':
+        run_condition = f"and runnumber>=cursor and runnumber<=cursor+{args.runs[1]} "
+
+        
     elif len(args.runs)>=3 and args.runlist==None:
         run_condition = "and runnumber in ( %s )" % ','.join( args.runs )
     elif args.runlist:
