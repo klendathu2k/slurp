@@ -129,6 +129,8 @@ def dbQuery( cnxn_string, query, ntries=10 ):
             delay = (itry + 1 ) * random.random()
             time.sleep(delay)
 
+    print(cnxn_string)
+    print(query)
     print(lastException)
     exit(0)
             
@@ -374,6 +376,57 @@ def getLatestId( tablename, dstname, run, seg ):
 
     return result
 
+def set_production_cursor( dsttype, build, tag, version, torun, schedd_query ):
+
+    if version is None:
+        version=0
+
+    if isinstance(version,str):
+        version=int( version.replace('v','') )
+    
+    query=f"""    
+    insert into production_cursor (dsttype,build,tag,version,lastrun) 
+    values ( '{dsttype}', '{build}', '{tag}', {version}, {torun} )
+    on conflict
+    on constraint production_cursor_pkey
+    do update set
+    lastrun=EXCLUDED.lastrun;
+    """
+    result=dbQuery( cnxn_string_map[ 'statusw' ], query )
+    result.commit()
+    return
+
+def get_production_cursor( name_, build, tag, version=None ):
+    name=name_
+    if '$(streamname)' in name:
+        name = name.replace('$(streamname)','_X_')
+
+    query=f"""
+    select lastrun from production_cursor where
+    dsttype='{name}' and
+    build='{build}'  and
+    tag='{tag}'      and
+    version={version} 
+    """
+    print(query)
+
+    array = [ int(r.lastrun) for r in dbQuery( cnxn_string_map[ 'status' ], query ) ]
+
+    result = 0
+    
+    if len(array)==0:
+        WARN( f"There is no production cursor found for {name_} {build} {tag} {version}.  Default to zero.")
+        result = 0
+    elif len(array)>1:
+        WARN( f"There are multiple production cursors found for {name_} {build} {tag} {version}.  Returning maximum.")
+        result= max(array)
+    else:
+        result= array[0]
+
+    INFO(f"Production cursor starts from run {result}")
+            
+    return result
+
 def update_production_status( matching, setup, condor, state ):
 
     # Condor map contains a dictionary keyed on the "output" field of the job description.
@@ -431,7 +484,7 @@ def update_production_status( matching, setup, condor, state ):
         update=f"""
         update  production_status
         set     status='{state}',{state}='{timestamp}',cluster={cluster},process={process}
-        where id={id_};
+        where id={id_} and status<'started';
         """
         updates.append( update )
 
@@ -594,6 +647,7 @@ def submit( rule, maxjobs, **kwargs ):
                 pprint.pprint(m)
 
     dispatched_runs = []
+    last_run = -1
 
 
     #
@@ -663,8 +717,13 @@ def submit( rule, maxjobs, **kwargs ):
                     d['ranges']= 'dbranges'
 
 
-            mymatching.append(d)        
-            dispatched_runs.append( (d['run'],d['seg']) )
+            mymatching.append(d)
+
+            run_ = d['run']
+            dispatched_runs.append( (run_,d['seg']) )
+
+            if int(run_) > last_run:
+                last_run = int(run_)
                 
         run_submit_loop=30
         schedd_query = None
@@ -752,12 +811,24 @@ def submit( rule, maxjobs, **kwargs ):
         INFO("Insert and update the production_status")
         if ( schedd_query ):
             
-
+            # Get the result from submitting the jobs
             INFO("... result")
             result = submit_result.cluster()            
 
+            # Update the production status table
             INFO("... update")
             update_production_status( matching, setup, schedd_query, state="submitted" )
+
+            # Update the production cursor
+            if args.advance_cursor==True:
+                #set_production_cursor ( last_run, setup, schedd_query )
+                set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, last_run, schedd_query )
+            elif args.set_cursor:
+                #set_production_cursor ( int(args.set_cursor), setup, schedd_query )
+                set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, int(args.set_cursor), schedd_query )
+                
+
+            
 
 
     else:
@@ -810,10 +881,7 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, version=None
                    hash='%s'
                    limit 1;
         """%( name, build, dbtag, hash_ )
-    else:
-
-
-        
+    else:        
         query="""
         select id,hash from production_setup 
                where name='%s'  and 

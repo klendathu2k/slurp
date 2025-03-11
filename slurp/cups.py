@@ -459,6 +459,9 @@ _error_messages = {
     'dst-stageout-failed'     :   2** 2, # DST file staeout failed
     'hist-stageout-failed'    :   2** 3, # histogram file staeout failed
 
+    'gpfs-failure'            :   2** 4, # could not initialize file on gpfs
+    'lustre-failure'          :   2** 5, # could not initialize file on lustre
+
     'failed-input-list'       :   2** 8, # failed to get correct input list
     'no-gl1-files'            :   2** 9, # ...
     'no-intt-files'           :   2**10, # ...
@@ -478,17 +481,22 @@ _error_messages = {
 
 @subcommand([
     argument( "message", help="Message to be appended to the production status entry" ),
-    argument( "--flag",    help="Adds a value to the flags", default='0' ),
+    argument( "--flag",    help="Adds a value to the flags [DEPRECATED]", default='0' ),
     argument( "--logsize", help="Sets the log file size", default='0' ),
-    argument( "--error", help="Sets a specific error condition", default="none", choices=_error_messages.keys() ),
+    argument( "--error", help="Sets a specific error condition", default=None, choices=_error_messages.keys() ),
 ])
 def message(args):
     """
     Sets message field on the production status table
     """
     flaginc=int(args.flag)
+    if args.error is not None:
+        flaginc=_error_messages[args.error]
+        
     id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
-    update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};"
+    update = f"""
+       update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};
+    """
     curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()

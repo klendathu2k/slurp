@@ -61,6 +61,23 @@ CREATE TYPE prodstate as ENUM
     """
     return result
 
+
+def sphnx_production_cursor_table_def():
+    result="""
+CREATE TABLE if not exists PRODUCTION_CURSOR
+(
+       id        serial          unique  ,   -- unique identifier
+       dsttype   text            not null,   -- dst type eg DST_STREAMING_EVENT_run3auau
+       build     text            not null,   -- ana build
+       tag       text            not null,   -- cdb tag
+       version   int             not null,   -- version/revision number
+       lastrun   int             not null,   -- runnumber
+       
+       primary key ( dsttype, build, tag, version )
+
+);       
+    """
+
 def sphnx_production_status_table_def( dsttype=None, build=None, dbtag=None ):
     result="""
 CREATE TABLE if not exists PRODUCTION_STATUS
@@ -133,6 +150,8 @@ class SPhnxProductionStatus:
     submission_host: str
     execution_node: str
     logsize: int
+    ranges: list[str]
+    last_message: str
 
 
 def sphnx_production_quality_table_def():

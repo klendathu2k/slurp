@@ -141,5 +141,7 @@ chmod u+x ${userscript} sPHENIX_INIT
 echo "Running the job in singularity: ${container}"
 singularity exec -B /home -B /direct/sphenix+u -B /gpfs02 -B /sphenix/u -B /sphenix/lustre01 -B /sphenix/user  -B /sphenix/data/data02 ${container} ./${userscript} ${userArgs[@]}
 
+
+exit $?
  
 
