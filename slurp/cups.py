@@ -528,14 +528,26 @@ def stageout(args):
         print("Copy back file")
 
     # Copy the file
-    try:
-        shutil.copy2( f"{args.filename}", f"{args.outdir}" )
-        print(".... copy back finished ....")
-    except Exception as e:
-        print(f"ERROR: Failed to copy file {args.filename} to {args.outdir}.  Aborting stageout.")
-        return
+    sz = -1
+    ntries_copy=0
+    start_copy  = datetime.datetime.now(datetime.timezone.utc)
+    ex_copy     = 'none'
+    while sztrue>sz and ntries_copy<args.retries:
+        try:
+            ntries_copy=ntries_copy+1            
+            shutil.copy2( f"{args.filename}", f"{args.outdir}" )            
+            print(".... copy back finished ....")
+            sz  = int( os.path.getsize(f"{args.outdir}/{args.filename}") )
+            if sz!=sztrue:
+                time.sleep(120)
+                print(f"WARN: Could not stageout to ${args.outdir}... pausing 2min and trying...")
+        except Exception as e:
+            print(f"ERROR: Failed to copy file {args.filename} to {args.outdir}.  Aborting stageout.")
+            ex_copy=str(e)
+            return
+    finish_copy  = datetime.datetime.now(datetime.timezone.utc)        
 
-    sz  = int( os.path.getsize(f"{args.outdir}/{args.filename}") ) 
+
 
     if args.verbose:
         print("Checksum before and after")
@@ -648,7 +660,7 @@ def stageout(args):
     # Could cache the files here ...
     os.remove(  f"{filename}")
 
-    return 'result.files', ntries_files, start_files, finish_files, ex_files, nm_files, sv_files, 'result.datasets', ntries_dsets, start_dsets, finish_dsets, ex_dsets, nm_dsets, sv_dsets, 'result.status', ntries_stat, start_stat, finish_stat, ex_stat, nm_stat, sv_stat    
+    return 'result.files', ntries_files, start_files, finish_files, ex_files, nm_files, sv_files, 'result.datasets', ntries_dsets, start_dsets, finish_dsets, ex_dsets, nm_dsets, sv_dsets, 'result.status', ntries_stat, start_stat, finish_stat, ex_stat, nm_stat, sv_stat, 'result.copy', ntries_copy, start_copy, finish_copy, ex_copy, args.filename, '/'.join(args.outdir.split('/')[:5])
 
 
 @subcommand([
