@@ -408,8 +408,6 @@ def get_production_cursor( name_, build, tag, version=None ):
     tag='{tag}'      and
     version={version} 
     """
-    print(query)
-
     array = [ int(r.lastrun) for r in dbQuery( cnxn_string_map[ 'status' ], query ) ]
 
     result = 0
@@ -646,6 +644,8 @@ def submit( rule, maxjobs, **kwargs ):
             for m in matching:
                 pprint.pprint(m)
 
+    submit_job[ "+sPHENIX_PRODUCTION" ] = f"{rule.name}_{rule.build}_{rule.tag}_{rule.version}"
+    
     dispatched_runs = []
     last_run = -1
 
@@ -678,6 +678,8 @@ def submit( rule, maxjobs, **kwargs ):
             runtype='none'
             d['runtype']='unset'
             d['runname']=rule.runname
+            d['+sPHENIX_RUNNUMBER']=str(m['run'])
+            d['+sPHENIX_SEGMENT']=str(m['seg'])
 
             leafdir=m["name"].replace(f"_{rule.runname}","")
 
@@ -804,7 +806,7 @@ def submit( rule, maxjobs, **kwargs ):
         INFO("Getting back the cluster and process IDs")
         schedd_query = schedd.query(
             constraint=f"ClusterId == {submit_result.cluster()}",
-            projection=["ClusterId", "ProcId", "Out", "UserLog", "Args" ]
+            projection=["ClusterId", "ProcId", "Out", "UserLog", "Args", "sPHENIX_PRODUCTION", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT" ]
         )
 
         # Update DB IFF we have a valid submission
