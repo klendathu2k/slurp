@@ -632,6 +632,9 @@ def submit(args):
                 ]
 
         if args.rules_yaml:
+            rules_yaml = {} # clear from last loop and reload
+            with open( args.rules_yaml ) as stream:
+                rules_yaml = yaml.safe_load( stream )            
             list_of_active_rules = rules_yaml.keys()                
 
         clear()
