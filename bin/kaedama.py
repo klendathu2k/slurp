@@ -213,6 +213,7 @@ def main():
         try:
             config = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
+            print(f"Could not open {args.config}")
             print(exc)
 
     run_condition = ""
