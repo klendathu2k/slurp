@@ -648,6 +648,7 @@ def submit( rule, maxjobs, **kwargs ):
     
     dispatched_runs = []
     last_run = -1
+    db_hold_query = None
 
 
     #
@@ -810,14 +811,32 @@ def submit( rule, maxjobs, **kwargs ):
                 constraint=f"sPHENIX_DSTTYPE == {rule.name.replace('$(streamname)','_X_')}",
                 projection=["ClusterId", "ProcId", "JobStatus", "sPHENIX_DSTTYPE", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT", "sPHENIX_SLURP_CUPSID" ]
             )
+            hold_query = []
             for ad in production_status_query:
                 ad_run  = int(ad['sPHENIX_RUNNUMBER'])
+                ad_cups = int(ad['sPHENIX_SLURP_CUPSID'])
+                ad_stat = int(ad['JobStatus'])                
+                
                 if ad_run < earliest_run_number and ad_stat==2:
                     earliest_run_number = ad_run
+
+                if args.mark_held_jobs and ad_stat==5:
+                    hold_query.append(f"""
+                    update production_status set status='held' where id={ad_cups};
+                    """)
+
+            if len(hold_query) > 0:
+                db_hold_query = ';\n'.join(hold_query)
+                print(db_hold_query)
+                dbQuery( cnxn_string_map['statw'], db_hold_query );
+
+                                      
 
             if earliest_run_number < 9E9 and args.advance_cursor==True:
                 set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, earliest_run_number, production_status_query )
                 
+
+
             # submits the job to condor
             INFO("... submitting to condor")
 
