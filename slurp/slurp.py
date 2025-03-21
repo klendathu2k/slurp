@@ -678,8 +678,17 @@ def submit( rule, maxjobs, **kwargs ):
             runtype='none'
             d['runtype']='unset'
             d['runname']=rule.runname
+            # Add DSTTYPE, RUNNUMBER and SEGMENT to the classad for each job.  The value passed in is a
+            # string.  Condor will then deduce the type from that string.  So... passing in integers as
+            # they are... wrapping the DSTTYPE in '"' so it is interpreted as a string rather than an expression.
+            streamname = m.get( 'streamname', None )
+            name = m['name']
+            if '$(streamname)' in name:
+                name = name.replace("$(streamname)",streamname)
+            d['+sPHENIX_DSTTYPE']  ='"'+ name +'"'
+            d['+sPHENIX_DATASET']  ='"'+str(rule.build)+"_"+str(rule.tag)+"_"+str(rule.version)+'"'
             d['+sPHENIX_RUNNUMBER']=str(m['run'])
-            d['+sPHENIX_SEGMENT']=str(m['seg'])
+            d['+sPHENIX_SEGMENT']  =str(m['seg'])
 
             leafdir=m["name"].replace(f"_{rule.runname}","")
 
@@ -740,6 +749,7 @@ def submit( rule, maxjobs, **kwargs ):
         cupsids = insert_production_status( matching, setup, cursor=cursorips ) 
         for i,m in zip(cupsids,mymatching):
             m['cupsid']=str(i)
+            m['+sPHENIX_SLURP_CUPSID']=str(i)
 
         
         INFO("Preparing to submit the jobs to condor")
