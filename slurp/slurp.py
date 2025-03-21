@@ -1445,6 +1445,7 @@ arg_parser.add_argument( "--no-dbinput", dest="dbinput", action="store_false",he
 
 arg_parser.add_argument( "--batch-name", dest="batch_name", default=None ) #default="$(name)_$(build)_$(tag)_$(version)"
 arg_parser.add_argument( "--doit", dest="doit", action="store_true", default=False )
+arg_parser.add_argument( "--mark-held-jobs", dest="mark_held_jobs", action="store_true", default=False )
 
 def warn_options( args, userargs ):
     if args.dbinput==False:
