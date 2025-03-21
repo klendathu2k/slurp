@@ -801,6 +801,23 @@ def submit( rule, maxjobs, **kwargs ):
                                 INFO(f"mkdir {eval(outdir)}")
                                 madedir[targetdir]=True
 
+            #
+            # Just prior to submitting, we will get the earliest run number that is still being processed for this dsttype
+            #
+            earliest_run_number = 9E9 #  signals no update b/c nothing is running
+            INFO(f"... querying condor for production {rule.name}")
+            production_status_query = schedd.query(
+                constraint=f"sPHENIX_DSTTYPE == {rule.name.replace('$(streamname)','_X_')}",
+                projection=["ClusterId", "ProcId", "JobStatus", "sPHENIX_DSTTYPE", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT", "sPHENIX_SLURP_CUPSID" ]
+            )
+            for ad in production_status_query:
+                ad_run  = int(ad['sPHENIX_RUNNUMBER'])
+                if ad_run < earliest_run_number and ad_stat==2:
+                    earliest_run_number = ad_run
+
+            if earliest_run_number < 9E9 and args.advance_cursor==True:
+                set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, earliest_run_number, production_status_query )
+                
             # submits the job to condor
             INFO("... submitting to condor")
 
