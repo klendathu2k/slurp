@@ -742,7 +742,7 @@ def submit( rule, maxjobs, **kwargs ):
             m['cupsid']=str(i)
 
         
-        INFO("Preparing to submitting the jobs to condor")
+        INFO("Preparing to submit the jobs to condor")
         try:
 
             INFO("... creating directories if they do not exist")
