@@ -852,7 +852,9 @@ def submit( rule, maxjobs, **kwargs ):
         INFO("Getting back the cluster and process IDs")
         schedd_query = schedd.query(
             constraint=f"ClusterId == {submit_result.cluster()}",
-            projection=["ClusterId", "ProcId", "Out", "UserLog", "Args", "sPHENIX_PRODUCTION", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT" ]
+#           projection=["ClusterId", "ProcId", "Out", "UserLog", "Args", "sPHENIX_PRODUCTION", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT" ]
+            projection=["ClusterId", "ProcId", "Out", "UserLog", "Args"
+                        ]            
         )
 
         # Update DB IFF we have a valid submission
