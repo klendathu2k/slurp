@@ -832,12 +832,12 @@ def submit( rule, maxjobs, **kwargs ):
             update_production_status( matching, setup, schedd_query, state="submitted" )
 
             # Update the production cursor
-            if args.advance_cursor==True:
-                #set_production_cursor ( last_run, setup, schedd_query )
-                set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, last_run, schedd_query )
-            elif args.set_cursor:
-                #set_production_cursor ( int(args.set_cursor), setup, schedd_query )
-                set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, int(args.set_cursor), schedd_query )
+            #if args.advance_cursor==True:
+            #    #set_production_cursor ( last_run, setup, schedd_query )
+            #    set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, last_run, schedd_query )
+            #elif args.set_cursor:
+            #    #set_production_cursor ( int(args.set_cursor), setup, schedd_query )
+            #    set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, int(args.set_cursor), schedd_query )
                 
 
             
