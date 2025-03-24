@@ -21,6 +21,11 @@ cat <<EOF > sPHENIX_INIT
 	export NOPAYLOADCLIENT_CONF=./sPHENIX_newcdb.json
     fi
 
+    if [ -e sPHENIX_newcdb_test.json ]; then
+	echo "... setting user provided conditions database config"
+	export NOPAYLOADCLIENT_CONF=./sPHENIX_newcdb_test.json
+    fi
+
 EOF
 
 onsighup ()  {
