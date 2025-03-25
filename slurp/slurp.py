@@ -792,14 +792,14 @@ def submit( rule, maxjobs, **kwargs ):
                                 if madedir.get( targetdir, False )==False:
                                     td =  targetdir.replace('$(streamname)',mystreamname )
                                     pathlib.Path( td ).mkdir( parents=True, exist_ok=True )
-                                    INFO(f"mkdir {td}")
+                                    #INFO(f"mkdir {td}")
                                     madedir[ td ]=True                                
                                 
                         else:
 
                             if madedir.get( targetdir, False )==False:
                                 pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
-                                INFO(f"mkdir {eval(outdir)}")
+                                #INFO(f"mkdir {eval(outdir)}")
                                 madedir[targetdir]=True
 
             #
