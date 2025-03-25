@@ -7,8 +7,8 @@
 #  ... deprecated ???
 cat <<EOF > sPHENIX_INIT
 
-    echo "Executing sPHENIX_INIT: build ${1}"
-    source /opt/sphenix/core/bin/sphenix_setup.sh -n ${1}
+#    echo "Executing sPHENIX_INIT: build ${1}"
+#    source /opt/sphenix/core/bin/sphenix_setup.sh -n ${1}
 
     # user has supplied an odbc.ini file.  use it.
     if [ -e odbc.ini ]; then
@@ -139,6 +139,11 @@ fi
 if [ -e sPHENIX_newcdb.json ]; then
 echo "Setting user provided conditions database config"
 export NOPAYLOADCLIENT_CONF=./sPHENIX_newcdb.json
+fi
+
+if [ -e sPHENIX_newcdb_test.json ]; then
+echo "Setting user provided conditions database config"
+export NOPAYLOADCLIENT_CONF=./sPHENIX_newcdb_test.json
 fi
 
 chmod u+x ${userscript} sPHENIX_INIT
