@@ -831,6 +831,9 @@ def submit( rule, maxjobs, **kwargs ):
                     __when = int(ad['EnteredCurrentStatus'])
                     hold_query.append(f"update production_status set status='held', message='{__reason}', ended=to_timestamp( {__when} ) where id={ad_cups};")
 
+                if args.clear_held_jobs and ad_stat==5:
+                    __reason = f"[cleared] {__reason}"
+
             if len(hold_query) > 0:
                 INFO("Marking {len(hold_query)} jobs as held.")
                 db_hold_query = ' '.join(hold_query)
@@ -839,6 +842,10 @@ def submit( rule, maxjobs, **kwargs ):
             if earliest_run_number < 9E9 and args.advance_cursor==True:
                 INFO("Advancing the run cursor")
                 set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, earliest_run_number, production_status_query )
+
+            if args.clear_held_jobs:
+                __constraint = f'regexp("{__replname}",sphenix_dsttype,"i") && (JobStatus==5)'
+                schedd.act( htcondor.JobAction.Remove, __constraint, 'Removed by kaedama' )
                 
 
 
@@ -1499,6 +1506,7 @@ arg_parser.add_argument( "--no-dbinput", dest="dbinput", action="store_false",he
 arg_parser.add_argument( "--batch-name", dest="batch_name", default=None ) #default="$(name)_$(build)_$(tag)_$(version)"
 arg_parser.add_argument( "--doit", dest="doit", action="store_true", default=False )
 arg_parser.add_argument( "--mark-held-jobs", dest="mark_held_jobs", action="store_true", default=False )
+arg_parser.add_argument( "--clear-held-jobs", dest="clear_held_jobs", action="store_true", default=False )
 
 def warn_options( args, userargs ):
     if args.dbinput==False:
