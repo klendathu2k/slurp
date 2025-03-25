@@ -24,6 +24,42 @@ import classad
 
 init()
 
+import fcntl
+import os
+
+class FileMutex:
+    """
+    File-based mutex recommended by Google AI.
+    """
+    def __init__(self, lock_file_path):
+        self.lock_file_path = lock_file_path
+        self.lock_file = None
+
+    def acquire(self, blocking=True, timeout=None):
+        if self.lock_file is None:
+            self.lock_file = open(self.lock_file_path, 'w')
+        
+        try:
+            fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
+            return True
+        except OSError as e:
+            if e.errno in (11, 35): #EAGAIN or EWOULDBLOCK
+                return False
+            raise
+    
+    def release(self):
+        if self.lock_file:
+            fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_UN)
+            self.lock_file.close()
+            self.lock_file = None
+    
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.release()
+
 args  = None
 
 def no_colorization(row,default_color=("",""),fail_color=("","")):
@@ -622,6 +658,9 @@ def submit(args):
             runreport = f"runs: 0 to 999999"
 
     tracebacks = []
+
+    mutex = FileMutex(".slurp/__ramenya_lock__")                
+    
     while ( go ):
 
         list_of_active_rules = args.rules
@@ -652,45 +691,45 @@ def submit(args):
         # Verify that there is enough room on condor to submit
         schedd = htcondor.Schedd() 
         ncondor = 1E9
-        try:
-            condor_query = schedd.query(
-                projection=["ClusterId","ProcId","JobStatus"]
-            )
-            ncondor = len(condor_query)
-            if ncondor > float(args.watermark) * int(args.maxcondor):
-                if args.watermark_action=="exit":
-                    print(f"Exiting b/c there are too many jobs ({ncondor}) in the condor schedd.")
-                    exit(0)
-                else:
-                    continue
 
-        except htcondor.HTCondorIOError:
-            print("... could not query condor, aborting this submission ...")
-            del statusdbw_
-            del statusdbw                
+        with mutex:
+
+            try:
+                condor_query = schedd.query(
+                    projection=["ClusterId","ProcId","JobStatus"]
+                )
+                ncondor = len(condor_query)
+                if ncondor > float(args.watermark) * int(args.maxcondor):
+                    if args.watermark_action=="exit":
+                        print(f"Exiting b/c there are too many jobs ({ncondor}) in the condor schedd.")
+                        exit(0)
+                    else:
+                        continue
+
+            except htcondor.HTCondorIOError:
+                print("... could not query condor, aborting this submission ...")
+                del statusdbw_
+                del statusdbw                
             
-        if ncondor == 1E9:
-            print("Could not connect to schedd... skipping")
+            if ncondor == 1E9:
+                print("Could not connect to schedd... skipping")
 
-        elif ncondor > args.maxcondor:
-            print(f"Skipping b/c there are too many jobs ({ncondor}) in the condor schedd.")
+            elif ncondor > args.maxcondor:
+                print(f"Skipping b/c there are too many jobs ({ncondor}) in the condor schedd.")
 
-        else:
+            else:
 
-            for r in list_of_active_rules:
-                print( f"Trying rule ... {r} {datetime.datetime.now().replace(microsecond=0)}" )
-                try:
-                    myargs = getArgsForRule( rules_yaml, r )
-                    print(myargs)
-                    kaedama( myargs, "--batch", "--rule", r, _out=sys.stdout )
-                except sh.ErrorReturnCode_1:
-                    print(traceback.format_exc())
-                    tracebacks.append( r )
-                
-        # query_pending_jobs()
-        # query_started_jobs()
-        # query_jobs_by_cluster()
-        # query_failed_jobs()
+                for r in list_of_active_rules:
+                    print( f"Trying rule ... {r} {datetime.datetime.now().replace(microsecond=0)}" )
+
+                    try:
+                        myargs = getArgsForRule( rules_yaml, r )
+                        print(myargs)
+                        kaedama( myargs, "--batch", "--rule", r, _out=sys.stdout )
+                    except sh.ErrorReturnCode_1:
+                        print(traceback.format_exc())
+                        tracebacks.append( r )
+            
 
         if args.loop==False: break
         for i in tqdm( range( args.delay * 10), desc="Next submit" ):
