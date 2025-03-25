@@ -803,10 +803,16 @@ def submit( rule, maxjobs, **kwargs ):
                                 madedir[targetdir]=True
 
             #
-            # Just prior to submitting, we will get the earliest run number that is still being processed for this dsttype
+            # Query the condor for all jobs running or held which are producing the specified DSTTYPE.
+            #   Mark held jobs as held in the production status table.
+            #   Advance the run cursor in the production cursor table.
             #
             earliest_run_number = 9E9 #  signals no update b/c nothing is running
-            INFO(f"... querying condor for production {rule.name}")
+            __subsys="[A-Z0-9_]+"
+            __replname = rule.name.replace('$(streamname)',__subsys)
+            INFO(f"... querying condor for production {rule.name} --> {__replname}")            
+            __constraint = f'regexp("{__replname}",sphenix_dsttype,"i") && (JobStatus==2 || JobStatus==5)'
+            INFO(__constraint)
             production_status_query = schedd.query(
                 constraint=f"sPHENIX_DSTTYPE == {rule.name.replace('$(streamname)','_X_')}",
                 projection=["ClusterId", "ProcId", "JobStatus", "sPHENIX_DSTTYPE", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT", "sPHENIX_SLURP_CUPSID" ]
