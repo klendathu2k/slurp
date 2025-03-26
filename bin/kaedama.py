@@ -12,6 +12,7 @@ from slurp import SPhnxCondorJob as Job
 from slurp import matches
 from slurp import submit 
 
+import argparse
 from slurp import arg_parser
 from slurp import parse_command_line 
 
@@ -60,6 +61,8 @@ arg_parser.add_argument( '--logdir', dest='logdir', default=None, help="Director
 
 arg_parser.add_argument( '--advance-cursor', dest='advance_cursor', default=False, action="store_true", help="Advances the production run cursor to the last run submitted")
 arg_parser.add_argument( '--set-cursor', dest='set_cursor', default=None, help="Sets the production run cursor to the provided value.")
+
+arg_parser.add_argument( '--dbtag', dest='dbtag', default=None, help=argparse.SUPPRESS ) # System option.  If provided by ramenya it will override the DB option specified in the yaml file.
 
 #
 # Specifies the default directory layout for files.  Note that "production" will be replaced with "production-testbed" for the
@@ -268,11 +271,18 @@ def main():
 
     logging.info( f"Executing rule {args.rule} where ... {run_condition} {seg_condition} {limit_condition}" )
 
-    # Get  the user parameters and append additional payload
+    #
+    # Get  the user parameters and append additional payload if specified on the command line.
+    # Also if the command line overrides a 
+    #
     params          = config.get('params',None)
     if args.append2rsync:
         params['rsync'] = params['rsync']+','+args.append2rsync
     params['rsync'] = params['rsync'] + ",.slurp/"
+
+    if args.dbtag:
+        logging.warn( f"Override cdb tag in config {params['dbtag']} with {args.dbtag}" )
+        params['dbtag']=args.dbtag
 
     # if the keyword 'cursor' appears, we will lookup the production cursor and replace it here
     if 'cursor' in run_condition:
