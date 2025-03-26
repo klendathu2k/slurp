@@ -146,6 +146,17 @@ echo "Setting user provided conditions database config"
 export NOPAYLOADCLIENT_CONF=./sPHENIX_newcdb_test.json
 fi
 
+# Test for the existence of the user script.  Add message if it is missing.
+if [ ! -f ${userscript} ]; then
+    ./cups.py -r 0 -s 0 -d xxx message "User script is missing." --error 'payload-stagein-failed'
+    exit 1
+fi
+
+
+
+
+
+
 chmod u+x ${userscript} sPHENIX_INIT
 
 echo "Running the job in singularity: ${container}"
