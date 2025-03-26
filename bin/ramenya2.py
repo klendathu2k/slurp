@@ -60,6 +60,17 @@ class FileMutex:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.release()
 
+def countdown(t):
+    with tqdm(total=t, desc="Countdown", unit="sec", colour="green", ascii=False) as pbar:
+        while t:
+            mins, secs = divmod(t, 60)
+            timer = '{:02d}:{:02d}'.format(mins, secs)
+            pbar.set_description(f"Countdown: {timer}")
+            sleep(1)
+            t -= 1
+            pbar.update(1)
+    print("It's go time!")
+        
 args  = None
 
 def no_colorization(row,default_color=("",""),fail_color=("","")):
@@ -732,8 +743,9 @@ def submit(args):
             
 
         if args.loop==False: break
-        for i in tqdm( range( args.delay * 10), desc="Next submit" ):
-            time.sleep(0.1)
+        #for i in tqdm( range( args.delay * 10), desc="Next submit" ):
+        #    time.sleep(0.1)
+        countdown( args.delay )
 
 query_choices=[
     "submitted",
