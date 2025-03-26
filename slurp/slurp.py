@@ -403,23 +403,43 @@ def get_production_cursor( name_, build, tag, version=None ):
 
     query=f"""
     select lastrun from production_cursor where
-    dsttype='{name}' and
-    build='{build}'  and
-    tag='{tag}'      and
+    dsttype   = '{name}' and
+    build  like '{build}'  and
+    tag    like '{tag}'      and
     version={version} 
+    order by id desc;
     """
     array = [ int(r.lastrun) for r in dbQuery( cnxn_string_map[ 'status' ], query ) ]
 
     result = 0
     
     if len(array)==0:
-        WARN( f"There is no production cursor found for {name_} {build} {tag} {version}.  Default to zero.")
-        result = 0
+        # No result.  Retry from the most recent cursor which has been defined.
+        result = -1
     elif len(array)>1:
-        WARN( f"There are multiple production cursors found for {name_} {build} {tag} {version}.  Returning maximum.")
-        result= max(array)
+        WARN( f"There are multiple production cursors found for {name_} {build} {tag} {version}.  Returning most recent.")
+        result= array[0]
     else:
         result= array[0]
+
+    if result==-1: # get the list of run curosrs and accept the most recent
+        query=f"""
+        select lastrun,tag from production_cursor where
+        dsttype   = '{name}' and
+        build  like '{build}'  and
+        version={version} 
+        order by id desc;
+        """
+        array = [ (int(r.lastrun),r.tag) for r in dbQuery( cnxn_string_map[ 'status' ], query ) ]
+
+        if len(array)>0:
+            INFO(f"Using lastrun={array[0][0]} from tag={array[0][1]}")
+            result=array[0][0]
+            set_production_cursor( name, build, tag, version, result, None )
+            
+        else:
+            result=0
+            
 
     INFO(f"Production cursor starts from run {result}")
             
@@ -853,6 +873,10 @@ def submit( rule, maxjobs, **kwargs ):
             INFO("... submitting to condor")
 
             submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
+            if submit_result.cluster()==0:
+                WARN("Submit result returned with cluster=0")
+            #pprint.pprint(submit_result)
+            
             # commits the insert done above
             cursorips.commit()
 
@@ -880,17 +904,6 @@ def submit( rule, maxjobs, **kwargs ):
             # Update the production status table
             INFO("... update")
             update_production_status( matching, setup, schedd_query, state="submitted" )
-
-            # Update the production cursor
-            #if args.advance_cursor==True:
-            #    #set_production_cursor ( last_run, setup, schedd_query )
-            #    set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, last_run, schedd_query )
-            #elif args.set_cursor:
-            #    #set_production_cursor ( int(args.set_cursor), setup, schedd_query )
-            #    set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, int(args.set_cursor), schedd_query )
-                
-
-            
 
 
     else:
