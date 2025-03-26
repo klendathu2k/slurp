@@ -621,6 +621,7 @@ def getArgsForRule( yaml, r ):
     argument( "--watermark-action", dest="watermark_action",help="Action to take when we exceed the high watermark",default="cycle", choices=['cycle','exit'] ),
     argument( "--dbinput", default=True, help="Sets the dbinput flag for kaedama [defaults to true]",action="store_true"),
     argument( "--no-dbinput", dest="dbinput", help="Unsets the dbinput flag for kaedama",action="store_false"),
+    argument( "--verbose",dest="verbose",help="Sets verbosity flag.  Kaedama will be directed to stdout.",action="store_true",default=False),
     argument( "SLURPFILE",   help="Specifies the slurpfile(s) containing the job definitions" )
 ])
 def submit(args):
@@ -735,16 +736,16 @@ def submit(args):
 
                     try:
                         myargs = getArgsForRule( rules_yaml, r )
-                        print(myargs)
-                        kaedama( myargs, "--batch", "--rule", r, _out=sys.stdout )
+                        if args.verbose:
+                            kaedama( myargs, "--batch", "--rule", r, _out=sys.stdout )
+                        else:
+                            kaedama( myargs, "--batch", "--rule", r )                        
                     except sh.ErrorReturnCode_1:
                         print(traceback.format_exc())
                         tracebacks.append( r )
             
 
         if args.loop==False: break
-        #for i in tqdm( range( args.delay * 10), desc="Next submit" ):
-        #    time.sleep(0.1)
         countdown( args.delay )
 
 query_choices=[
