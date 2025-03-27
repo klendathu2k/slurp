@@ -446,6 +446,8 @@ def get_production_cursor( name_, build, tag, version=None ):
     return result
 
 def update_production_status( matching, setup, condor, state ):
+    # NOTE:  This code can be signficantly simplified.  We are updating the production status, adding the
+    #        
 
     # Condor map contains a dictionary keyed on the "output" field of the job description.
     # The map contains the cluster ID, the process ID, the arguments, and the output log.
@@ -458,12 +460,13 @@ def update_production_status( matching, setup, condor, state ):
         ulog      = ad['UserLog'].split('/')[-1] 
         key       = ulog.split('.')[0].lower()  # lowercase b/c referenced by file basename
 
-        condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
+        condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog, 'CupsId':int(ad['sPHENIX_SLURP_CUPSID']) }
 
     # TODO: version???  does setup get the v000 string or just 0?
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag, setup.version )
 
     updates = []
+    INFO("... building the DB update ...")
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
@@ -484,20 +487,23 @@ def update_production_status( matching, setup, condor, state ):
 
         key     = dstfile
 
+        id_=0
         try:
             cluster = condor_map[ key.lower() ][ 'ClusterId' ]
             process = condor_map[ key.lower() ][ 'ProcId'    ]
+            id_     = condor_map[ key.lower() ][ 'CupsId'    ]
         except KeyError:
             ERROR("Key Error getting cluster and/or process number from the class ads map.")
             ERROR(f"  key={key}")
             ERROR("Assuming this is an issue with condor, setting cluster=0, process=0 and trying to continue...")
             cluster=0
             process=0
+            id_=getLatestId( 'production_status', dstname, run, segment ) # revert to slow method
         
 
         # 1s time resolution
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
-        id_ = getLatestId( 'production_status', dstname, run, segment )
+        #id_ = getLatestId( 'production_status', dstname, run, segment )
 
         update=f"""
         update  production_status
@@ -506,8 +512,10 @@ def update_production_status( matching, setup, condor, state ):
         """
         updates.append( update )
 
+    INFO("... executing the DB update ..." )
     curs = dbQuery( cnxn_string_map[ 'statusw' ], ';'.join(updates)  )
     curs.commit()
+    INFO("... done with update ... ")
 
 def insert_production_status( matching, setup, cursor ):
 
@@ -888,9 +896,8 @@ def submit( rule, maxjobs, **kwargs ):
         INFO("Getting back the cluster and process IDs")
         schedd_query = schedd.query(
             constraint=f"ClusterId == {submit_result.cluster()}",
-#           projection=["ClusterId", "ProcId", "Out", "UserLog", "Args", "sPHENIX_PRODUCTION", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT" ]
-            projection=["ClusterId", "ProcId", "Out", "UserLog", "Args"
-                        ]            
+            projection=["ClusterId", "ProcId", "Out", "UserLog", "Args", "sPHENIX_PRODUCTION", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT", "sPHENIX_SLURP_CUPSID" ]
+            #projection=["ClusterId", "ProcId", "Out", "UserLog", "Args"]            
         )
 
         # Update DB IFF we have a valid submission
