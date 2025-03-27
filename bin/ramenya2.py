@@ -27,6 +27,16 @@ init()
 import fcntl
 import os
 
+condor_job_status_map = {
+    1:"Idle",
+    2:"Running",
+    3:"Removing",
+    4:"Completed",
+    5:"Held",
+    6:"Transferring Output",
+    7:"Suspended",
+}
+
 class FileMutex:
     """
     File-based mutex recommended by Google AI.
@@ -392,15 +402,6 @@ def query_jobs_held_by_condor(conditions="true", title="Summary of jobs by with 
         return
 
     schedd = htcondor.Schedd() 
-    condor_job_status_map = {
-        1:"Idle",
-        2:"Running",
-        3:"Removing",
-        4:"Completed",
-        5:"Held",
-        6:"Transferring Output",
-        7:"Suspended",
-    }
 
     # Query held jobs
     try:
@@ -630,6 +631,8 @@ def submit(args):
     """
     go = True
 
+    
+
     global timestart
     timestart=str(args.timestart)
     kaedama  = sh.Command("kaedama.py" )
@@ -708,7 +711,7 @@ def submit(args):
 
             try:
                 condor_query = schedd.query(
-                    projection=["ClusterId","ProcId","JobStatus"]
+                    projection=["ClusterId","ProcId","JobStatus","sPHENIX_DSTTYPE"]
                 )
                 ncondor = len(condor_query)
                 if ncondor > float(args.watermark) * int(args.maxcondor):
@@ -717,6 +720,21 @@ def submit(args):
                         exit(0)
                     else:
                         continue
+
+                #dst_counts={}
+                #for ad in condor_query:
+                #    dst = dst_counts.get( ad['sPHENIX_DSTTYPE'],
+                #                          { 'Idle':0,
+                #                            'Running':0,
+                #                            'Removing':0,
+                #                            'Completed':0,
+                #                            'Held':0,
+                #                            'Stageout':0,
+                #                            'Suspended':0
+                #                           } )
+                #    dst[condor_job_status_map[ad['JobStatus']]]+=1
+                #    dst_counts[ ad['sPHENIX_DSTTYPE'] ] = dst                
+                #print( tabulate((dst_counts)) )
 
             except htcondor.HTCondorIOError:
                 print("... could not query condor, aborting this submission ...")
