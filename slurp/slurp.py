@@ -844,6 +844,19 @@ def submit( rule, maxjobs, **kwargs ):
                 constraint=__constraint,
                 projection=["ClusterId", "ProcId", "JobStatus", "HoldReason", "EnteredCurrentStatus", "sPHENIX_DSTTYPE", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT", "sPHENIX_SLURP_CUPSID" ]
             )
+            __earliest_run_in_parent = 9E9;
+            for ad in production_status_query:
+                #print(ad['clusterid'])
+                try:                
+                    run=int(ad['sPHENIX_RUNNUMBER'])
+                    if run<__earliest_run_in_parent and 2==int(ad['JobStatus']):
+                        __earliest_run_in_parent=run                    
+                except KeyError:
+                    # If there's a job in there w/out the run number... don't try to adjust
+                    pass
+
+            INFO(f"Earliest run in the feeding jobs: {__earliest_run_in_parent}")
+            INFO(f"Earliest run that matched: {__earliest_matching_run}")
             #
             # Query the condor for all jobs running or held which are producing the specified DSTTYPE.
             #   Mark held jobs as held in the production status table.
