@@ -857,12 +857,15 @@ def submit( rule, maxjobs, **kwargs ):
 
             INFO(f"Earliest run in the feeding jobs: {__earliest_run_in_parent}")
             INFO(f"Earliest run that matched: {__earliest_matching_run}")
+                
+            earliest_run_number = min( __earliest_run_in_parent, __earliest_matching_run )
+
             #
             # Query the condor for all jobs running or held which are producing the specified DSTTYPE.
             #   Mark held jobs as held in the production status table.
             #   Advance the run cursor in the production cursor table.
             #
-            earliest_run_number = 9E9 #  signals no update b/c nothing is running
+            # $$$ earliest_run_number = 9E9 #  signals no update b/c nothing is running
             __subsys="[A-Z0-9_]+"
             __replname = rule.name.replace('$(streamname)',__subsys)
             INFO(f"... querying condor for production {rule.name} --> {__replname}")            
@@ -878,8 +881,8 @@ def submit( rule, maxjobs, **kwargs ):
                 ad_cups = int(ad['sPHENIX_SLURP_CUPSID'])
                 ad_stat = int(ad['JobStatus'])
                                 
-                if ad_run < earliest_run_number and ad_stat==2:
-                    earliest_run_number = ad_run
+                # $$$ if ad_run < earliest_run_number and ad_stat==2:
+                    # $$$ earliest_run_number = ad_run
 
                 if args.mark_held_jobs and ad_stat==5:
                     __reason = str(ad['HoldReason']).replace("'",'"')
@@ -895,7 +898,7 @@ def submit( rule, maxjobs, **kwargs ):
                 dbQuery( cnxn_string_map['statusw'], db_hold_query ).commit();
 
             if earliest_run_number < 9E9 and args.advance_cursor==True:
-                INFO("Advancing the run cursor")
+                INFO(f"Advancing the run cursor to {earliest_run_number}")
                 set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, earliest_run_number, production_status_query )
 
             if args.clear_held_jobs:
