@@ -400,6 +400,30 @@ def getinputs(args):
 
     return 'result', ntries, start, finish, ex, nm, sv
 
+#_______________________________________________________________________________________________________
+@subcommand([
+])
+def getranges(args):
+    """
+    Retrieves the list of input file ranges
+    """
+    tablename=args.table
+    dstname=args.dstname
+    run=int(args.run)
+    seg=int(args.segment)
+    id_ = getLatestId( tablename, dstname, run, seg )
+    query = f"""
+    select ranges from {tablename} where id={id_} limit 1
+    """
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], query )
+    if curs:
+        for result in curs:
+            flist = str(result[0]).split(',')
+            for f in flist:
+                print(f)
+
+    return 'result', ntries, start, finish, ex, nm, sv
+
 
 #_______________________________________________________________________________________________________
 @subcommand([
