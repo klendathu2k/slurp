@@ -724,6 +724,7 @@ def submit( rule, maxjobs, **kwargs ):
 
             if int(m['run'])<__earliest_matching_run:
                 __earliest_matching_run=int(m['run'])
+
             leafdir=m["name"].replace(f"_{rule.runname}","")
 
             # massage the inputs from space to comma separated
@@ -904,7 +905,6 @@ def submit( rule, maxjobs, **kwargs ):
             if args.clear_held_jobs:
                 __constraint = f'regexp("{__replname}",sphenix_dsttype,"i") && (JobStatus==5)'
                 schedd.act( htcondor.JobAction.Remove, __constraint, 'Removed by kaedama' )
-                
 
 
             # submits the job to condor
@@ -1236,10 +1236,10 @@ def matches( rule, kwargs={} ):
         lfn2pfn = { pfn.split("/")[-1] : pfn for pfn in glob(rule.direct+'/*') }
         INFO(f"done {len(lfn2pfn)}")
 
-    else:
+    elif 0:
 
         INFO("Building lfn2pfn map from filecatalog")
-
+        
         for mydatasettuple in input_datasets.keys():
 
             mydataset=mydatasettuple[1]
@@ -1271,6 +1271,47 @@ def matches( rule, kwargs={} ):
                 lfn2pfn.update( { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) } )
             elif rule.lfn2pfn=="lfn2lfn":
                 lfn2pfn.update( { r.lfn : r.lfn } )
+
+    else:
+
+        requirements = []
+        INFO( f'TEST lfn map query for {input_datasets.keys()}' )                        
+        for mydatasettuple in input_datasets.keys():
+
+            mydataset=mydatasettuple[1]
+            mydsttype=mydatasettuple[0]
+
+            requirements.append( f"(dataset='{mydataset}' and dsttype='{mydsttype}')" )
+
+        requirement = '( ' + ' or '.join( requirements ) + ' )'
+
+
+        fcquery=f"""
+        
+        with lfnlist as (
+        
+        select filename from datasets where 
+        
+        runnumber>={runMin}   and 
+        runnumber<={runMax}   and 
+        
+        {requirement}
+        
+        )
+
+        select lfn,full_file_path as pfn from 
+
+        lfnlist join files
+        
+        on lfnlist.filename=files.lfn;        
+        """
+
+
+        if rule.lfn2pfn=="lfn2pfn":
+            lfn2pfn.update( { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) } )
+        elif rule.lfn2pfn=="lfn2lfn":
+            lfn2pfn.update( { r.lfn : r.lfn } )        
+        
 
                     
     # Build lists of PFNs available for each run
