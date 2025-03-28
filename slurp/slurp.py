@@ -691,6 +691,7 @@ def submit( rule, maxjobs, **kwargs ):
         matching = matching[:int(maxjobs)]
 
 
+    __earliest_matching_run=9E9
     if dump==False:
         if verbose==-10:
             INFO(submit_job)
@@ -721,6 +722,8 @@ def submit( rule, maxjobs, **kwargs ):
             d['+sPHENIX_RUNNUMBER']=str(m['run'])
             d['+sPHENIX_SEGMENT']  =str(m['seg'])
 
+            if int(m['run'])<__earliest_matching_run:
+                __earliest_matching_run=int(m['run'])
             leafdir=m["name"].replace(f"_{rule.runname}","")
 
             # massage the inputs from space to comma separated
