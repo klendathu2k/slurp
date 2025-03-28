@@ -60,6 +60,8 @@ userargs = None
 __frozen__ = True
 __rules__  = []
 
+# This will hold the list of datasets which are present in the input query
+input_datasets = {}
 def printDbInfo( cnxn, title ):
     name=cnxn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
     serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
@@ -1088,9 +1090,6 @@ def matches( rule, kwargs={} ):
         inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
 
         outputs = [] # WARNING: len(outputs) and len(fc_result) must be equal
-
-        # This will hold the list of datasets which are present in the input query
-        input_datasets = {}
 
         # Matches the dsttype runtype 
         regex_dset = re.compile( '(DST_[A-Z0-9_]+_[a-z0-9]+)_([a-z0-9]+_(\d\d\d\dp\d\d\d|nocdbtag))_*(v\d\d\d)*' )
