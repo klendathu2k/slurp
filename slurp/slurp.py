@@ -893,7 +893,7 @@ def submit( rule, maxjobs, **kwargs ):
                     __reason = f"[cleared] {__reason}"
 
             if len(hold_query) > 0:
-                INFO("Marking {len(hold_query)} jobs as held.")
+                INFO(f"Marking {len(hold_query)} jobs as held.")
                 db_hold_query = ' '.join(hold_query)
                 dbQuery( cnxn_string_map['statusw'], db_hold_query ).commit();
 
