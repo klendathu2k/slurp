@@ -498,9 +498,10 @@ _error_messages = {
     'sigkill'                :   2**18, # SIGKILL recieved
     'sigpipe'                :   2**19, # SIGPIPE recieved
     'sigusr1'                :   2**20, # SIGUSR1 recieved
-    'sigusr2'                :   2**21, # SIGUSR1 recieved    
-    
-    
+    'sigusr2'                :   2**21, # SIGUSR1 recieved
+
+    'software-fault'         :   2**32, # generic software fault detected, job self immolated
+        
 }
 
 @subcommand([
