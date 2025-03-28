@@ -835,6 +835,15 @@ def submit( rule, maxjobs, **kwargs ):
                                 #INFO(f"mkdir {eval(outdir)}")
                                 madedir[targetdir]=True
 
+            __constraints = []
+            for dsttype,dataset in input_datasets.keys():
+                __constraints.append( f'(sPHENIX_DSTTYPE=="{dsttype}" && sPHENIX_DATASET=="{dataset}")' )
+            __constraint='||'.join( __constraints )
+            INFO(__constraint)
+            production_status_query = schedd.query(
+                constraint=__constraint,
+                projection=["ClusterId", "ProcId", "JobStatus", "HoldReason", "EnteredCurrentStatus", "sPHENIX_DSTTYPE", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT", "sPHENIX_SLURP_CUPSID" ]
+            )
             #
             # Query the condor for all jobs running or held which are producing the specified DSTTYPE.
             #   Mark held jobs as held in the production status table.
