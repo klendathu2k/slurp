@@ -1600,7 +1600,8 @@ arg_parser.add_argument( "--clear-held-jobs", dest="clear_held_jobs", action="st
 
 def warn_options( args, userargs ):
     if args.dbinput==False:
-        WARN("Option --no-dbinput is deprecated, and will be retired in the future.  All workflows should become db aware.")
+        WARN("Option --no-dbinput has been deprecated and we now retire it. Resetting args.dbinput=True.")
+        args.dbinput=True
 
 def parse_command_line():
     global blocking
