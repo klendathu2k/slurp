@@ -539,6 +539,8 @@ def insert_production_status( matching, setup, cursor ):
         if m['inputs']:
             dstfileinput=m['inputs']
 
+        dstranges = m.get('ranges','unset')
+
         # TODO: version ???
         # TODO: is dstfile and key redundant ???
         version = m.get('version',None)
@@ -564,7 +566,7 @@ def insert_production_status( matching, setup, cursor ):
         # TODO: Handle conflict
         node=platform.node().split('.')[0]
 
-        value = f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" 
+        value = f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}','{dstranges}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" 
 
         if streamname:
             value = value.replace( '$(streamname)', streamname )
@@ -576,7 +578,7 @@ def insert_production_status( matching, setup, cursor ):
     # Inserts the production status lines for each match, returning the list of IDs associated with each match.
     insert = f"""
     insert into production_status
-           (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents, submission_host )
+           (dsttype, dstname, dstfile, run, segment, nsegments, inputs, ranges, prod_id, cluster, process, status, submitting, nevents, submission_host )
     values 
            {insvals}
 
