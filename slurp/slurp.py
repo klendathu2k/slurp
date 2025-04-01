@@ -694,6 +694,7 @@ def submit( rule, maxjobs, **kwargs ):
 
 
     __earliest_matching_run=9E9
+    __last_submitted_run=0
     if dump==False:
         if verbose==-10:
             INFO(submit_job)
@@ -726,6 +727,9 @@ def submit( rule, maxjobs, **kwargs ):
 
             if int(m['run'])<__earliest_matching_run:
                 __earliest_matching_run=int(m['run'])
+
+            if int(m['run'])>=__last_submitted_run:
+                _last_submitted_run=int(m['run'])
 
             leafdir=m["name"].replace(f"_{rule.runname}","")
 
@@ -903,6 +907,10 @@ def submit( rule, maxjobs, **kwargs ):
             if earliest_run_number < 9E9 and args.advance_cursor==True:
                 INFO(f"Advancing the run cursor to {earliest_run_number}")
                 set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, earliest_run_number, production_status_query )
+
+            if __last_submitted_run > 0 and args.ratchet_cursor==True:
+                INFO(f"Advancing the run cursor to {__last_submitted_run}")
+                set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, __last_submitted_run, production_status_query )                
 
             if args.clear_held_jobs:
                 __constraint = f'regexp("{__replname}",sphenix_dsttype,"i") && (JobStatus==5)'
