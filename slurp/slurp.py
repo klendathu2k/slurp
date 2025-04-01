@@ -385,14 +385,11 @@ def set_production_cursor( dsttype, build, tag, version, torun, schedd_query ):
 
     if isinstance(version,str):
         version=int( version.replace('v','') )
-    
-    query=f"""    
-    insert into production_cursor (dsttype,build,tag,version,lastrun) 
-    values ( '{dsttype}', '{build}', '{tag}', {version}, {torun} )
-    on conflict
-    on constraint production_cursor_pkey
-    do update set
-    lastrun=EXCLUDED.lastrun;
+
+    query=f"""
+    update production_cursor
+    set lastrun={torun}
+    where dsttype={dsttype} and build={build} and tag={tag} and version={version}
     """
     result=dbQuery( cnxn_string_map[ 'statusw' ], query )
     result.commit()
