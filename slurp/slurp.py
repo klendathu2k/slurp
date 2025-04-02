@@ -389,7 +389,7 @@ def set_production_cursor( dsttype, build, tag, version, torun, schedd_query ):
     query=f"""
     update production_cursor
     set lastrun={torun}
-    where dsttype={dsttype} and build={build} and tag={tag} and version={version}
+    where dsttype='{dsttype}' and build='{build}' and tag='{tag}' and version={version}
     """
     result=dbQuery( cnxn_string_map[ 'statusw' ], query )
     result.commit()
