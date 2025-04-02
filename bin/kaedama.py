@@ -64,6 +64,7 @@ arg_parser.add_argument( '--ratchet-cursor', dest='ratchet_cursor', default=Fals
 arg_parser.add_argument( '--set-cursor', dest='set_cursor', default=None, help="Sets the production run cursor to the provided value.")
 
 arg_parser.add_argument( '--dbtag', dest='dbtag', default=None, help=argparse.SUPPRESS ) # System option.  If provided by ramenya it will override the DB option specified in the yaml file.
+arg_parser.add_argument( '--input-dataset', dest='dataset', default=None, help=argparse.SUPPRESS ) # System option.  If provided by ramenya it will override the dataset option specified in the yaml file.
 
 #
 # Specifies the default directory layout for files.  Note that "production" will be replaced with "production-testbed" for the
@@ -284,6 +285,10 @@ def main():
     if args.dbtag:
         logging.warn( f"Override cdb tag in config {params['dbtag']} with {args.dbtag}" )
         params['dbtag']=args.dbtag
+
+    if args.dataset:
+        logging.warn( f"Override dataset in config {params['dataset']} with {args.dataset}" )
+        params['dataset']=args.dataset        
 
     # if the keyword 'cursor' appears, we will lookup the production cursor and replace it here
     if 'cursor' in run_condition:
