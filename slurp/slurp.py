@@ -720,7 +720,7 @@ def submit( rule, maxjobs, **kwargs ):
                 __earliest_matching_run=int(m['run'])
 
             if int(m['run'])>=__last_submitted_run:
-                _last_submitted_run=int(m['run'])
+                __last_submitted_run=int(m['run'])
 
             leafdir=m["name"].replace(f"_{rule.runname}","")
 
