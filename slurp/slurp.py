@@ -53,7 +53,6 @@ MAXDSTNAMES = 100
 
 # List of states which block the job
 blocking = ["submitting","submitted","started","running","evicted","failed","finished"]
-#blocking = []
 args     = None
 userargs = None
 
@@ -313,11 +312,6 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
 
     dbresult = dbQuery( cnxn_string_map['statusw'], query )
 
-    #print( cnxn_string_map['statusw'] )
-    #print( query )
-    #for db in dbresult:
-    #    pprint.pprint(db)
-    
     # Transform the list of tuples from the db query to a list of prouction status dataclass objects
     result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
 
@@ -829,14 +823,12 @@ def submit( rule, maxjobs, **kwargs ):
                                 if madedir.get( targetdir, False )==False:
                                     td =  targetdir.replace('$(streamname)',mystreamname )
                                     pathlib.Path( td ).mkdir( parents=True, exist_ok=True )
-                                    #INFO(f"mkdir {td}")
                                     madedir[ td ]=True                                
                                 
                         else:
 
                             if madedir.get( targetdir, False )==False:
                                 pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
-                                #INFO(f"mkdir {eval(outdir)}")
                                 madedir[targetdir]=True
 
             __constraints = []
