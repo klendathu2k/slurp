@@ -64,11 +64,14 @@ class FileMutex:
             self.lock_file = None
     
     def __enter__(self):
+        print("Aquiring mutex...")
         self.acquire()
+        print("Got it!")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.release()
+        print("Releasing mutex")
 
 def countdown(t):
     with tqdm(total=t, desc="Countdown", unit="sec", colour="green", ascii=False) as pbar:
@@ -631,6 +634,7 @@ def submit(args):
     """
     go = True
 
+    
     
 
     global timestart
