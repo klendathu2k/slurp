@@ -123,6 +123,16 @@ CREATE TABLE if not exists PRODUCTION_STATUS
 """   
     return result
 
+@dataclass( frozen=True )
+class SPhnxProductionStatusMap:
+    """
+    Data class which takes in the id, dstfile and status columns from the 
+    production_status table.  Used in building the mapping between dstfile
+    and production status flag.
+    """
+    id:      int
+    dstfile: str
+    status:  str
 
 @dataclass( frozen=True )
 class SPhnxProductionStatus:

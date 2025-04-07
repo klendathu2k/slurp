@@ -32,7 +32,7 @@ import inspect
 #from slurp.slurptables import sphnx_production_status_table_def
 
 from slurptables import SPhnxProductionSetup
-from slurptables import SPhnxProductionStatus
+from slurptables import SPhnxProductionStatusMap
 from slurptables import SPhnxInvalidRunList
 
 
@@ -302,7 +302,7 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
     """
     result = [] # of SPhnxProductionStatus
 
-    query = f"select * from production_status where true"
+    query = f"select id,dstfile,status from production_status where true"
     if ( runmn>runmx ): 
         query = query + f" and run>={runmn}"
     else              : 
@@ -313,7 +313,7 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
     dbresult = dbQuery( cnxn_string_map['statusw'], query )
 
     # Transform the list of tuples from the db query to a list of prouction status dataclass objects
-    result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
+    result = [ SPhnxProductionStatusMap( *db ) for db in dbresult ]
 
 
     return result
@@ -1414,9 +1414,12 @@ def matches( rule, kwargs={} ):
     # has failed and needs expert attention.
     #
     prod_status_map = {}
+    prod_id_map = {}
     INFO("Building production status map")    
     for stat in prod_status:
-        prod_status_map[stat.dstfile] = stat.status 
+        prod_status_map[stat.dstfile] = stat.status
+        prod_id_map[stat.dstfile]     = stat.id
+    # note: prod_status is only used to build the map above.  It only requires the status flag.
 
     INFO("Production status map")
 
