@@ -52,7 +52,7 @@ with open('.slurp/slurppath.sh', 'w' ) as sp:
 MAXDSTNAMES = 100
 
 # List of states which block the job
-blocking = ["submitting","submitted","started","running","evicted","failed","finished"]
+blocking = ["submitting","submitted","started","running","held","evicted","failed","finished"]
 args     = None
 userargs = None
 
@@ -1583,7 +1583,7 @@ def matches( rule, kwargs={} ):
 #
 arg_parser = argparse.ArgumentParser()    
 arg_parser.add_argument( "--batch", default=False, action="store_true",help="Batch mode...")
-arg_parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=["submitting","submitted","started","running","evicted","failed","finished"] )
+arg_parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=["submitting","submitted","started","running","held","evicted","failed","finished"] )
 arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, action='store_true', 
                          help='Existing filecatalog entry does not block a job')
 
