@@ -66,6 +66,8 @@ arg_parser.add_argument( '--set-cursor', dest='set_cursor', default=None, help="
 arg_parser.add_argument( '--dbtag', dest='dbtag', default=None, help=argparse.SUPPRESS ) # System option.  If provided by ramenya it will override the DB option specified in the yaml file.
 arg_parser.add_argument( '--input-dataset', dest='dataset', default=None, help=argparse.SUPPRESS ) # System option.  If provided by ramenya it will override the dataset option specified in the yaml file.
 
+arg_parser.add_argument( '--mem', dest='mem', default=None, help=argparse.SUPPRESS ) # System option.  If provided by ramenya it will override the parameter specified in the yaml file.
+
 #
 # Specifies the default directory layout for files.  Note that "production" will be replaced with "production-testbed" for the
 # testbed setups.
@@ -289,6 +291,12 @@ def main():
     if args.dataset:
         logging.warn( f"Override dataset in config {params['dataset']} with {args.dataset}" )
         params['dataset']=args.dataset        
+
+    if args.mem:
+        params['mem']=args.mem                
+        logging.warn( f"Override mem in config {params['mem']} with {args.mem}" )
+
+        
 
     # if the keyword 'cursor' appears, we will lookup the production cursor and replace it here
     if 'cursor' in run_condition:
