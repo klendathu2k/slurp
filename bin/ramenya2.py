@@ -22,6 +22,22 @@ import yaml
 import htcondor
 import classad
 
+import signal
+import select 
+
+def OnCTRLC(sn,fr):
+    pause=120
+    x=input(  f"{Fore.RED}{Style.BRIGHT}You pressed ctrl-c.  {pause/60} min pause started.  Enter 'a' to abort ramenya.  Enter anything else to continue loop.{Style.RESET_ALL}{Fore.RESET}" )
+    i, o, e = select.select( [sys.stdin], [], [], 120 )
+    if i:
+        result=sys.stdin.readline().strip()
+        if result=='a':
+            exit(0)
+        else:
+            pass
+
+signal.signal(signal.SIGINT, OnCTRLC)
+
 init()
 
 import fcntl
@@ -64,9 +80,9 @@ class FileMutex:
             self.lock_file = None
     
     def __enter__(self):
-        print("Aquiring mutex...")
+        print(f"{Fore.YELLOW}Aquiring mutex...{Fore.RESET}")
         self.acquire()
-        print("Got it!")
+        print("{Fore.GREEN}Got it!{Fore.RESET}")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -744,20 +760,20 @@ def submit(args):
                 #print( tabulate((dst_counts)) )
 
             except htcondor.HTCondorIOError:
-                print("... could not query condor, aborting this submission ...")
+                print("{Fore.RED}... could not query condor, aborting this submission ...{Fore.RESET}")
                 del statusdbw_
                 del statusdbw                
             
             if ncondor == 1E9:
-                print("Could not connect to schedd... skipping")
+                print("{Fore.RED}Could not connect to schedd... skipping{Fore.RESET}")
 
             elif ncondor > args.maxcondor:
-                print(f"Skipping b/c there are too many jobs ({ncondor}) in the condor schedd.")
+                print(f"{Fore.YELLOW}Skipping b/c there are too many jobs ({ncondor}) in the condor schedd.{Fore.RESET}")
 
             else:
 
                 for r in list_of_active_rules:
-                    print( f"Trying rule ... {r} {datetime.datetime.now().replace(microsecond=0)}" )
+                    print( f"{Fore.GREEN}Trying rule ... {r} {datetime.datetime.now().replace(microsecond=0)}{Fore.RESET}" )
 
                     try:
                         myargs = getArgsForRule( rules_yaml, r )
