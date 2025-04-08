@@ -788,7 +788,7 @@ def submit( rule, maxjobs, **kwargs ):
         try:
 
             INFO("... creating directories if they do not exist")
-            for outname in [ 'outdir', 'logdir', 'condor', 'histdir' ]:
+            for outname in [ 'outdir', 'logdir', 'condor', 'histdir', 'calibdir' ]:
 
                 outdir=kwargs.get(outname,None)
                 if outdir==None: continue
