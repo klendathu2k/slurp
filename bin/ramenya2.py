@@ -693,6 +693,7 @@ def submit(args):
             runreport = f"runs: 0 to 999999"
 
     tracebacks = []
+    successes  = []
 
     mutex = FileMutex(".slurp/__ramenya_lock__")                
     
@@ -718,10 +719,15 @@ def submit(args):
         print( tabulate( [ list_of_active_rules ], ['active rules'], tablefmt=tablefmt ) )
         print( runreport )
 
+        if len(successes)>0:
+            print( "Success on last iteration:")
+            print( tabulate( [ successes ], ['success'], tablefmt=tablefmt ) )
+        successes = []
+
         if len(tracebacks)>0:
             print( "Failed on last iteration:")
             print( tabulate( [ tracebacks ], ['failures'], tablefmt=tablefmt ) )
-            tracebacks = []
+        tracebacks = []
 
         # Verify that there is enough room on condor to submit
         schedd = htcondor.Schedd() 
@@ -780,7 +786,8 @@ def submit(args):
                         if args.verbose:
                             kaedama( myargs, "--batch", "--rule", r, _out=sys.stdout )
                         else:
-                            kaedama( myargs, "--batch", "--rule", r )                        
+                            kaedama( myargs, "--batch", "--rule", r )
+                        successes.append(r)
                     except sh.ErrorReturnCode_1:
                         print(traceback.format_exc())
                         tracebacks.append( r )
