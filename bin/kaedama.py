@@ -68,6 +68,8 @@ arg_parser.add_argument( '--input-dataset', dest='dataset', default=None, help=a
 
 arg_parser.add_argument( '--mem', dest='mem', default=None, help=argparse.SUPPRESS ) # System option.  If provided by ramenya it will override the parameter specified in the yaml file.
 
+arg_parser.add_argument( '--mask', nargs='*', dest='mask', default=[], help=argparse.SUPPRESS ) # System option.  Manipulates the param['required'] list if it is provided.  Removes the specified system from the list.
+
 #
 # Specifies the default directory layout for files.  Note that "production" will be replaced with "production-testbed" for the
 # testbed setups.
@@ -307,6 +309,16 @@ def main():
         print( params.get('version',None) )
         runcursor=get_production_cursor( params['name'], params['build_name'], params['dbtag'], params['version'] )
         run_condition=run_condition.replace('cursor',str(runcursor))
+
+    if params:
+
+        if params.get('required',None):
+            params['required']=params['required'].strip()
+            for mask in args.mask:
+                params['required'] = params['required'].replace( mask, '' )
+            params['required']=params['required'].replace('  ',' ')
+            params['required']=params['required'].strip()            
+            logging.info( f"Setting 'required' subsystems: {params['required']}" )                    
     
 
     # Input query specifies the source of the input files
