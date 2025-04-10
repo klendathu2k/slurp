@@ -82,7 +82,7 @@ class FileMutex:
     def __enter__(self):
         print(f"{Fore.YELLOW}Aquiring mutex...{Fore.RESET}")
         self.acquire()
-        print("{Fore.GREEN}Got it!{Fore.RESET}")
+        print(f"{Fore.GREEN}Got it!{Fore.RESET}")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
