@@ -26,8 +26,8 @@ import signal
 import select 
 
 def OnCTRLC(sn,fr):
-    pause=120
-    x=input(  f"{Fore.RED}{Style.BRIGHT}You pressed ctrl-c.  {pause/60} min pause started.  Enter 'a' to abort ramenya.  Enter anything else to continue loop.{Style.RESET_ALL}{Fore.RESET}" )
+    pause=1200
+    x=input(  f"{Fore.RED}{Style.BRIGHT}You pressed ctrl-c.  {pause/60} min pause started.  Repeat to abort ramenya.  Enter anything else to continue loop.{Style.RESET_ALL}{Fore.RESET}" )
     i, o, e = select.select( [sys.stdin], [], [], 120 )
     if i:
         result=sys.stdin.readline().strip()
