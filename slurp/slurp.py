@@ -721,6 +721,15 @@ def submit( rule, maxjobs, **kwargs ):
             d['+sPHENIX_DATASET']  ='"'+str(rule.build)+"_"+str(rule.tag)+"_"+str(rule.version)+'"'
             d['+sPHENIX_RUNNUMBER']=str(m['run'])
             d['+sPHENIX_SEGMENT']  =str(m['seg'])
+            if args.resubmit:
+                timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )                
+                d['+sPHENIX_SLURP_RESUBMIT']=f'"True"'
+                d['+sPHENIX_SLURP_RESUBMIT_TIMESTAMP']=f'"{timestamp}"'                
+            if args.unblock:
+                timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )                                
+                ublocks=','.join(args.unblock)
+                d['+sPHENIX_SLURP_UNBLOCK']=f'"{ublocks}"'
+                d['+sPHENIX_SLURP_UNBLOCK_TIMESTAMP']=f'"{timestamp}"'                
 
             if int(m['run'])<__earliest_matching_run:
                 __earliest_matching_run=int(m['run'])
