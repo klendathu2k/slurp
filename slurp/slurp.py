@@ -107,8 +107,8 @@ if 0:
 
 def dbQuery( cnxn_string, query, ntries=10 ):
 
-    # A guard rail
-    assert( 'delete' not in query.lower() )    
+    # A guard rail ... or maybe not ...
+    #assert( 'delete' not in query.lower() )    
     #assert( 'insert' not in query.lower() )    
     #assert( 'update' not in query.lower() )    
     #assert( 'select'     in query.lower() )
@@ -959,8 +959,11 @@ def submit( rule, maxjobs, **kwargs ):
 
         # Finally, if we have a list of unblocked IDs we will remove them from the DB
         if len(unblocked)>0:
-            unblockquery = f"/* DANGER */ delete from production_status where id in ({','.join(unblocked)});"
-            dbQuery( cnxn_string_map['statusw'], unblockquery )
+            unblockedids = [ str(i) for i in unblocked ]
+            ################################### DANGER ###############################################
+            unblockquery = f"delete from production_status where id in ({','.join(unblockedids)});"  #
+            dbQuery( cnxn_string_map['statusw'], unblockquery ).commit()                             #
+            ################################### DANGER ###############################################            
 
 
     else:
@@ -1497,7 +1500,7 @@ def matches( rule, kwargs={} ):
             if args.batch==False:           WARN("%s is blocked by production status=%s, skipping."%( dst, stat ))
             continue
 
-        # If we have unblocked we add th
+        # If we have unblocked we add to the list 
         if blockid:
             unblocked_ids.append(blockid)
 
