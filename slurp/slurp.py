@@ -606,7 +606,7 @@ def submit( rule, maxjobs, **kwargs ):
         kwargs['resubmit'] = args.resubmit
 
     # Build list of LFNs which match the input
-    matching, setup, runlist = matches( rule, kwargs )
+    matching, setup, runlist, unblocked = matches( rule, kwargs )
 
     nmatches = len(matching)
     if len(matching)==0:
@@ -681,7 +681,13 @@ def submit( rule, maxjobs, **kwargs ):
     #
     if maxjobs:
         INFO(f"Truncating the number of jobs to maxjobs={maxjobs}")        
-        matching = matching[:int(maxjobs)]
+        matching  = matching[:int(maxjobs)]
+        if len(unblocked)>0:
+            ERROR("Unblocking failed jobs and truncating the maximum number of submitted jobs can lead.")
+            ERROR("to inconsistent production status.  So this is disallowed.  You should cleanup the")
+            ERROR("production DB by hand, and probably the filecatalog and DSTs as well before resubmitting.")
+            exit(0)
+        unblocked = []
 
 
     __earliest_matching_run=9E9
@@ -942,6 +948,12 @@ def submit( rule, maxjobs, **kwargs ):
             update_production_status( matching, setup, schedd_query, state="submitted" )
 
 
+        # Finally, if we have a list of unblocked IDs we will remove them from the DB
+        if len(unblocked)>0:
+            unblockquery = f"/* DANGER */ delete from production_status where id in ({','.join(unblocked)});"
+            dbQuery( cnxn_string_map['statusw'], unblockquery )
+
+
     else:
         order=["script","name","nevents","run","seg","lfn","indir","dst","outdir","buildarg","tag","stdout","stderr","condor","mem"]           
         with open( "submit.job", "w" ) as f:
@@ -1187,7 +1199,8 @@ def matches( rule, kwargs={} ):
                     input_datasets[ ( dset, dtype ) ] = 1
                         
     
-    if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
+    if len(lfn_lists)==0:
+        return [], None, [], []  # Early exit if nothing to be done
 
     #
     # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
@@ -1430,6 +1443,8 @@ def matches( rule, kwargs={} ):
     list_of_runs = []
     INFO("Building matches")
 
+    unblocked_ids = []
+
     assert( len(fc_result)==len(outputs) ) 
     for (fc,dst) in zip(fc_result,outputs):
 
@@ -1462,6 +1477,7 @@ def matches( rule, kwargs={} ):
         #
         x    = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
+        blockid = prod_id_map.get( x, None )
 
         #
         # There is a master list of states which result in a DST producion job being blocked.  By default
@@ -1471,6 +1487,11 @@ def matches( rule, kwargs={} ):
         if stat in blocking:
             if args.batch==False:           WARN("%s is blocked by production status=%s, skipping."%( dst, stat ))
             continue
+
+        # If we have unblocked we add th
+        if blockid:
+            unblocked_ids.append(blockid)
+
         
         #
         # Next we check to see if the job has alread been produced (i.e. it is registered w/in the file catalog).
@@ -1580,7 +1601,7 @@ def matches( rule, kwargs={} ):
 
     INFO(f"Matched {len(result)} jobs to the rule")
 
-    return result, setup, list_of_runs
+    return result, setup, list_of_runs, unblocked_ids
 
 #__________________________________________________________________________________________________
 #
