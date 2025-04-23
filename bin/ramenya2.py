@@ -616,6 +616,8 @@ def getArgsForRule( yaml, r ):
             continue
 
         y = str(v)
+
+        assert( 'mask' not in flag, "We cannot mask file streams in a production loop" )
         
         for x in y.split(' '):
             result.append( str(x) )
