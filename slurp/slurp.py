@@ -136,6 +136,67 @@ def dbQuery( cnxn_string, query, ntries=10 ):
     exit(0)
             
 
+def get_hostinfo_table(mnrun,mxrun):
+    query=f"""
+    with config as (
+    select {mnrun} as mnrun,
+           {mxrun} as mxrun
+    ),
+
+    streams as (
+    select * from hostinfo,config where runnumber>=config.mnrun and runnumber<=config.mxrun
+    ),
+
+    intt_stream as (
+    select runnumber, UPPER(hostname) as names from streams where hostname in ( 'intt0', 'intt1', 'intt2', 'intt3', 'intt4', 'intt5', 'intt6', 'intt7' )
+    ),
+    mvtx_stream as (
+    select runnumber, UPPER(hostname) as names from streams where hostname in ( 'mvtx0',  'mvtx1',  'mvtx2',  'mvtx3',  'mvtx4',  'mvtx5' )
+    ),
+    tpot_stream as ( 
+    select runnumber, 'TPOT' as names from streams where hostname in ( 'ebdc39' ) 
+    ),
+    tpc_stream as (
+    select runnumber, replace( hostname, 'ebdc', 'TPC' ) as streamname from streams where hostname in ( 'ebdc00', 'ebdc01', 'ebdc02', 'ebdc03', 'ebdc04', 'ebdc05', 'ebdc06', 'ebdc07', 'ebdc08', 'ebdc09', 
+                                                                                                        'ebdc10', 'ebdc11', 'ebdc12', 'ebdc13', 'ebdc14', 'ebdc15', 'ebdc16', 'ebdc17', 'ebdc18', 'ebdc19', 
+                                                                                                        'ebdc20', 'ebdc21', 'ebdc22', 'ebdc23' ) 
+    ),
+
+    all_streams as ( 
+    select * from tpc_stream
+    union
+    select * from intt_stream
+    union 
+    select * from mvtx_stream
+    union
+    select * from tpot_stream
+    )
+    select runnumber,string_agg( distinct streamname, ' ' ) as streams from all_streams group by runnumber;
+    """
+    dbresult = dbQuery( cnxn_string_map['daqdb'], query )
+    table = { db.runnumber : db.streams for db in dbresult }
+
+
+    values=[]
+    for k,v in table.items():
+        values.append(f"({k},'{v}')")
+
+    values=','.join(values)
+
+    result=f"""
+    SET NOCOUNT ON;
+    CREATE TEMP TABLE hostinfo_table(
+        runnumber   int,
+        required    text
+    );
+    INSERT INTO hostinfo_table (runnumber,required)
+    VALUES
+    {values}
+    ;
+    """
+
+    return result
+    
     
 
 verbose=0
@@ -667,7 +728,7 @@ def submit( rule, maxjobs, **kwargs ):
             for m in matching:
                 pprint.pprint(m)
 
-    submit_job[ "+sPHENIX_PRODUCTION" ] = f"{rule.name}_{rule.build}_{rule.tag}_{rule.version}"
+    submit_job[ "+sPHENIX_PRODUCTION" ] = '"' + f"{rule.name}_{rule.build}_{rule.tag}_{rule.version}" +'"'
     
     dispatched_runs = []
     last_run = -1
@@ -856,8 +917,8 @@ def submit( rule, maxjobs, **kwargs ):
                 projection=["ClusterId", "ProcId", "JobStatus", "HoldReason", "EnteredCurrentStatus", "sPHENIX_DSTTYPE", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT", "sPHENIX_SLURP_CUPSID" ]
             )
             __earliest_run_in_parent = 9E9;
+            last_condor_status = {} # condor_stat : [ list of cups ids ]
             for ad in production_status_query:
-                #print(ad['clusterid'])
                 try:                
                     run=int(ad['sPHENIX_RUNNUMBER'])
                     if run<__earliest_run_in_parent and 2==int(ad['JobStatus']):
@@ -865,6 +926,20 @@ def submit( rule, maxjobs, **kwargs ):
                 except KeyError:
                     # If there's a job in there w/out the run number... don't try to adjust
                     pass
+
+                try:
+                    cupsid=int(ad['sPHENIX_SLURP_CUPSID'])
+                    condorstatus = int(ad['JobStatus'])
+                    cupsarray = last_condor_status.get( condorstatus, [] )
+                    cupsarray.append(str(cupsid))
+                    last_condor_status[ str(condorstatus) ].append(cupsarray)
+                except KeyError:
+                    pass
+
+            for stat,cupsarray in last_condor_status.items():
+                msg = f'Last observed condor status = {stat}'
+                upd = f"update production_status set message='{msg}' where id in {','.join(cupsarray)};"
+                dbQuery( cnxn_string_map['statusw'], upd ).commit();                
 
             INFO(f"Earliest run in the feeding jobs: {__earliest_run_in_parent}")
             INFO(f"Earliest run that matched: {__earliest_matching_run}")
@@ -1138,6 +1213,8 @@ def matches( rule, kwargs={} ):
     if rule.files:
         # curs      = cursors[ rule.filesdb ]
 
+        print( rule.files )
+
         inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
 
         outputs = [] # WARNING: len(outputs) and len(fc_result) must be equal
@@ -1146,7 +1223,7 @@ def matches( rule, kwargs={} ):
         regex_dset = re.compile( '(DST_[A-Z0-9_]+_[a-z0-9]+)_([a-z0-9]+_(\d\d\d\dp\d\d\d|nocdbtag))_*(v\d\d\d)*' )
         
         INFO(f"... {len(fc_result)} inputs")
-        for f in inputquery:
+        for f in inputquery:            
             fc_result.append(f) # cache the query
             run     = f.runnumber
             segment = f.segment

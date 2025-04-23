@@ -21,6 +21,7 @@ from slurp import SEGFMT as SEGFMT_
 
 from slurp import PRODUCTION_MODE
 from slurp import get_production_cursor
+from slurp import get_hostinfo_table
 
 import sh
 import sys
@@ -154,8 +155,7 @@ def checkRequiredParams( params ):
     if fatal:
         logging.error("YAML rule is not properly defined.  Correct above errors and try again.")
         exit(1)
-        
-    
+
 
 def main():
 
@@ -315,15 +315,23 @@ def main():
         if params.get('required',None):
             params['required']=params['required'].strip()
             for mask in args.mask:
-                params['required'] = params['required'].replace( mask, '' )
-            params['required']=params['required'].replace('  ',' ')
+                print(f"...{mask}...")
+                mask=mask.strip()
+                params['required']=params['required'].replace( f"{mask} ", '' ) # clean up everything but the trailing position
+                params['required']=params['required'].replace( f" {mask}", '' ) # clean up if in trailing position                                
+            #params['required']=params['required'].replace('  ',' ')
             params['required']=params['required'].strip()            
             logging.info( f"Setting 'required' subsystems: {params['required']}" )                    
-    
 
+    hostinfo_table=""
     # Input query specifies the source of the input files
-    input_         = config.get('input')
-    input_query    = input_.get('query','').format(**locals(),**params)
+    input_         = config.get('input')    
+    input_query    = input_.get('query','')
+    if 'hostinfo_table' in input_query:
+        __mnrun=params.get('mnrun',0)
+        __mxrun=params.get('mxrun',999999)
+        hostinfo_table = get_hostinfo_table( __mnrun, __mxrun )
+    input_query    = input_.get('query','').format(**locals(),**params)    
     input_query_db = input_.get('db',None)
     input_query_direct = input_.get('direct_path',None)
     if input_query_direct is not None:
