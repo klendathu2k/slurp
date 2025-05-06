@@ -411,9 +411,13 @@ def main():
 
     #__________________________________________________________________________________
     #
-    # Pre Submission Phase... execute the action script on the results of the 
-    # specified query to the specified database.
+    # Prep the import tables
     #__________________________________________________________________________________
+    import_tables = config.get('import_tables',None)
+    if import_tables:
+        for table in import_tables:
+            for name_,dbquery in table.items():
+                dbquery['query']=dbquery['query'].format( **locals(), **params )
 
 
     #__________________________________________________________________________________
