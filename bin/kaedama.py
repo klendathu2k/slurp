@@ -462,7 +462,8 @@ def main():
                          payload           = params['payload'],
                          job               = job,
                          limit             = args.limit,
-                         version          = version_number
+                         version           = version_number,
+                         import_tables     = import_tables
                      )
 
 
