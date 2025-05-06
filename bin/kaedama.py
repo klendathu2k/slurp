@@ -341,6 +341,11 @@ def main():
 
 
     if args.printquery:
+        import_tables = config.get('import_tables',None)
+        if import_tables:
+            for table in import_tables:
+                for name_,dbquery in table.items():
+                    print(dbquery['query'].format( **locals(), **params ))
         print(input_query)
         return
 
