@@ -20,16 +20,7 @@ from collections import defaultdict
 import random
 import inspect
 
-#from slurp import slurptables
-#from slurp.slurptables import SPhnxProductionSetup
-#from slurp.slurptables import SPhnxProductionStatus
-#from slurp.slurptables import SPhnxInvalidRunList
-#from slurp.slurptables import sphnx_production_status_table_def
 
-#import slurptables.SPhnxProductionSetup
-#import slurptables.SPhnxProductionStatus
-#import slurptables.SPhnxInvalidRunList
-#from slurp.slurptables import sphnx_production_status_table_def
 
 from slurptables import SPhnxProductionSetup
 from slurptables import SPhnxProductionStatusMap
