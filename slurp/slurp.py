@@ -1648,6 +1648,7 @@ def matches( rule, kwargs={} ):
         runs_last_event = getattr(fc,'runs_last_event',None)
         streamname = getattr(fc,'streamname',None)
         streamfile = getattr(fc,'streamfile',None)
+        runtype_from_input = getattr( fc, 'runtype', None )
 
         if firstevent: firstevent=str(firstevent)
         if lastevent: lastevent=str(lastevent)
@@ -1768,7 +1769,8 @@ def matches( rule, kwargs={} ):
                 neventsper=neventsper,
                 streamname=streamname,
                 streamfile=streamfile,
-                version=version
+                version=version,
+                runtype=runtype_from_input
                 )
 
             match = match.dict()
