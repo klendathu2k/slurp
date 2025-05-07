@@ -1432,7 +1432,8 @@ def matches( rule, kwargs={} ):
         lfn2pfn = { pfn.split("/")[-1] : pfn for pfn in glob(rule.direct+'/*') }
         INFO(f"done {len(lfn2pfn)}")
 
-    elif 0:
+    ############################################## \/ \/ \/ THIS CODE BLOCK IS INOP \/ \/ \/ ############################        
+    elif 0: 
 
         INFO("Building lfn2pfn map from filecatalog")
         
@@ -1467,6 +1468,7 @@ def matches( rule, kwargs={} ):
                 lfn2pfn.update( { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) } )
             elif rule.lfn2pfn=="lfn2lfn":
                 lfn2pfn.update( { r.lfn : r.lfn } )
+    ############################################## ^^ ^^ ^^ THIS CODE BLOCK IS INOP ^^ ^^ ^^ ############################                        
 
     else:
 
