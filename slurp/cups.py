@@ -558,7 +558,7 @@ def stageout(args):
     for attempt_ in range(0,args.retries):
         try:
             shutil.copy2( f"{args.filename}", f"{args.outdir}/" )
-            success=True
+            success_=True
             sz  = int( os.path.getsize(f"{args.outdir}/{args.filename}") )
             if sz != sztrue:
                 raise Exception("File was truncated")
