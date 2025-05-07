@@ -1348,6 +1348,8 @@ def matches( rule, kwargs={} ):
                 ERROR(rule.files)
                 exit(1)
 
+            #print( f.files )
+
             #
             # Drop the run and segment numbers and leading stuff and just pull the datasets.  Note.  When
             # we switch up to versioning of the files, this will sweep up the version number as well.
