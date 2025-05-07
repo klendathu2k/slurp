@@ -1507,8 +1507,13 @@ def matches( rule, kwargs={} ):
 
         if rule.lfn2pfn=="lfn2pfn":
             lfn2pfn.update( { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) } )
+        # for the case where we build a straight lfn : lfn mapping...  we don't need a DB query...
         elif rule.lfn2pfn=="lfn2lfn":
-            lfn2pfn.update( { r.lfn : r.lfn } )        
+            #lfn2pfn.update( { r.lfn : r.lfn } )
+            for k,v in lfn_lists.items():
+                for lfn in v:
+                    lfn2pfn.update( { lfn : lfn } )
+                    
         
 
                     
