@@ -87,7 +87,7 @@ cnxn_string_map = {
     'filecatalog' : f'DSN={dsnfiler};READONLY=True',
     'status'      : f'DSN={dsnprodr};UID=argouser',
     'statusw'     : f'DSN={dsnprodw};UID=argouser',
-    'raw'         :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
+    'raw'         :  'DSN=RawdataCatalog_write;UID=phnxrc',
     'rawdr'       :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
 }
 
