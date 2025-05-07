@@ -534,6 +534,7 @@ def message(args):
     argument( "filename", help="Name of the file to be staged out"),
     argument( "outdir",   help="Output directory" ),
     argument( "--retries", help="Number of retries before silent failure", type=int, default=5 ),
+    argument( "--delay", help="Delay between retries in seconds (default 600)", type=int, default=600 ),    
     argument( "--hostname", help="host name of the filesystem", default="lustre", choices=["lustre","gpfs"] ),
     argument( "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
     argument(     "--inc", help="If set, increments the number of events",dest="inc",default=False,action="store_true"),
@@ -553,12 +554,43 @@ def stageout(args):
         print("Copy back file")
 
     # Copy the file
-    try:
-        shutil.copy2( f"{args.filename}", f"{args.outdir}" )
-        print(".... copy back finished ....")
-    except Exception as e:
-        print(f"ERROR: Failed to copy file {args.filename} to {args.outdir}.  Aborting stageout.")
-        return
+    success_=False
+    for attempt_ in range(0,args.retries):
+        try:
+            shutil.copy2( f"{args.filename}", f"{args.outdir}/" )
+            success=True
+            sz  = int( os.path.getsize(f"{args.outdir}/{args.filename}") )
+            if sz != sztrue:
+                raise Exception("File was truncated")
+            break
+        except OSError as e:
+            print(f"An unexpected error occurred: {e}")
+        time.sleep(args.delay)
+
+    # On a failed copy we will mark the job as failed and abort.
+    if success_==False:
+        tablename=args.table
+        dstname=args.dstname
+        timestamp=args.timestamp
+        run=int(args.run)
+        seg=int(args.segment)
+        id_ = getLatestId( tablename, dstname, run, seg )
+        update=f"""
+        update {tablename} set status='failed',ended='{timestamp}',last_message='Copy back failed' where id={id_}
+        """
+        curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
+        if curs:
+            curs.commit()
+
+        try:
+            os.remove( f"{args.outdir}/{args.filename}" )
+        except:
+            print(f"WARNING: could not cleanup {args.outdir}/{args.filename}")
+            pass
+
+        exit(123) # need to exit with an exit code so hopefully event builder will likewise term.
+            
+        return 'result', ntries, start, finish, ex, nm, sv        
 
     sz  = int( os.path.getsize(f"{args.outdir}/{args.filename}") ) 
 
