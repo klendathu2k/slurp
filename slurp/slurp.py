@@ -763,7 +763,9 @@ def submit( rule, maxjobs, **kwargs ):
 
             # TODO:  This should be accessed from the run table / daqdb
             runtype='none'
-            d['runtype']='unset'
+            d['runtype']=m.get('runtype','unset')  # ... if the query returns a runtype it will be in match
+            #if m['runtype']:
+            #    d['runtype']=m['runtype']
             d['runname']=rule.runname
             # Add DSTTYPE, RUNNUMBER and SEGMENT to the classad for each job.  The value passed in is a
             # string.  Condor will then deduce the type from that string.  So... passing in integers as
@@ -797,18 +799,22 @@ def submit( rule, maxjobs, **kwargs ):
             # massage the inputs from space to comma separated
             if m.get('inputs',None): 
                 m['inputs']= ','.join( m['inputs'].split() )
-                if '/physics/' in m['inputs']: # physics can appear twice by mistake...
-                    runtype = 'physics'
-                    d['runtype']=runtype
-                if '/beam/' in m['inputs']: # beam supercedes...
-                    runtype = 'beam'
-                    d['runtype']=runtype
-                if '/cosmics/' in m['inputs']: # beam supercedes...
-                    runtype = 'cosmics'
-                    d['runtype']=runtype
-                if '/calib/' in m['inputs']: # beam supercedes...
-                    runtype = 'calib'
-                    d['runtype']=runtype
+
+                if d['runtype']=='unset': # if we didn't get it from the input query
+                    if '/physics/' in m['inputs']: # physics can appear twice by mistake...
+                        runtype = 'physics'
+                        d['runtype']=runtype
+                    if '/beam/' in m['inputs']: # beam supercedes...
+                        runtype = 'beam'
+                        d['runtype']=runtype
+                    if '/cosmics/' in m['inputs']: # beam supercedes...
+                        runtype = 'cosmics'
+                        d['runtype']=runtype
+                    if '/calib/' in m['inputs']: # beam supercedes...
+                        runtype = 'calib'
+                        d['runtype']=runtype
+                else:                   # and if we did
+                    runtype=d['runtype'] 
 
                 
             runtypes[runtype]=1 # register the runtype for directory creation below
