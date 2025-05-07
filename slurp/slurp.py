@@ -1211,11 +1211,101 @@ def matches( rule, kwargs={} ):
     dstnames = {}
 
     if rule.files:
-        # curs      = cursors[ rule.filesdb ]
 
-        print( rule.files )
+        # Build set of user defined temporary tables from (likely) foreign databases
+        inputquery = None
+        
+        if rule.import_tables:
 
-        inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
+            datatype_map = {
+                "<class 'int'>" : "int",
+                "<class 'str'>" : "text",
+                "<class 'datetime.datetime'>" : "timestamp"
+            }
+            
+            create_import_tables = []
+            fill_import_tables = []        
+            
+            for table in rule.import_tables:
+                for tablename,tablequery in table.items():
+                    # Query the requested database, getting the rows from the result and the
+                    # description of the columns.
+                    tabledata = dbQuery( cnxn_string_map[ tablequery['db'] ], tablequery['query'] )
+                    columns   = [column[0] for column in tabledata.description]
+                    datatypes = [
+                        datatype_map[str(column[1])]
+                        for column in tabledata.description
+                    ]
+                    tablecolumns=[]
+                    for col_,typ_ in zip(columns,datatypes):
+                        tablecolumns.append(f"{col_} {typ_}")
+                    tablecolumns=',\n'.join(tablecolumns)                        
+                    rows      = [row for row in tabledata ]
+                    # Create the table in 
+                    create_table = f"""
+                    create temp table {tablename} (
+                    {tablecolumns}
+                    )
+                    """
+                    # We will defer the creation of these tables... but this may be expensive memory wise... TBD.
+                    create_import_tables.append(create_table)
+                    fill_table = f"""
+                    insert into {tablename}({','.join(columns)}) values
+                    """
+                    rows_=[]
+                    for row in rows:
+                        row_ = []
+                        for r in row:
+
+                            if r==None:
+                                row_.append('NULL')
+                            elif isinstance(r,int):
+                                row_.append(str(r))
+                            else:
+                                row_.append("'"+str(r)+"'")                                
+
+                        rows_.append(row_)
+                                
+                    rows2_ = []
+                    for row_ in rows_:
+                        rows2_.append( '(' + ','.join(row_) + ')' )
+
+                    fill_table += f"""
+                    {','.join(rows2_)}
+                    """
+
+                    fill_import_tables.append(fill_table)
+
+                    if len(rows2_)==0:
+                        WARN("Import table query returned no values.  This is about to end poorly...")
+                        print(tablequery)
+
+
+            for mktable,fltable in zip(create_import_tables,fill_import_tables):
+                print(mktable)
+                print(fltable)                
+
+                if inputquery==None:
+                    try:
+                        inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], mktable )
+                        inputquery.execute( fltable )                        
+                    except:
+                        print(mktable)
+                        print(fltable)
+                else:
+                    try:
+                        inputquery.execute( mktable )
+                        inputquery.execute( fltable )
+                    except:
+                        print(mktable)
+                        print(fltable)                        
+
+
+        if inputquery == None:
+            inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
+        else:
+            inputquery.execute( rule.files )
+        
 
         outputs = [] # WARNING: len(outputs) and len(fc_result) must be equal
 
