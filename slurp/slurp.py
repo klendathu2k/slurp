@@ -264,7 +264,8 @@ class SPhnxRule:
     payload:           str = "";      # Payload directory (condor transfers inputs from)
     limit:    int = 0                 # maximum number of matches to return 0=all
     runname:           str = None     # eg run2pp, extracted from name or ...
-    version:          str = None     # eg v001 
+    version:           str = None     # eg v001
+    import_tables:     dict = None
 
     def __eq__(self, that ):
         return self.name == that.name
