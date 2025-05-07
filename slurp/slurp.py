@@ -952,7 +952,7 @@ def submit( rule, maxjobs, **kwargs ):
             #   Advance the run cursor in the production cursor table.
             #
             # $$$ earliest_run_number = 9E9 #  signals no update b/c nothing is running
-            __subsys="[A-Z0-9_]+"
+            __subsys="([A-Z0-9]+|[a-z0-9]+)_"                                                            ###########<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ###################################### 
             __replname = rule.name.replace('$(streamname)',__subsys)
             INFO(f"... querying condor for production {rule.name} --> {__replname}")            
             __constraint = f'regexp("{__replname}",sphenix_dsttype,"i") && (JobStatus==2 || JobStatus==5)'
