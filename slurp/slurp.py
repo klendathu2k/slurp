@@ -323,6 +323,7 @@ class SPhnxMatch:
     streamname : str = None
     streamfile : str = None
     version: str = None
+    runtype: str = None
 
     def __eq__( self, that ):
         return self.run==that.run and self.seg==that.seg
