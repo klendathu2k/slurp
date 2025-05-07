@@ -1309,8 +1309,6 @@ def matches( rule, kwargs={} ):
 
         outputs = [] # WARNING: len(outputs) and len(fc_result) must be equal
 
-        # Matches the dsttype runtype 
-        regex_dset = re.compile( '(DST_[A-Z0-9_]+_[a-z0-9]+)_([a-z0-9]+_(\d\d\d\dp\d\d\d|nocdbtag))_*(v\d\d\d)*' )
         
         INFO(f"... {len(fc_result)} inputs")
         for f in inputquery:            
@@ -1365,8 +1363,15 @@ def matches( rule, kwargs={} ):
             # and we reprocess.
             #
             # ... but we don't need to build this if we are using direct lookup
-            if rule.direct==None:            
+            if rule.direct==None and rule.lfn2pfn != 'lfn2lfn':
 
+                # Matches the dsttype...
+                #                          DSTTYPE         runtype    build          cdbtag                    version
+                regex_dset = re.compile( '(DST_[A-Z0-9_]+_[a-z0-9]+)_([a-z0-9]+_(\d\d\d\dp\d\d\d|nocdbtag))_*(v\d\d\d)*' )
+                #
+                # breaks if DSTTYPE contains lowercase values.  Note that this is only utilized if we are mapping lfns onto pfns.
+                #
+                    
                 for fn in f.files.split():
                     base1 = fn.split('-')[0]
                     rematch = regex_dset.match( base1 )
