@@ -576,7 +576,7 @@ def stageout(args):
         seg=int(args.segment)
         id_ = getLatestId( tablename, dstname, run, seg )
         update=f"""
-        update {tablename} set status='failed',ended='{timestamp}',last_message='Copy back failed' where id={id_}
+        update {tablename} set status='failed',ended='{timestamp}', message='Copy back failed'  where id={id_}
         """
         curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
         if curs:
