@@ -557,11 +557,12 @@ def stageout(args):
     success_=False
     for attempt_ in range(0,args.retries):
         try:
-            shutil.copy2( f"{args.filename}", f"{args.outdir}/" )
+            shutil.copy2( f"{args.filename}", f"{args.outdir}/{args.filename}.part" ) # initiate the copy.  '.part' suffix indicates the file is in transit
             success_=True
-            sz  = int( os.path.getsize(f"{args.outdir}/{args.filename}") )
+            sz  = int( os.path.getsize(f"{args.outdir}/{args.filename}.part") )       # verify the file size
             if sz != sztrue:
                 raise Exception("File was truncated")
+            shutil.move( f"{args.outdir}/{args.filename}.part", f"{args.outdir}/{args.filename}" )  # rename the output file          
             break
         except OSError as e:
             print(f"An unexpected error occurred: {e}")
