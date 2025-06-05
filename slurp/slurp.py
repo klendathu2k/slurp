@@ -324,6 +324,7 @@ class SPhnxMatch:
     streamfile : str = None
     version: str = None
     runtype: str = None
+    nendpoint: int = None
 
     def __eq__( self, that ):
         return self.run==that.run and self.seg==that.seg
@@ -337,6 +338,7 @@ class SPhnxMatch:
         run = int(self.run)
         object.__setattr__(self, 'rungroup', f'{100*math.floor(run/100):08d}_{100*math.ceil((run+1)/100):08d}')
 
+    # Returns a dictionary of all members which are not None.
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
@@ -716,6 +718,12 @@ def submit( rule, maxjobs, **kwargs ):
 
     INFO("Passing job to htcondor.Submit")
     submit_job = htcondor.Submit( jobd )
+    #INFO(submit_job)
+    #for m in matching:
+    #    pprint.pprint(m)
+    #exit(0)
+    
+    
     if verbose>0:
         INFO(submit_job)
         if verbose>10:
@@ -909,13 +917,19 @@ def submit( rule, maxjobs, **kwargs ):
 
             __constraints = []
             for dsttype,dataset in input_datasets.keys():
+                INFO(f"-- {dsttype} {dataset} --")
                 __constraints.append( f'(sPHENIX_DSTTYPE=="{dsttype}" && sPHENIX_DATASET=="{dataset}")' )
+
             __constraint='||'.join( __constraints )
-            INFO(__constraint)
+                
+
+            # DISABLE THIS FUNCTIONALITY B/C SOMETHING HAS BROKEN UPSTREAM.  (!?)
+            __constraint="false"                            
             production_status_query = schedd.query(
                 constraint=__constraint,
                 projection=["ClusterId", "ProcId", "JobStatus", "HoldReason", "EnteredCurrentStatus", "sPHENIX_DSTTYPE", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT", "sPHENIX_SLURP_CUPSID" ]
             )
+
             __earliest_run_in_parent = 9E9;
             last_condor_status = {} # condor_stat : [ list of cups ids ]
             for ad in production_status_query:
@@ -957,6 +971,8 @@ def submit( rule, maxjobs, **kwargs ):
             INFO(f"... querying condor for production {rule.name} --> {__replname}")            
             __constraint = f'regexp("{__replname}",sphenix_dsttype,"i") && (JobStatus==2 || JobStatus==5)'
             INFO(__constraint)
+
+            __constraint="false"
             production_status_query = schedd.query(
                 constraint=__constraint,                
                 projection=["ClusterId", "ProcId", "JobStatus", "HoldReason", "EnteredCurrentStatus", "sPHENIX_DSTTYPE", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT", "sPHENIX_SLURP_CUPSID" ]
@@ -1013,11 +1029,13 @@ def submit( rule, maxjobs, **kwargs ):
             raise
             
         INFO("Getting back the cluster and process IDs")
-        schedd_query = schedd.query(
-            constraint=f"ClusterId == {submit_result.cluster()}",
-            projection=["ClusterId", "ProcId", "Out", "UserLog", "Args", "sPHENIX_PRODUCTION", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT", "sPHENIX_SLURP_CUPSID" ]
-            #projection=["ClusterId", "ProcId", "Out", "UserLog", "Args"]            
-        )
+        schedd_query = None  # disabled
+        if 0:
+            schedd_query = schedd.query(
+                constraint=f"ClusterId == {submit_result.cluster()}",
+                projection=["ClusterId", "ProcId", "Out", "UserLog", "Args", "sPHENIX_PRODUCTION", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT", "sPHENIX_SLURP_CUPSID" ]
+                #projection=["ClusterId", "ProcId", "Out", "UserLog", "Args"]            
+            )
 
         # Update DB IFF we have a valid submission
         INFO("Insert and update the production_status")
@@ -1326,6 +1344,7 @@ def matches( rule, kwargs={} ):
 
             # This is where the candidate output filename is built...  
             output_ = DSTFMT %(name_,build,tag,int(run),int(segment))
+            print(output_)
 
             if version:
                 output_ = DSTFMTv %(name_,build,tag,str(version),int(run),int(segment))
@@ -1373,6 +1392,7 @@ def matches( rule, kwargs={} ):
                 #
                 # breaks if DSTTYPE contains lowercase values.  Note that this is only utilized if we are mapping lfns onto pfns.
                 #
+                # this code block is pretty well deprecated at this point.  it won't match streaming event files, for instance.
                     
                 for fn in f.files.split():
                     base1 = fn.split('-')[0]
@@ -1651,6 +1671,7 @@ def matches( rule, kwargs={} ):
         streamname = getattr(fc,'streamname',None)
         streamfile = getattr(fc,'streamfile',None)
         runtype_from_input = getattr( fc, 'runtype', None )
+        nendpoint = getattr( fc, 'nendpoint', 0) # counts the number of tpc endpoints
 
         if firstevent: firstevent=str(firstevent)
         if lastevent: lastevent=str(lastevent)
@@ -1772,7 +1793,8 @@ def matches( rule, kwargs={} ):
                 streamname=streamname,
                 streamfile=streamfile,
                 version=version,
-                runtype=runtype_from_input
+                runtype=runtype_from_input,
+                nendpoint=nendpoint
                 )
 
             match = match.dict()

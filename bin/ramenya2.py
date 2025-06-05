@@ -733,44 +733,30 @@ def submit(args):
 
         # Verify that there is enough room on condor to submit
         schedd = htcondor.Schedd() 
-        ncondor = 1E9
+        #$$$ ncondor = 1E9
+        ncondor = 0
 
         with mutex:
+            if False:
+                try:
+                    condor_query = schedd.query(
+                        projection=["ClusterId","ProcId","JobStatus","sPHENIX_DSTTYPE"]
+                    )
+                    ncondor = len(condor_query)
+                    if ncondor > float(args.watermark) * int(args.maxcondor):
+                        if args.watermark_action=="exit":
+                            print(f"Exiting b/c there are too many jobs ({ncondor}) in the condor schedd.")
+                            exit(0)
+                        else:
+                            print( "**********************************************************************")
+                            print(f"Skipping b/c there are too many jobs ({ncondor}) in the condor schedd.") 
+                            print( "**********************************************************************")                       
+                            continue
 
-            try:
-                condor_query = schedd.query(
-                    projection=["ClusterId","ProcId","JobStatus","sPHENIX_DSTTYPE"]
-                )
-                ncondor = len(condor_query)
-                if ncondor > float(args.watermark) * int(args.maxcondor):
-                    if args.watermark_action=="exit":
-                        print(f"Exiting b/c there are too many jobs ({ncondor}) in the condor schedd.")
-                        exit(0)
-                    else:
-                        print( "**********************************************************************")
-                        print(f"Skipping b/c there are too many jobs ({ncondor}) in the condor schedd.") 
-                        print( "**********************************************************************")                       
-                        continue
-
-                #dst_counts={}
-                #for ad in condor_query:
-                #    dst = dst_counts.get( ad['sPHENIX_DSTTYPE'],
-                #                          { 'Idle':0,
-                #                            'Running':0,
-                #                            'Removing':0,
-                #                            'Completed':0,
-                #                            'Held':0,
-                #                            'Stageout':0,
-                #                            'Suspended':0
-                #                           } )
-                #    dst[condor_job_status_map[ad['JobStatus']]]+=1
-                #    dst_counts[ ad['sPHENIX_DSTTYPE'] ] = dst                
-                #print( tabulate((dst_counts)) )
-
-            except htcondor.HTCondorIOError:
-                print("{Fore.RED}... could not query condor, aborting this submission ...{Fore.RESET}")
-                del statusdbw_
-                del statusdbw                
+                except htcondor.HTCondorIOError:
+                    print("{Fore.RED}... could not query condor, aborting this submission ...{Fore.RESET}")
+                    del statusdbw_
+                    del statusdbw                
             
             if ncondor == 1E9:
                 print("{Fore.RED}Could not connect to schedd... skipping{Fore.RESET}")
