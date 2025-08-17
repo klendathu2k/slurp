@@ -18,12 +18,14 @@ import math
 import platform
 from collections import defaultdict
 import random
+import inspect
+
 
 
 from slurptables import SPhnxProductionSetup
-from slurptables import SPhnxProductionStatus
+from slurptables import SPhnxProductionStatusMap
 from slurptables import SPhnxInvalidRunList
-from slurptables import sphnx_production_status_table_def
+
 
 from dataclasses import dataclass, asdict, field
 
@@ -31,38 +33,51 @@ from simpleLogger import DEBUG, INFO, WARN, ERROR, CRITICAL
 
 import logging
 
+SLURPPATH=os.path.dirname( inspect.getfile( SPhnxProductionSetup ) )
+pathlib.Path( '.slurp' ).mkdir( exist_ok=True )
+with open('.slurp/slurppath.sh', 'w' ) as sp:
+    sp.write( f'export SLURPPATH={SLURPPATH}\n' )
+
+
 # This is the maximum number of DST names / types that will be in production at any one time
 MAXDSTNAMES = 100
 
 # List of states which block the job
-blocking = ["submitting","submitted","started","running","evicted","failed","finished"]
-#blocking = []
+blocking = ["submitting","submitted","started","running","held","evicted","failed","finished"]
 args     = None
 userargs = None
 
 __frozen__ = True
 __rules__  = []
 
+# This will hold the list of datasets which are present in the input query
+input_datasets = {}
 def printDbInfo( cnxn, title ):
     name=cnxn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
     serv=cnxn.getinfo(pyodbc.SQL_SERVER_NAME)
     print(f"Connected {name} from {serv} as {title}")
 
-
 # Check if we are running within a testbed area
 PRODUCTION_MODE=False
-
-if 'testbed' in str(pathlib.Path(".").absolute()).lower():
+if pathlib.Path(".slurp/testbed").is_file():
+    print("Testbed mode by config")    
+    dsnprodr = 'ProductionStatus'
+    dsnprodw = 'ProductionStatusWrite'
+    dsnfiler = 'FileCatalog'
+    dsnfilew = 'FileCatalog'
+elif 'testbed' in str(pathlib.Path(".").absolute()).lower():   
+    print("Testbed mode by path")
     dsnprodr = 'ProductionStatus'
     dsnprodw = 'ProductionStatusWrite'
     dsnfiler = 'FileCatalog'
     dsnfilew = 'FileCatalog'
 else:
     PRODUCTION_MODE=True
-    dsnprodr = 'ProductionStatus'
-    dsnprodw = 'ProductionStatusWrite'
+    dsnprodr = 'Production_read'
+    dsnprodw = 'Production_write'
     dsnfiler = 'FileCatalog'
-    dsnfilew = 'FileCatalog'    
+    dsnfilew = 'FileCatalog'        
+
     
 cnxn_string_map = {
     'daq'         :  'DSN=daq;UID=phnxrc;READONLY=True',
@@ -70,18 +85,21 @@ cnxn_string_map = {
     'fc'          : f'DSN={dsnfiler};READONLY=True',
     'fccro'       : f'DSN={dsnfiler};READONLY=True',
     'filecatalog' : f'DSN={dsnfiler};READONLY=True',
-    'status'      : f'DSN={dsnprodr}',
-    'statusw'     : f'DSN={dsnprodw}',
-    'raw'         :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
+    'status'      : f'DSN={dsnprodr};UID=argouser',
+    'statusw'     : f'DSN={dsnprodw};UID=argouser',
+    'raw'         :  'DSN=RawdataCatalog_write;UID=phnxrc',
     'rawdr'       :  'DSN=RawdataCatalog_read;UID=phnxrc;READONLY=True',
 }
 
-pprint.pprint( cnxn_string_map )
+if 0:
+    pprint.pprint( cnxn_string_map )
+    for k,v in cnxn_string_map.items():
+        printDbInfo( pyodbc.connect(v), k )
 
 def dbQuery( cnxn_string, query, ntries=10 ):
 
-    # A guard rail
-    assert( 'delete' not in query.lower() )    
+    # A guard rail ... or maybe not ...
+    #assert( 'delete' not in query.lower() )    
     #assert( 'insert' not in query.lower() )    
     #assert( 'update' not in query.lower() )    
     #assert( 'select'     in query.lower() )
@@ -103,10 +121,73 @@ def dbQuery( cnxn_string, query, ntries=10 ):
             delay = (itry + 1 ) * random.random()
             time.sleep(delay)
 
+    print(cnxn_string)
+    print(query)
     print(lastException)
     exit(0)
             
 
+def get_hostinfo_table(mnrun,mxrun):
+    query=f"""
+    with config as (
+    select {mnrun} as mnrun,
+           {mxrun} as mxrun
+    ),
+
+    streams as (
+    select * from hostinfo,config where runnumber>=config.mnrun and runnumber<=config.mxrun
+    ),
+
+    intt_stream as (
+    select runnumber, UPPER(hostname) as names from streams where hostname in ( 'intt0', 'intt1', 'intt2', 'intt3', 'intt4', 'intt5', 'intt6', 'intt7' )
+    ),
+    mvtx_stream as (
+    select runnumber, UPPER(hostname) as names from streams where hostname in ( 'mvtx0',  'mvtx1',  'mvtx2',  'mvtx3',  'mvtx4',  'mvtx5' )
+    ),
+    tpot_stream as ( 
+    select runnumber, 'TPOT' as names from streams where hostname in ( 'ebdc39' ) 
+    ),
+    tpc_stream as (
+    select runnumber, replace( hostname, 'ebdc', 'TPC' ) as streamname from streams where hostname in ( 'ebdc00', 'ebdc01', 'ebdc02', 'ebdc03', 'ebdc04', 'ebdc05', 'ebdc06', 'ebdc07', 'ebdc08', 'ebdc09', 
+                                                                                                        'ebdc10', 'ebdc11', 'ebdc12', 'ebdc13', 'ebdc14', 'ebdc15', 'ebdc16', 'ebdc17', 'ebdc18', 'ebdc19', 
+                                                                                                        'ebdc20', 'ebdc21', 'ebdc22', 'ebdc23' ) 
+    ),
+
+    all_streams as ( 
+    select * from tpc_stream
+    union
+    select * from intt_stream
+    union 
+    select * from mvtx_stream
+    union
+    select * from tpot_stream
+    )
+    select runnumber,string_agg( distinct streamname, ' ' ) as streams from all_streams group by runnumber;
+    """
+    dbresult = dbQuery( cnxn_string_map['daqdb'], query )
+    table = { db.runnumber : db.streams for db in dbresult }
+
+
+    values=[]
+    for k,v in table.items():
+        values.append(f"({k},'{v}')")
+
+    values=','.join(values)
+
+    result=f"""
+    SET NOCOUNT ON;
+    CREATE TEMP TABLE hostinfo_table(
+        runnumber   int,
+        required    text
+    );
+    INSERT INTO hostinfo_table (runnumber,required)
+    VALUES
+    {values}
+    ;
+    """
+
+    return result
+    
     
 
 verbose=0
@@ -126,7 +207,7 @@ class SPhnxCondorJob:
     Condor submission job template.
     """
     universe:              str = "vanilla"
-    executable:            str = "jobwrapper.sh"    
+    executable:            str = f"{SLURPPATH}/jobwrapper.sh"    
     arguments:             str = "$(nevents) $(run) $(seg) $(lfn) $(indir) $(dst) $(outdir) $(buildarg) $(tag) $(ClusterId) $(ProcId)"
     batch_name:            str = "$(name)_$(build)_$(tag)_$(version)"
     output:                str = None 
@@ -135,7 +216,8 @@ class SPhnxCondorJob:
     periodichold: 	   str = "(NumJobStarts>=1 && JobStatus == 1)"
     priority:              str = "1958"
     job_lease_duration:    str = "3600"
-    requirements:          str = '(CPU_Type == "mdc2")';    
+    #requirements:          str = '(CPU_Type == "mdc2")';
+    requirements:          str = None
     request_cpus:          str = "1"
     request_memory:        str = "$(mem)"
     should_transfer_files: str = "YES"
@@ -156,6 +238,8 @@ class SPhnxCondorJob:
     transferout:           str = "false"
     transfererr:           str = "false"
 
+    periodicremove:        str = None
+
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
@@ -173,13 +257,15 @@ class SPhnxRule:
     filesdb:           str  = None    # Input files DB to query
     runlist:           str  = None    # Input run list query from daq
     direct:            str  = None    # Direct path to input files (supercedes filecatalog)
+    lfn2pfn:           str  = "lfn2pfn"  # could be lfn2lfn
     job:               SPhnxCondorJob = SPhnxCondorJob()
     resubmit:          bool = False   # Set true if job should overwrite existing job
     buildarg:          str  = ""      # The build tag passed as an argument (leaves the "." in place).
     payload:           str = "";      # Payload directory (condor transfers inputs from)
     limit:    int = 0                 # maximum number of matches to return 0=all
     runname:           str = None     # eg run2pp, extracted from name or ...
-    version:          str = None     # eg v001 
+    version:           str = None     # eg v001
+    import_tables:     dict = None
 
     def __eq__(self, that ):
         return self.name == that.name
@@ -237,6 +323,8 @@ class SPhnxMatch:
     streamname : str = None
     streamfile : str = None
     version: str = None
+    runtype: str = None
+    nendpoint: int = None
 
     def __eq__( self, that ):
         return self.run==that.run and self.seg==that.seg
@@ -250,6 +338,7 @@ class SPhnxMatch:
         run = int(self.run)
         object.__setattr__(self, 'rungroup', f'{100*math.floor(run/100):08d}_{100*math.ceil((run+1)/100):08d}')
 
+    # Returns a dictionary of all members which are not None.
     def dict(self):
         return { k: str(v) for k, v in asdict(self).items() if v is not None }
 
@@ -270,7 +359,7 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
     """
     result = [] # of SPhnxProductionStatus
 
-    query = f"select * from production_status where true"
+    query = f"select id,dstfile,status from production_status where true"
     if ( runmn>runmx ): 
         query = query + f" and run>={runmn}"
     else              : 
@@ -281,7 +370,8 @@ def fetch_production_status( setup, runmn=0, runmx=-1 ):
     dbresult = dbQuery( cnxn_string_map['statusw'], query )
 
     # Transform the list of tuples from the db query to a list of prouction status dataclass objects
-    result = [ SPhnxProductionStatus( *db ) for db in dbresult ]
+    result = [ SPhnxProductionStatusMap( *db ) for db in dbresult ]
+
 
     return result
 
@@ -339,7 +429,75 @@ def getLatestId( tablename, dstname, run, seg ):
 
     return result
 
+def set_production_cursor( dsttype, build, tag, version, torun, schedd_query ):
+
+    if version is None:
+        version=0
+
+    if isinstance(version,str):
+        version=int( version.replace('v','') )
+
+    query=f"""
+    update production_cursor
+    set lastrun={torun}
+    where dsttype='{dsttype}' and build='{build}' and tag='{tag}' and version={version}
+    """
+    result=dbQuery( cnxn_string_map[ 'statusw' ], query )
+    result.commit()
+    return
+
+def get_production_cursor( name_, build, tag, version=None ):
+    name=name_
+    if '$(streamname)' in name:
+        name = name.replace('$(streamname)','_X_')
+
+    query=f"""
+    select lastrun from production_cursor where
+    dsttype   = '{name}' and
+    build  like '{build}'  and
+    tag    like '{tag}'      and
+    version={version} 
+    order by id desc;
+    """
+    array = [ int(r.lastrun) for r in dbQuery( cnxn_string_map[ 'status' ], query ) ]
+
+    result = 0
+    
+    if len(array)==0:
+        # No result.  Retry from the most recent cursor which has been defined.
+        result = -1
+    elif len(array)>1:
+        WARN( f"There are multiple production cursors found for {name_} {build} {tag} {version}.  Returning most recent.")
+        result= array[0]
+    else:
+        result= array[0]
+
+    if result==-1: # get the list of run curosrs and accept the most recent
+        query=f"""
+        select lastrun,tag from production_cursor where
+        dsttype   = '{name}' and
+        build  like '{build}'  and
+        version={version} 
+        order by id desc;
+        """
+        array = [ (int(r.lastrun),r.tag) for r in dbQuery( cnxn_string_map[ 'status' ], query ) ]
+
+        if len(array)>0:
+            INFO(f"Using lastrun={array[0][0]} from tag={array[0][1]}")
+            result=array[0][0]
+            set_production_cursor( name, build, tag, version, result, None )
+            
+        else:
+            result=0
+            
+
+    INFO(f"Production cursor starts from run {result}")
+            
+    return result
+
 def update_production_status( matching, setup, condor, state ):
+    # NOTE:  This code can be signficantly simplified.  We are updating the production status, adding the
+    #        
 
     # Condor map contains a dictionary keyed on the "output" field of the job description.
     # The map contains the cluster ID, the process ID, the arguments, and the output log.
@@ -352,12 +510,13 @@ def update_production_status( matching, setup, condor, state ):
         ulog      = ad['UserLog'].split('/')[-1] 
         key       = ulog.split('.')[0].lower()  # lowercase b/c referenced by file basename
 
-        condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog }
+        condor_map[key]= { 'ClusterId':clusterId, 'ProcId':procId, 'Out':out, 'UserLog':ulog, 'CupsId':int(ad['sPHENIX_SLURP_CUPSID']) }
 
     # TODO: version???  does setup get the v000 string or just 0?
     name = sphenix_dstname( setup.name, setup.build, setup.dbtag, setup.version )
 
     updates = []
+    INFO("... building the DB update ...")
     for m in matching:
         run     = int(m['run'])
         segment = int(m['seg'])
@@ -378,30 +537,35 @@ def update_production_status( matching, setup, condor, state ):
 
         key     = dstfile
 
+        id_=0
         try:
             cluster = condor_map[ key.lower() ][ 'ClusterId' ]
             process = condor_map[ key.lower() ][ 'ProcId'    ]
+            id_     = condor_map[ key.lower() ][ 'CupsId'    ]
         except KeyError:
             ERROR("Key Error getting cluster and/or process number from the class ads map.")
             ERROR(f"  key={key}")
             ERROR("Assuming this is an issue with condor, setting cluster=0, process=0 and trying to continue...")
             cluster=0
             process=0
+            id_=getLatestId( 'production_status', dstname, run, segment ) # revert to slow method
         
 
         # 1s time resolution
         timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )
-        id_ = getLatestId( 'production_status', dstname, run, segment )
+        #id_ = getLatestId( 'production_status', dstname, run, segment )
 
         update=f"""
         update  production_status
         set     status='{state}',{state}='{timestamp}',cluster={cluster},process={process}
-        where id={id_};
+        where id={id_} and status<'started';
         """
         updates.append( update )
 
+    INFO("... executing the DB update ..." )
     curs = dbQuery( cnxn_string_map[ 'statusw' ], ';'.join(updates)  )
     curs.commit()
+    INFO("... done with update ... ")
 
 def insert_production_status( matching, setup, cursor ):
 
@@ -422,6 +586,8 @@ def insert_production_status( matching, setup, cursor ):
 
         if m['inputs']:
             dstfileinput=m['inputs']
+
+        dstranges = m.get('ranges','unset')
 
         # TODO: version ???
         # TODO: is dstfile and key redundant ???
@@ -448,19 +614,19 @@ def insert_production_status( matching, setup, cursor ):
         # TODO: Handle conflict
         node=platform.node().split('.')[0]
 
-        value = f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" 
+        value = f"('{dsttype}','{dstname}','{dstfile}',{run},{segment},0,'{dstfileinput}','{dstranges}',{prod_id},{cluster},{process},'{status}', '{timestamp}', 0, '{node}' )" 
 
         if streamname:
             value = value.replace( '$(streamname)', streamname )
 
         values.append( value )
        
-    insvals = ','.join(values)
+    insvals = ','.join(values)    
 
     # Inserts the production status lines for each match, returning the list of IDs associated with each match.
     insert = f"""
     insert into production_status
-           (dsttype, dstname, dstfile, run, segment, nsegments, inputs, prod_id, cluster, process, status, submitting, nevents, submission_host )
+           (dsttype, dstname, dstfile, run, segment, nsegments, inputs, ranges, prod_id, cluster, process, status, submitting, nevents, submission_host )
     values 
            {insvals}
 
@@ -468,7 +634,11 @@ def insert_production_status( matching, setup, cursor ):
     """
 
     # TODO: standardized query
-    cursor.execute(insert)    # commit is deferred until the update succeeds
+    try:
+        cursor.execute(insert)    # commit is deferred until the update succeeds
+    except Exception as E:
+        print(insert)
+        raise(E)
 
     result=[ int(x.id) for x in cursor ]
 
@@ -493,7 +663,7 @@ def submit( rule, maxjobs, **kwargs ):
         kwargs['resubmit'] = args.resubmit
 
     # Build list of LFNs which match the input
-    matching, setup, runlist = matches( rule, kwargs )
+    matching, setup, runlist, unblocked = matches( rule, kwargs )
 
     nmatches = len(matching)
     if len(matching)==0:
@@ -531,7 +701,7 @@ def submit( rule, maxjobs, **kwargs ):
     jobd = rule.job.dict()
 
     # If we are using a wrapper, the user script becomes the first argument
-    if jobd['executable']=='jobwrapper.sh':
+    if jobd['executable']==f'{SLURPPATH}/jobwrapper.sh':
         INFO(f"Setting up general jobwrapper script.  Adding user script {rule.script} as first argument")
         jobd['arguments']= rule.script + ' ' + jobd['arguments']
         INFO(f"  {jobd['arguments']}")
@@ -542,16 +712,29 @@ def submit( rule, maxjobs, **kwargs ):
     leafdir = rule.name.replace( f'_{rule.runname}', "" )
     jobd['arguments'] = jobd['arguments'].replace( '{leafdir}', leafdir )
 
+    # And b/c the condor log is special...
+    jobd['log'] = jobd['log'].replace( '{leafdir}', leafdir )
+
 
     INFO("Passing job to htcondor.Submit")
     submit_job = htcondor.Submit( jobd )
+    #INFO(submit_job)
+    #for m in matching:
+    #    pprint.pprint(m)
+    #exit(0)
+    
+    
     if verbose>0:
         INFO(submit_job)
         if verbose>10:
             for m in matching:
                 pprint.pprint(m)
 
+    submit_job[ "+sPHENIX_PRODUCTION" ] = '"' + f"{rule.name}_{rule.build}_{rule.tag}_{rule.version}" +'"'
+    
     dispatched_runs = []
+    last_run = -1
+    db_hold_query = None
 
 
     #
@@ -561,9 +744,17 @@ def submit( rule, maxjobs, **kwargs ):
     #
     if maxjobs:
         INFO(f"Truncating the number of jobs to maxjobs={maxjobs}")        
-        matching = matching[:int(maxjobs)]
+        matching  = matching[:int(maxjobs)]
+        if len(unblocked)>0:
+            ERROR("Unblocking failed jobs and truncating the maximum number of submitted jobs can lead.")
+            ERROR("to inconsistent production status.  So this is disallowed.  You should cleanup the")
+            ERROR("production DB by hand, and probably the filecatalog and DSTs as well before resubmitting.")
+            exit(0)
+        unblocked = []
 
 
+    __earliest_matching_run=9E9
+    __last_submitted_run=0
     if dump==False:
         if verbose==-10:
             INFO(submit_job)
@@ -580,26 +771,58 @@ def submit( rule, maxjobs, **kwargs ):
 
             # TODO:  This should be accessed from the run table / daqdb
             runtype='none'
-            d['runtype']='unset'
+            d['runtype']=m.get('runtype','unset')  # ... if the query returns a runtype it will be in match
+            #if m['runtype']:
+            #    d['runtype']=m['runtype']
             d['runname']=rule.runname
+            # Add DSTTYPE, RUNNUMBER and SEGMENT to the classad for each job.  The value passed in is a
+            # string.  Condor will then deduce the type from that string.  So... passing in integers as
+            # they are... wrapping the DSTTYPE in '"' so it is interpreted as a string rather than an expression.
+            streamname = m.get( 'streamname', None )
+            name = m['name']
+            if '$(streamname)' in name:
+                name = name.replace("$(streamname)",streamname)
+            d['+sPHENIX_DSTTYPE']  ='"'+ name +'"'
+            d['+sPHENIX_DATASET']  ='"'+str(rule.build)+"_"+str(rule.tag)+"_"+str(rule.version)+'"'
+            d['+sPHENIX_RUNNUMBER']=str(m['run'])
+            d['+sPHENIX_SEGMENT']  =str(m['seg'])
+            if args.resubmit:
+                timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )                
+                d['+sPHENIX_SLURP_RESUBMIT']=f'"True"'
+                d['+sPHENIX_SLURP_RESUBMIT_TIMESTAMP']=f'"{timestamp}"'                
+            if args.unblock:
+                timestamp=str( datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)  )                                
+                ublocks=','.join(args.unblock)
+                d['+sPHENIX_SLURP_UNBLOCK']=f'"{ublocks}"'
+                d['+sPHENIX_SLURP_UNBLOCK_TIMESTAMP']=f'"{timestamp}"'                
+
+            if int(m['run'])<__earliest_matching_run:
+                __earliest_matching_run=int(m['run'])
+
+            if int(m['run'])>=__last_submitted_run:
+                __last_submitted_run=int(m['run'])
 
             leafdir=m["name"].replace(f"_{rule.runname}","")
 
             # massage the inputs from space to comma separated
             if m.get('inputs',None): 
                 m['inputs']= ','.join( m['inputs'].split() )
-                if '/physics/' in m['inputs']: # physics can appear twice by mistake...
-                    runtype = 'physics'
-                    d['runtype']=runtype
-                if '/beam/' in m['inputs']: # beam supercedes...
-                    runtype = 'beam'
-                    d['runtype']=runtype
-                if '/cosmics/' in m['inputs']: # beam supercedes...
-                    runtype = 'cosmics'
-                    d['runtype']=runtype
-                if '/calib/' in m['inputs']: # beam supercedes...
-                    runtype = 'calib'
-                    d['runtype']=runtype
+
+                if d['runtype']=='unset': # if we didn't get it from the input query
+                    if '/physics/' in m['inputs']: # physics can appear twice by mistake...
+                        runtype = 'physics'
+                        d['runtype']=runtype
+                    if '/beam/' in m['inputs']: # beam supercedes...
+                        runtype = 'beam'
+                        d['runtype']=runtype
+                    if '/cosmics/' in m['inputs']: # beam supercedes...
+                        runtype = 'cosmics'
+                        d['runtype']=runtype
+                    if '/calib/' in m['inputs']: # beam supercedes...
+                        runtype = 'calib'
+                        d['runtype']=runtype
+                else:                   # and if we did
+                    runtype=d['runtype'] 
 
                 
             runtypes[runtype]=1 # register the runtype for directory creation below
@@ -621,8 +844,13 @@ def submit( rule, maxjobs, **kwargs ):
                     d['ranges']= 'dbranges'
 
 
-            mymatching.append(d)        
-            dispatched_runs.append( (d['run'],d['seg']) )
+            mymatching.append(d)
+
+            run_ = d['run']
+            dispatched_runs.append( (run_,d['seg']) )
+
+            if int(run_) > last_run:
+                last_run = int(run_)
                 
         run_submit_loop=30
         schedd_query = None
@@ -637,13 +865,14 @@ def submit( rule, maxjobs, **kwargs ):
         cupsids = insert_production_status( matching, setup, cursor=cursorips ) 
         for i,m in zip(cupsids,mymatching):
             m['cupsid']=str(i)
+            m['+sPHENIX_SLURP_CUPSID']=str(i)
 
         
-        INFO("Preparing to submitting the jobs to condor")
+        INFO("Preparing to submit the jobs to condor")
         try:
 
             INFO("... creating directories if they do not exist")
-            for outname in [ 'outdir', 'logdir', 'condor', 'histdir' ]:
+            for outname in [ 'outdir', 'logdir', 'condor', 'histdir', 'calibdir' ]:
 
                 outdir=kwargs.get(outname,None)
                 if outdir==None: continue
@@ -677,21 +906,120 @@ def submit( rule, maxjobs, **kwargs ):
                                 
                                 if madedir.get( targetdir, False )==False:
                                     td =  targetdir.replace('$(streamname)',mystreamname )
-                                    pathlib.Path( td ).mkdir( parents=True, exist_ok=True )            
-                                    INFO(f"mkdir {td}")
+                                    pathlib.Path( td ).mkdir( parents=True, exist_ok=True )
                                     madedir[ td ]=True                                
                                 
                         else:
 
                             if madedir.get( targetdir, False )==False:
                                 pathlib.Path( eval(outdir) ).mkdir( parents=True, exist_ok=True )            
-                                INFO(f"mkdir {eval(outdir)}")
                                 madedir[targetdir]=True
+
+            __constraints = []
+            for dsttype,dataset in input_datasets.keys():
+                INFO(f"-- {dsttype} {dataset} --")
+                __constraints.append( f'(sPHENIX_DSTTYPE=="{dsttype}" && sPHENIX_DATASET=="{dataset}")' )
+
+            __constraint='||'.join( __constraints )
+                
+
+            # DISABLE THIS FUNCTIONALITY B/C SOMETHING HAS BROKEN UPSTREAM.  (!?)
+            __constraint="false"                            
+            production_status_query = schedd.query(
+                constraint=__constraint,
+                projection=["ClusterId", "ProcId", "JobStatus", "HoldReason", "EnteredCurrentStatus", "sPHENIX_DSTTYPE", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT", "sPHENIX_SLURP_CUPSID" ]
+            )
+
+            __earliest_run_in_parent = 9E9;
+            last_condor_status = {} # condor_stat : [ list of cups ids ]
+            for ad in production_status_query:
+                try:                
+                    run=int(ad['sPHENIX_RUNNUMBER'])
+                    if run<__earliest_run_in_parent and 2==int(ad['JobStatus']):
+                        __earliest_run_in_parent=run                    
+                except KeyError:
+                    # If there's a job in there w/out the run number... don't try to adjust
+                    pass
+
+                try:
+                    cupsid=int(ad['sPHENIX_SLURP_CUPSID'])
+                    condorstatus = int(ad['JobStatus'])
+                    cupsarray = last_condor_status.get( condorstatus, [] )
+                    cupsarray.append(str(cupsid))
+                    last_condor_status[ str(condorstatus) ].append(cupsarray)
+                except KeyError:
+                    pass
+
+            for stat,cupsarray in last_condor_status.items():
+                msg = f'Last observed condor status = {stat}'
+                upd = f"update production_status set message='{msg}' where id in {','.join(cupsarray)};"
+                dbQuery( cnxn_string_map['statusw'], upd ).commit();                
+
+            INFO(f"Earliest run in the feeding jobs: {__earliest_run_in_parent}")
+            INFO(f"Earliest run that matched: {__earliest_matching_run}")
+                
+            earliest_run_number = min( __earliest_run_in_parent, __earliest_matching_run )
+
+            #
+            # Query the condor for all jobs running or held which are producing the specified DSTTYPE.
+            #   Mark held jobs as held in the production status table.
+            #   Advance the run cursor in the production cursor table.
+            #
+            # $$$ earliest_run_number = 9E9 #  signals no update b/c nothing is running
+            __subsys="([A-Z0-9]+|[a-z0-9]+)_"                                                            ###########<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ###################################### 
+            __replname = rule.name.replace('$(streamname)',__subsys)
+            INFO(f"... querying condor for production {rule.name} --> {__replname}")            
+            __constraint = f'regexp("{__replname}",sphenix_dsttype,"i") && (JobStatus==2 || JobStatus==5)'
+            INFO(__constraint)
+
+            __constraint="false"
+            production_status_query = schedd.query(
+                constraint=__constraint,                
+                projection=["ClusterId", "ProcId", "JobStatus", "HoldReason", "EnteredCurrentStatus", "sPHENIX_DSTTYPE", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT", "sPHENIX_SLURP_CUPSID" ]
+            )
+            hold_query = []
+            for ad in production_status_query:
+                ad_run  = int(ad['sPHENIX_RUNNUMBER'])
+                ad_cups = int(ad['sPHENIX_SLURP_CUPSID'])
+                ad_stat = int(ad['JobStatus'])
+                                
+                # $$$ if ad_run < earliest_run_number and ad_stat==2:
+                    # $$$ earliest_run_number = ad_run
+
+                if args.mark_held_jobs and ad_stat==5:
+                    __reason = str(ad['HoldReason']).replace("'",'"')
+                    __when = int(ad['EnteredCurrentStatus'])
+                    hold_query.append(f"update production_status set status='held', message='{__reason}', ended=to_timestamp( {__when} ) where id={ad_cups};")
+
+                if args.clear_held_jobs and ad_stat==5:
+                    __reason = f"[cleared] {__reason}"
+
+            if len(hold_query) > 0:
+                INFO(f"Marking {len(hold_query)} jobs as held.")
+                db_hold_query = ' '.join(hold_query)
+                dbQuery( cnxn_string_map['statusw'], db_hold_query ).commit();
+
+            if earliest_run_number < 9E9 and args.advance_cursor==True:
+                INFO(f"Advancing the run cursor to {earliest_run_number}")
+                set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, earliest_run_number, production_status_query )
+
+            if __last_submitted_run > 0 and args.ratchet_cursor==True:
+                INFO(f"Advancing the run cursor to {__last_submitted_run}")
+                set_production_cursor( setup.name, setup.build, setup.dbtag, rule.version, __last_submitted_run, production_status_query )                
+
+            if args.clear_held_jobs:
+                __constraint = f'regexp("{__replname}",sphenix_dsttype,"i") && (JobStatus==5)'
+                schedd.act( htcondor.JobAction.Remove, __constraint, 'Removed by kaedama' )
+
 
             # submits the job to condor
             INFO("... submitting to condor")
 
             submit_result = schedd.submit(submit_job, itemdata=iter(mymatching))  # submit one job for each item in the itemdata
+            if submit_result.cluster()==0:
+                WARN("Submit result returned with cluster=0")
+            #pprint.pprint(submit_result)
+            
             # commits the insert done above
             cursorips.commit()
 
@@ -701,21 +1029,34 @@ def submit( rule, maxjobs, **kwargs ):
             raise
             
         INFO("Getting back the cluster and process IDs")
-        schedd_query = schedd.query(
-            constraint=f"ClusterId == {submit_result.cluster()}",
-            projection=["ClusterId", "ProcId", "Out", "UserLog", "Args" ]
-        )
+        schedd_query = None  # disabled
+        if 0:
+            schedd_query = schedd.query(
+                constraint=f"ClusterId == {submit_result.cluster()}",
+                projection=["ClusterId", "ProcId", "Out", "UserLog", "Args", "sPHENIX_PRODUCTION", "sPHENIX_RUNNUMBER", "sPHENIX_SEGMENT", "sPHENIX_SLURP_CUPSID" ]
+                #projection=["ClusterId", "ProcId", "Out", "UserLog", "Args"]            
+            )
 
         # Update DB IFF we have a valid submission
         INFO("Insert and update the production_status")
         if ( schedd_query ):
             
-
+            # Get the result from submitting the jobs
             INFO("... result")
             result = submit_result.cluster()            
 
+            # Update the production status table
             INFO("... update")
             update_production_status( matching, setup, schedd_query, state="submitted" )
+
+
+        # Finally, if we have a list of unblocked IDs we will remove them from the DB
+        if len(unblocked)>0:
+            unblockedids = [ str(i) for i in unblocked ]
+            ################################### DANGER ###############################################
+            unblockquery = f"delete from production_status where id in ({','.join(unblockedids)});"  #
+            dbQuery( cnxn_string_map['statusw'], unblockquery ).commit()                             #
+            ################################### DANGER ###############################################            
 
 
     else:
@@ -768,10 +1109,7 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, version=None
                    hash='%s'
                    limit 1;
         """%( name, build, dbtag, hash_ )
-    else:
-
-
-        
+    else:        
         query="""
         select id,hash from production_setup 
                where name='%s'  and 
@@ -809,7 +1147,7 @@ def fetch_production_setup( name_, build, dbtag, repo, dir_, hash_, version=None
         is_clean = len( sh.git("-c","color.status=no","status","-uno","--short",_cwd=dir_).strip().split('\n') ) == 0;
 
         # git show origin/main --format=%h -s
-        remote_hash = sh.git("show","origin/main","--format=%h","-s").strip()
+        remote_hash = sh.git("show","origin","--format=%h","-s", _cwd=dir_).strip()
         is_current = (hash_ == remote_hash)
 
         id_ = int( array[0][0] )
@@ -891,20 +1229,107 @@ def matches( rule, kwargs={} ):
     dstnames = {}
 
     if rule.files:
-        # curs      = cursors[ rule.filesdb ]
 
-        inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
+        # Build set of user defined temporary tables from (likely) foreign databases
+        inputquery = None
+        
+        if rule.import_tables:
+
+            datatype_map = {
+                "<class 'int'>" : "int",
+                "<class 'str'>" : "text",
+                "<class 'datetime.datetime'>" : "timestamp"
+            }
+            
+            create_import_tables = []
+            fill_import_tables = []        
+            
+            for table in rule.import_tables:
+                for tablename,tablequery in table.items():
+                    # Query the requested database, getting the rows from the result and the
+                    # description of the columns.
+                    tabledata = dbQuery( cnxn_string_map[ tablequery['db'] ], tablequery['query'] )
+                    columns   = [column[0] for column in tabledata.description]
+                    datatypes = [
+                        datatype_map[str(column[1])]
+                        for column in tabledata.description
+                    ]
+                    tablecolumns=[]
+                    for col_,typ_ in zip(columns,datatypes):
+                        tablecolumns.append(f"{col_} {typ_}")
+                    tablecolumns=',\n'.join(tablecolumns)                        
+                    rows      = [row for row in tabledata ]
+                    # Create the table in 
+                    create_table = f"""
+                    create temp table {tablename} (
+                    {tablecolumns}
+                    )
+                    """
+                    # We will defer the creation of these tables... but this may be expensive memory wise... TBD.
+                    create_import_tables.append(create_table)
+                    fill_table = f"""
+                    insert into {tablename}({','.join(columns)}) values
+                    """
+                    rows_=[]
+                    for row in rows:
+                        row_ = []
+                        for r in row:
+
+                            if r==None:
+                                row_.append('NULL')
+                            elif isinstance(r,int):
+                                row_.append(str(r))
+                            else:
+                                row_.append("'"+str(r)+"'")                                
+
+                        rows_.append(row_)
+                                
+                    rows2_ = []
+                    for row_ in rows_:
+                        rows2_.append( '(' + ','.join(row_) + ')' )
+
+                    fill_table += f"""
+                    {','.join(rows2_)}
+                    """
+
+                    fill_import_tables.append(fill_table)
+
+                    if len(rows2_)==0:
+                        WARN("Import table query returned no values.  This is about to end poorly...")
+                        print(tablequery)
+
+
+            for mktable,fltable in zip(create_import_tables,fill_import_tables):
+                print(mktable)
+                print(fltable)                
+
+                if inputquery==None:
+                    try:
+                        inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], mktable )
+                        inputquery.execute( fltable )                        
+                    except:
+                        print(mktable)
+                        print(fltable)
+                else:
+                    try:
+                        inputquery.execute( mktable )
+                        inputquery.execute( fltable )
+                    except:
+                        print(mktable)
+                        print(fltable)                        
+
+
+        if inputquery == None:
+            inputquery = dbQuery( cnxn_string_map[ rule.filesdb ], rule.files )
+        else:
+            inputquery.execute( rule.files )
+        
 
         outputs = [] # WARNING: len(outputs) and len(fc_result) must be equal
 
-        # This will hold the list of datasets which are present in the input query
-        input_datasets = {}
-
-        # Matches the dsttype runtype 
-        regex_dset = re.compile( '(DST_[A-Z0-9_]+_[a-z0-9]+)_([a-z0-9]+_(\d\d\d\dp\d\d\d|nocdbtag))_*(v\d\d\d)*' )
         
         INFO(f"... {len(fc_result)} inputs")
-        for f in inputquery:
+        for f in inputquery:            
             fc_result.append(f) # cache the query
             run     = f.runnumber
             segment = f.segment
@@ -919,6 +1344,7 @@ def matches( rule, kwargs={} ):
 
             # This is where the candidate output filename is built...  
             output_ = DSTFMT %(name_,build,tag,int(run),int(segment))
+            print(output_)
 
             if version:
                 output_ = DSTFMTv %(name_,build,tag,str(version),int(run),int(segment))
@@ -941,6 +1367,8 @@ def matches( rule, kwargs={} ):
                 ERROR(rule.files)
                 exit(1)
 
+            #print( f.files )
+
             #
             # Drop the run and segment numbers and leading stuff and just pull the datasets.  Note.  When
             # we switch up to versioning of the files, this will sweep up the version number as well.
@@ -956,7 +1384,16 @@ def matches( rule, kwargs={} ):
             # and we reprocess.
             #
             # ... but we don't need to build this if we are using direct lookup
-            if rule.direct==None:            
+            if rule.direct==None and rule.lfn2pfn != 'lfn2lfn':
+
+                # Matches the dsttype...
+                #                          DSTTYPE         runtype    build          cdbtag                    version
+                regex_dset = re.compile( '(DST_[A-Z0-9_]+_[a-z0-9]+)_([a-z0-9]+_(\d\d\d\dp\d\d\d|nocdbtag))_*(v\d\d\d)*' )
+                #
+                # breaks if DSTTYPE contains lowercase values.  Note that this is only utilized if we are mapping lfns onto pfns.
+                #
+                # this code block is pretty well deprecated at this point.  it won't match streaming event files, for instance.
+                    
                 for fn in f.files.split():
                     base1 = fn.split('-')[0]
                     rematch = regex_dset.match( base1 )
@@ -965,11 +1402,11 @@ def matches( rule, kwargs={} ):
                     vnum = rematch.group(4)
                     if vnum:
                         dtype = dtype + '_' + vnum
-                        #input_datasets[ dset ] = 1
-                        input_datasets[ ( dset, dtype ) ] = 1
-
+                    input_datasets[ ( dset, dtype ) ] = 1
+                        
     
-    if len(lfn_lists)==0: return [], None, []  # Early exit if nothing to be done
+    if len(lfn_lists)==0:
+        return [], None, [], []  # Early exit if nothing to be done
 
     #
     # Build dictionary of DSTs existing in the datasets table of the file catalog.  For every DST that is in this list,
@@ -996,6 +1433,11 @@ def matches( rule, kwargs={} ):
     # lfn2pfn provides a mapping between physical files on disk and the corresponding lfn
     # (i.e. the pfn with the directory path stripped off).
     #
+    # It is possible to run sPHENIX software such that it is responsible for looking up the
+    # pfn... in which case we can omit building the lfn2pfn mapping and pass down just the
+    # logical filenames.  (Note that this requires that there can only be a 1:1 mapping
+    # between LFN and PFN)...
+    #    
     # A few notes.  This mapping will not be constrained to the set of input files provided
     # by the query.  It will either be all files in the direct search path specified in the
     # yaml file, OR it will be all files contained in the input data set(s).
@@ -1012,13 +1454,17 @@ def matches( rule, kwargs={} ):
         lfn2pfn = { pfn.split("/")[-1] : pfn for pfn in glob(rule.direct+'/*') }
         INFO(f"done {len(lfn2pfn)}")
 
-    else:
-        INFO("Building lfn2pfn map from filecatalog")
+    ############################################## \/ \/ \/ THIS CODE BLOCK IS INOP \/ \/ \/ ############################        
+    elif 0: 
 
+        INFO("Building lfn2pfn map from filecatalog")
+        
         for mydatasettuple in input_datasets.keys():
 
             mydataset=mydatasettuple[1]
             mydsttype=mydatasettuple[0]
+
+            INFO( f'lfn map query for {mydataset} {mydsttype}' )
 
             fcquery=f"""
 
@@ -1039,7 +1485,58 @@ def matches( rule, kwargs={} ):
 
             on lfnlist.filename=files.lfn;        
             """
+
+            if rule.lfn2pfn=="lfn2pfn":
+                lfn2pfn.update( { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) } )
+            elif rule.lfn2pfn=="lfn2lfn":
+                lfn2pfn.update( { r.lfn : r.lfn } )
+    ############################################## ^^ ^^ ^^ THIS CODE BLOCK IS INOP ^^ ^^ ^^ ############################                        
+
+    else:
+
+        requirements = []
+        INFO( f'TEST lfn map query for {input_datasets.keys()}' )                        
+        for mydatasettuple in input_datasets.keys():
+
+            mydataset=mydatasettuple[1]
+            mydsttype=mydatasettuple[0]
+
+            requirements.append( f"(dataset='{mydataset}' and dsttype='{mydsttype}')" )
+
+        requirement = '( ' + ' or '.join( requirements ) + ' )'
+
+
+        fcquery=f"""
+        
+        with lfnlist as (
+        
+        select filename from datasets where 
+        
+        runnumber>={runMin}   and 
+        runnumber<={runMax}   and 
+        
+        {requirement}
+        
+        )
+
+        select lfn,full_file_path as pfn from 
+
+        lfnlist join files
+        
+        on lfnlist.filename=files.lfn;        
+        """
+
+
+        if rule.lfn2pfn=="lfn2pfn":
             lfn2pfn.update( { r.lfn : r.pfn for r in dbQuery( cnxn_string_map['fccro'],fcquery ) } )
+        # for the case where we build a straight lfn : lfn mapping...  we don't need a DB query...
+        elif rule.lfn2pfn=="lfn2lfn":
+            #lfn2pfn.update( { r.lfn : r.lfn } )
+            for k,v in lfn_lists.items():
+                for lfn in v:
+                    lfn2pfn.update( { lfn : lfn } )
+                    
+        
 
                     
     # Build lists of PFNs available for each run
@@ -1077,33 +1574,44 @@ def matches( rule, kwargs={} ):
 
 
     if PRODUCTION_MODE:
+        # git branch --show-current
+        localbranch = sh.git( 'branch', '--show-current', _cwd=payload ).strip()
 
-        localhash = sh.git('show','origin/master','--format=%h','-s',_cwd=payload).rstrip()
-        remothash = sh.git('show',                '--format=%h','-s',_cwd=payload).rstrip()
+        #localhash = sh.git('show','--format=%H','-s','--no-abbrev-commit',_cwd=payload).strip()[:40]
+        localhash    = sh.git('rev-parse','HEAD', _cwd=payload).strip()[:40]
+        remotehashes = [ f[:40] for f in sh.git('rev-list','--all',f'origin/{localbranch}', _cwd=payload).split('\n') ]
 
-        if localhash==remothash:
-            INFO( f"Local and remote hash match in the payload directory {localhash} {remothash}" )
+        if localhash.strip() in remotehashes:
+            INFO( f"Local and remote hash match in the payload directory {localhash}.  You may proceed." )
         elif build=='new': 
-            INFO( f"Local and remote hash are {localhash} {remothash} ... we are running under new, so go for it!" )
+            INFO( f"Local hash not found in remote {localhash} ... we are running under new, so go for it!" )
+        elif args.doit:
+            WARN("The darkside is a pathway to many abilities that some consider unnatural...")
         else:
             WARN( f"""
-        
-            Jobs will not be submitted.
+
+            YOU ARE IN A PRODUCTION ENVIRONMENT.
+
+            Local hash DOES NOT match any hash on the remote for the payload directory.
+
+            {localhash}
             
-            Local and remote hash DO NOT match in the payload directory {localhash} {remothash}.
-            
-            You are running in a production environment.  In order to ensure reproducibility of results
-            we require that the payload area is under version control (git), and that the local and remote
-            git hashes match.  
+            In order to ensure reproducibility of results we require that the payload area is under 
+            version control (git), and that the local hash is found in the remote repo.
             
             If you need to test a small change, you should place them on a branch.  (Do a git stash, 
             create the new branch, do a git stash pop and add your codes to the branch.  Push to
             the remote and run your jobs).
-            
-            If you are making a significant change that needs to be tracked, consider also incrementing
-            the version number of the production.
+
+            If you are making a physics-analysis-meaningful change that needs to be tracked, consider 
+            also incrementing the version number of the production and reproducing the data sample.
+                        
             """ )
             exit(0)
+
+    else:
+
+        WARN("You are running in testbed mode... so no consistency with the remote is required.")
 
 
     
@@ -1132,9 +1640,12 @@ def matches( rule, kwargs={} ):
     # has failed and needs expert attention.
     #
     prod_status_map = {}
+    prod_id_map = {}
     INFO("Building production status map")    
     for stat in prod_status:
-        prod_status_map[stat.dstfile] = stat.status 
+        prod_status_map[stat.dstfile] = stat.status
+        prod_id_map[stat.dstfile]     = stat.id
+    # note: prod_status is only used to build the map above.  It only requires the status flag.
 
     INFO("Production status map")
 
@@ -1144,6 +1655,8 @@ def matches( rule, kwargs={} ):
     #
     list_of_runs = []
     INFO("Building matches")
+
+    unblocked_ids = []
 
     assert( len(fc_result)==len(outputs) ) 
     for (fc,dst) in zip(fc_result,outputs):
@@ -1157,6 +1670,8 @@ def matches( rule, kwargs={} ):
         runs_last_event = getattr(fc,'runs_last_event',None)
         streamname = getattr(fc,'streamname',None)
         streamfile = getattr(fc,'streamfile',None)
+        runtype_from_input = getattr( fc, 'runtype', None )
+        nendpoint = getattr( fc, 'nendpoint', 0) # counts the number of tpc endpoints
 
         if firstevent: firstevent=str(firstevent)
         if lastevent: lastevent=str(lastevent)
@@ -1177,6 +1692,7 @@ def matches( rule, kwargs={} ):
         #
         x    = dst.replace(".root","").strip()
         stat = prod_status_map.get( x, None )
+        blockid = prod_id_map.get( x, None )
 
         #
         # There is a master list of states which result in a DST producion job being blocked.  By default
@@ -1186,6 +1702,11 @@ def matches( rule, kwargs={} ):
         if stat in blocking:
             if args.batch==False:           WARN("%s is blocked by production status=%s, skipping."%( dst, stat ))
             continue
+
+        # If we have unblocked we add to the list 
+        if blockid:
+            unblocked_ids.append(blockid)
+
         
         #
         # Next we check to see if the job has alread been produced (i.e. it is registered w/in the file catalog).
@@ -1271,7 +1792,9 @@ def matches( rule, kwargs={} ):
                 neventsper=neventsper,
                 streamname=streamname,
                 streamfile=streamfile,
-                version=version
+                version=version,
+                runtype=runtype_from_input,
+                nendpoint=nendpoint
                 )
 
             match = match.dict()
@@ -1295,13 +1818,13 @@ def matches( rule, kwargs={} ):
 
     INFO(f"Matched {len(result)} jobs to the rule")
 
-    return result, setup, list_of_runs
+    return result, setup, list_of_runs, unblocked_ids
 
 #__________________________________________________________________________________________________
 #
 arg_parser = argparse.ArgumentParser()    
 arg_parser.add_argument( "--batch", default=False, action="store_true",help="Batch mode...")
-arg_parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=["submitting","submitted","started","running","evicted","failed","finished"] )
+arg_parser.add_argument( '-u', '--unblock-state', nargs='*', dest='unblock',  choices=["submitting","submitted","started","running","held","evicted","failed","finished"] )
 arg_parser.add_argument( '-r', '--resubmit', dest='resubmit', default=False, action='store_true', 
                          help='Existing filecatalog entry does not block a job')
 
@@ -1309,10 +1832,14 @@ arg_parser.add_argument( "--dbinput", default=True, action="store_true",help="Pa
 arg_parser.add_argument( "--no-dbinput", dest="dbinput", action="store_false",help="Unsets dbinput flag." )
 
 arg_parser.add_argument( "--batch-name", dest="batch_name", default=None ) #default="$(name)_$(build)_$(tag)_$(version)"
+arg_parser.add_argument( "--doit", dest="doit", action="store_true", default=False )
+arg_parser.add_argument( "--mark-held-jobs", dest="mark_held_jobs", action="store_true", default=False )
+arg_parser.add_argument( "--clear-held-jobs", dest="clear_held_jobs", action="store_true", default=False )
 
 def warn_options( args, userargs ):
     if args.dbinput==False:
-        WARN("Option --no-dbinput is deprecated, and will be retired in the future.  All workflows should become db aware.")
+        WARN("Option --no-dbinput has been deprecated and we now retire it. Resetting args.dbinput=True.")
+        args.dbinput=True
 
 def parse_command_line():
     global blocking

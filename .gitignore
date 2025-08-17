@@ -24,3 +24,7 @@ odbc_test.ini
 slurp-examples
 meh
 condor
+slurp/#slurp.py#
+slurp/#slurptables.py#
+slurp/cups.py.broke
+.slurp/slurppath.sh

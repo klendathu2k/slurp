@@ -1,7 +1,7 @@
 #!/usr/bin/env python 
 
 import cProfile
-import slurp
+#import slurp
 import yaml
 import datetime
 import pathlib
@@ -10,12 +10,18 @@ from slurp import SPhnxRule  as Rule
 from slurp import SPhnxMatch as Match
 from slurp import SPhnxCondorJob as Job
 from slurp import matches
-from slurp import submit
+from slurp import submit 
 
+import argparse
 from slurp import arg_parser
+from slurp import parse_command_line 
 
-#from slurp import RUNFMT
-#from slurp import SEGFMT
+from slurp import RUNFMT as RUNFMT_
+from slurp import SEGFMT as SEGFMT_
+
+from slurp import PRODUCTION_MODE
+from slurp import get_production_cursor
+from slurp import get_hostinfo_table
 
 import sh
 import sys
@@ -37,7 +43,7 @@ arg_parser.add_argument( '--rule', help="Submit against specified rule", default
 arg_parser.add_argument( '--limit', help="Maximum number of jobs to submit", default=0, type=int )
 arg_parser.add_argument( '--submit',help="Job will be submitted", dest="submit", default="True", action="store_true")
 arg_parser.add_argument( '--no-submit', help="Job will not be submitted... print things", dest="submit", action="store_false")
-arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=['26022'] )
+arg_parser.add_argument( '--runs', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list.  If cursor is provided as the first argument, start from the last run wholly or partially submitted.  The second argument is interpreted as a window, i.e. submit runs cursor to cursor+N inclusive.", default=['cursor'] )
 arg_parser.add_argument( '--runlist', default=None, help="Flat text file containing list of runs to process, separated by whitespace / newlines." )
 arg_parser.add_argument( '--segments', nargs='+', help="One argument for a specific run.  Two arguments an inclusive range.  Three or more, a list", default=[] )
 arg_parser.add_argument( '--config',help="Specifies the yaml configuration file")
@@ -52,15 +58,29 @@ arg_parser.add_argument( '--print-query',dest='printquery',help="Print the query
 
 arg_parser.add_argument( '--append-to-rsync', dest='append2rsync', default=None,help="Appends the argument to the list of rsync files to copy to the worker node" )
 
+arg_parser.add_argument( '--logdir', dest='logdir', default=None, help="Directory for kaedama logging (defaults under /tmp)" )
+
+arg_parser.add_argument( '--advance-cursor', dest='advance_cursor', default=False, action="store_true", help="Advances the production run cursor to the last run submitted (sticks to last running job)")
+arg_parser.add_argument( '--ratchet-cursor', dest='ratchet_cursor', default=False, action="store_true", help="Advances the production run cursor to the last run submitted")
+arg_parser.add_argument( '--set-cursor', dest='set_cursor', default=None, help="Sets the production run cursor to the provided value.")
+
+arg_parser.add_argument( '--dbtag', dest='dbtag', default=None, help=argparse.SUPPRESS ) # System option.  If provided by ramenya it will override the DB option specified in the yaml file.
+arg_parser.add_argument( '--input-dataset', dest='dataset', default=None, help=argparse.SUPPRESS ) # System option.  If provided by ramenya it will override the dataset option specified in the yaml file.
+
+arg_parser.add_argument( '--mem', dest='mem', default=None, help=argparse.SUPPRESS ) # System option.  If provided by ramenya it will override the parameter specified in the yaml file.
+
+arg_parser.add_argument( '--mask', nargs='*', dest='mask', default=[], help=argparse.SUPPRESS ) # System option.  Manipulates the param['required'] list if it is provided.  Removes the specified system from the list.
+
 #
 # Specifies the default directory layout for files.  Note that "production" will be replaced with "production-testbed" for the
 # testbed setups.
 #
 _default_filesystem = {
-        'outdir'  :           "/sphenix/lustre01/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/dst"
-    ,   'logdir'  : "file:///sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/log"
-    ,   'histdir' :        "/sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/hist"
-    ,   'condor'  :                                 "/tmp/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)"    
+        'outdir'   :           "/sphenix/lustre01/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/dst"
+    ,   'logdir'   : "file:///sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/log"
+    ,   'histdir'  :        "/sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/hist"
+    ,   'calibdir' :        "/sphenix/data/data02/sphnxpro/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/calib"    
+    ,   'condor'   :                                 "/tmp/production/$(runname)/$(runtype)/$(build)_$(tag)_$(version)/{leafdir}/run_$(rungroup)/log"    
 }
 
 def sanity_checks( params, inputq ):
@@ -135,16 +155,15 @@ def checkRequiredParams( params ):
     if fatal:
         logging.error("YAML rule is not properly defined.  Correct above errors and try again.")
         exit(1)
-        
-    
+
 
 def main():
 
     # parse command line options
-    args, userargs = slurp.parse_command_line()
+    args, userargs = parse_command_line()
 
     mycwd = pathlib.Path(".")
-    if 'testbed' in str(mycwd.absolute()).lower():
+    if 'testbed' in str(mycwd.absolute()).lower() or pathlib.Path(".slurp/testbed").is_file():
         args.test_mode = True
         logging.info("Running in testbed mode.")
 
@@ -156,7 +175,10 @@ def main():
         mylogdir=f"/tmp/testbed/kaedama/{args.rule}"; #{str(datetime.datetime.today().date())}.log",
     else:
         mylogdir=f"/tmp/kaedama/kaedama/{args.rule}"; #{str(datetime.datetime.today().date())}.log",
-    pathlib.Path(mylogdir).mkdir( parents=True, exist_ok=True )            
+    pathlib.Path(mylogdir).mkdir( parents=True, exist_ok=True )
+
+    if args.logdir:
+        mylogdir=args.logdir
 
     RotFileHandler = RotatingFileHandler(
     #    filename='kaedama.log', 
@@ -201,13 +223,21 @@ def main():
         try:
             config = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
+            print(f"Could not open {args.config}")
             print(exc)
 
     run_condition = ""
-    if len(args.runs)==1:
-        run_condition = f"and runnumber={args.runs[0]}"
-    elif len(args.runs)==2:
-        run_condition = f"and runnumber>={args.runs[0]} and runnumber<={args.runs[1]}"
+    if len(args.runs)==1 and args.runs[0] != 'cursor':
+        run_condition = f"and runnumber={args.runs[0]} "
+    elif len(args.runs)==1 and args.runs[0] == 'cursor':
+        run_condition = f"and runnumber>={args.runs[0]} "        
+
+    elif len(args.runs)==2 and args.runs[0] != 'cursor':
+        run_condition = f"and runnumber>={args.runs[0]} and runnumber<={args.runs[1]} "
+    elif len(args.runs)==2 and args.runs[0] == 'cursor':
+        run_condition = f"and runnumber>=cursor and runnumber<=cursor+{args.runs[1]} "
+
+        
     elif len(args.runs)>=3 and args.runlist==None:
         run_condition = "and runnumber in ( %s )" % ','.join( args.runs )
     elif args.runlist:
@@ -230,8 +260,8 @@ def main():
     #streamname = args.streamname
     #streamfile = args.streamfile
 
-    RUNFMT = slurp.RUNFMT
-    SEGFMT = slurp.SEGFMT
+    RUNFMT = RUNFMT_
+    SEGFMT = SEGFMT_
     PWD    = str(pathlib.Path(".").absolute())
 
     limit_condition=""
@@ -248,23 +278,74 @@ def main():
 
     logging.info( f"Executing rule {args.rule} where ... {run_condition} {seg_condition} {limit_condition}" )
 
-    # Get  the user parameters and append additional payload
+    #
+    # Get  the user parameters and append additional payload if specified on the command line.
+    # Also if the command line overrides a 
+    #
     params          = config.get('params',None)
     if args.append2rsync:
         params['rsync'] = params['rsync']+','+args.append2rsync
+    params['rsync'] = params['rsync'] + ",.slurp/"
+
+    if args.dbtag:
+        logging.warn( f"Override cdb tag in config {params['dbtag']} with {args.dbtag}" )
+        params['dbtag']=args.dbtag
+
+    if args.dataset:
+        logging.warn( f"Override dataset in config {params['dataset']} with {args.dataset}" )
+        params['dataset']=args.dataset        
+
+    if args.mem:
+        params['mem']=args.mem                
+        logging.warn( f"Override mem in config {params['mem']} with {args.mem}" )
 
         
 
+    # if the keyword 'cursor' appears, we will lookup the production cursor and replace it here
+    if 'cursor' in run_condition:
+        print( params['name'] )
+        print( params['build_name'] )
+        print( params['dbtag'] )
+        print( params.get('version',None) )
+        runcursor=get_production_cursor( params['name'], params['build_name'], params['dbtag'], params['version'] )
+        run_condition=run_condition.replace('cursor',str(runcursor))
+
+    if params:
+
+        if params.get('required',None):
+            params['required']=params['required'].strip()
+            for mask in args.mask:
+                print(f"...{mask}...")
+                mask=mask.strip()
+                params['required']=params['required'].replace( f"{mask} ", '' ) # clean up everything but the trailing position
+                params['required']=params['required'].replace( f" {mask}", '' ) # clean up if in trailing position                                
+            #params['required']=params['required'].replace('  ',' ')
+            params['required']=params['required'].strip()            
+            logging.info( f"Setting 'required' subsystems: {params['required']}" )                    
+
+    hostinfo_table=""
     # Input query specifies the source of the input files
-    input_         = config.get('input')
-    input_query    = input_.get('query','').format(**locals(),**params)
+    input_         = config.get('input')    
+    input_query    = input_.get('query','')
+    if 'hostinfo_table' in input_query:
+        __mnrun=params.get('mnrun',0)
+        __mxrun=params.get('mxrun',999999)
+        hostinfo_table = get_hostinfo_table( __mnrun, __mxrun )
+    input_query    = input_.get('query','').format(**locals(),**params)    
     input_query_db = input_.get('db',None)
     input_query_direct = input_.get('direct_path',None)
     if input_query_direct is not None:
         input_query_direct = input_query_direct.format( **vars( args ) )
 
+    input_query_lfn2pfn = input_.get('lfn2pfn','lfn2pfn')        
+
 
     if args.printquery:
+        import_tables = config.get('import_tables',None)
+        if import_tables:
+            for table in import_tables:
+                for name_,dbquery in table.items():
+                    print(dbquery['query'].format( **locals(), **params ))
         print(input_query)
         return
 
@@ -310,17 +391,6 @@ def main():
     if version_number is not None:
         version_number = f"v{version_number:03d}"
 
-
-    # If we have a version number futher manipulate the directory structure...
-    #if version_number is not None:
-    #    for key,val in filesystem.items():
-    #        filesystem[key]=filesystem[key].replace("{leafdir}","{leafdir}/"+f"{version_number}")        
-        
-        
-
-
-            
-
     if args.test_mode:
         print("[TESTMODE: print filesystem block]")
         pprint.pprint(filesystem)
@@ -341,21 +411,13 @@ def main():
 
     #__________________________________________________________________________________
     #
-    # Pre Submission Phase... execute the action script on the results of the 
-    # specified query to the specified database.
+    # Prep the import tables
     #__________________________________________________________________________________
-    #if presubmit:
-    #    cursor=cursors[ presubmit.get('db','fcc') ]
-    #    pre_query  = presubmit.get('query', '').format(**locals())
-    #    result_ = [ list(x) 
-    #        for x in  cursor.execute(pre_query).fetchall() 
-    #    ]
-    #    for result in result_:
-    #        query      = ' '.join([ str(x) for x in result ])
-    #        pre_action = presubmit.get('action','').format( **locals())
-    #        pre_action = pre_action.split()
-    #        actor=sh.Command( pre_action[0] )
-    #        actor( *pre_action[1:], _out=sys.stdout )
+    import_tables = config.get('import_tables',None)
+    if import_tables:
+        for table in import_tables:
+            for name_,dbquery in table.items():
+                dbquery['query']=dbquery['query'].format( **locals(), **params )
 
 
     #__________________________________________________________________________________
@@ -392,6 +454,7 @@ def main():
                          files             = input_query,
                          filesdb           = input_query_db,
                          direct            = input_query_direct,
+                         lfn2pfn           = input_query_lfn2pfn,
                          runlist           = runlist_query,            # deprecated TODO
                          script            = params['script'],
                          build             = params['build'],
@@ -399,7 +462,8 @@ def main():
                          payload           = params['payload'],
                          job               = job,
                          limit             = args.limit,
-                         version          = version_number
+                         version           = version_number,
+                         import_tables     = import_tables
                      )
 
 

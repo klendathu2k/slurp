@@ -18,19 +18,31 @@ import hashlib
 import os
 import shutil
 import platform
+from pathlib import Path
 
 MAXDSTNAMES = 100
 
-if ( os.environ.get('CUPS_PRODUCTION_MODE',False) ):
+prod_mode = Path("CUPS_PRODUCTION_MODE").is_file()
+test_mode = Path("CUPS_TESTBED_MODE").is_file()
+if ( prod_mode ):
+    #print("Found production mode")
+    dsnprodr = 'Production_read'
+    dsnprodw = 'Production_write'
+    dsnfiler = 'FileCatalog'
+    dsnfilew = 'FileCatalog'    
+elif ( test_mode ):
+    #print("Found testbed mode")
     dsnprodr = 'ProductionStatus'
     dsnprodw = 'ProductionStatusWrite'
     dsnfiler = 'FileCatalog'
     dsnfilew = 'FileCatalog'
 else:
+    #print("NOTICE: Neither production nor testbed mode set.  Default to testbed.  YMMV.")
     dsnprodr = 'ProductionStatus'
     dsnprodw = 'ProductionStatusWrite'
     dsnfiler = 'FileCatalog'
-    dsnfilew = 'FileCatalog'        
+    dsnfilew = 'FileCatalog'
+
 
 def printDbInfo( cnxn, title ):
     name=cnxn.getinfo(pyodbc.SQL_DATA_SOURCE_NAME)
@@ -40,8 +52,8 @@ def printDbInfo( cnxn, title ):
 cnxn_string_map = {
     'fcw'         : f'DSN={dsnfilew};UID=phnxrc',
     'fcr'         : f'DSN={dsnfiler};READONLY=True;UID=phnxrc',
-    'statr'       : f'DSN={dsnprodr}',
-    'statw'       : f'DSN={dsnprodw}',
+    'statr'       : f'DSN={dsnprodr};UID=argouser',
+    'statw'       : f'DSN={dsnprodw};UID=argouser',
 }    
 
 def dbQuery( cnxn_string, query, ntries=10 ):
@@ -84,43 +96,6 @@ def dbQuery( cnxn_string, query, ntries=10 ):
             
     return curs, ntries, start, finish, lastException, name, serv
             
-
-#
-# Production status connection
-#
-try:
-    statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
-    statusdbc = statusdb.cursor()
-except (pyodbc.InterfaceError,pyodbc.OperationalError) as e:
-    for s in [ 10*random.random(), 20*random.random(), 30*random.random(), 60*random.random(), 120*random.random() ]:
-        print(f"Could not connect to DB... retry in {s}s")
-        time.sleep(s)
-        try:
-            statusdb  = pyodbc.connect("DSN=ProductionStatusWrite")
-            statusdbc = statusdb.cursor()
-            break
-        except:
-            pass
-    else:
-        print(sys.argv())
-        print(e)
-        exit(1)
-
-try:
-    statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
-    statusdbr = statusdbr_.cursor()
-except pyodbc.InterfaceError:
-    for s in [ 10*random.random(), 20*random.random(), 30*random.random() ]:
-        print(f"Could not connect to DB... retry in {s}s")
-        time.sleep(s)
-        try:
-            statusdbr_ = pyodbc.connect("DSN=ProductionStatus")
-            statusdbr = statusdbr_.cursor()
-        except:
-            exit(0)
-except pyodbc.Error as e:
-    print(e)
-    exit(1)
 
 def md5sum( filename ):
     file_hash=None
@@ -204,8 +179,8 @@ def getLatestId( tablename, dstname, run, seg ):
 @subcommand()
 def info( args ):
     start = datetime.datetime.now(datetime.timezone.utc)        
-    printDbInfo( statusdb,   "Production Status DB [write]" )
-    printDbInfo( statusdbr_, "Production Status DB [write]" )
+    #printDbInfo( statusdb,   "Production Status DB [write]" )
+    #printDbInfo( statusdbr_, "Production Status DB [write]" )
     cupsid=os.getenv('cupsid')
     print(f"Working with cupsid={cupsid}")
     print("Printing arguments")
@@ -216,22 +191,22 @@ def info( args ):
     return 'result', 0, start, finish, 'success', '....', '....'
 
     
-
-def update_production_status( update_query, retries=10, delay=10.0 ):
-    print(update_query)
-    for itry in range(0,retries):
-        time.sleep( delay * (itry + 1 ) * random.random() )
-        try:
-            with pyodbc.connect("DSN=ProductionStatusWrite") as statusdb:
-                curs=statusdb.cursor()
-                curs.execute(update_query)
-                curs.commit()
-                print(f"Applied after {itry+1} attempts")
-                return
-        except:
-            print(f"Failed {itry+1} attempts...")
-
-    print("Update failed")
+# Method appears to be deprecated...
+#def update_production_status( update_query, retries=10, delay=10.0 ):
+#    print(update_query)
+#    for itry in range(0,retries):
+#        time.sleep( delay * (itry + 1 ) * random.random() )
+#        try:
+#            with pyodbc.connect("DSN=ProductionStatusWrite") as statusdb:
+#                curs=statusdb.cursor()
+#                curs.execute(update_query)
+#                curs.commit()
+#                print(f"Applied after {itry+1} attempts")
+#                return
+#        except:
+#            print(f"Failed {itry+1} attempts...")
+#
+#    print("Update failed")
     
 
 
@@ -416,7 +391,30 @@ def getinputs(args):
     query = f"""
     select inputs from {tablename} where id={id_} limit 1
     """
+    curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], query )
+    if curs:
+        for result in curs:
+            flist = str(result[0]).split(',')
+            for f in flist:
+                print(f)
 
+    return 'result', ntries, start, finish, ex, nm, sv
+
+#_______________________________________________________________________________________________________
+@subcommand([
+])
+def getranges(args):
+    """
+    Retrieves the list of input file ranges
+    """
+    tablename=args.table
+    dstname=args.dstname
+    run=int(args.run)
+    seg=int(args.segment)
+    id_ = getLatestId( tablename, dstname, run, seg )
+    query = f"""
+    select ranges from {tablename} where id={id_} limit 1
+    """
     curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], query )
     if curs:
         for result in curs:
@@ -473,19 +471,57 @@ def catalog(args):
     print("[CUPS WARNING: catalog is deprecated")
     return
     
+_error_messages = {
+    'none'            : 0, # no error message is set
+    'success'         : 0, # ...
+
+    #
+    # Error codes and flags related to configuration
+    #
+    'payload-stagein-failed'  :   2** 0, # payload file stagein failed
+    'dst-stagein-failed'      :   2** 1, # DST file stagein failed    
+    'dst-stageout-failed'     :   2** 2, # DST file staeout failed
+    'hist-stageout-failed'    :   2** 3, # histogram file staeout failed
+
+    'gpfs-failure'            :   2** 4, # could not initialize file on gpfs
+    'lustre-failure'          :   2** 5, # could not initialize file on lustre
+
+    'failed-input-list'       :   2** 8, # failed to get correct input list
+    'no-gl1-files'            :   2** 9, # ...
+    'no-intt-files'           :   2**10, # ...
+    'no-mvtx-files'           :   2**11, # ...
+    'no-tpc-files'            :   2**12, # ...
+    'no-seb-files'            :   2**13, # ...
+    
+    'sighup'                 :   2**16, # SIGSTOP recieved
+    'sigint'                 :   2**17, # SIGINT  recieved
+    'sigkill'                :   2**18, # SIGKILL recieved
+    'sigpipe'                :   2**19, # SIGPIPE recieved
+    'sigusr1'                :   2**20, # SIGUSR1 recieved
+    'sigusr2'                :   2**21, # SIGUSR1 recieved
+
+    'software-fault'         :   2**32, # generic software fault detected, job self immolated
+        
+}
 
 @subcommand([
     argument( "message", help="Message to be appended to the production status entry" ),
-    argument( "--flag",    help="Adds a value to the flags", default='0' ),
+    argument( "--flag",    help="Adds a value to the flags [DEPRECATED]", default='0' ),
     argument( "--logsize", help="Sets the log file size", default='0' ),
+    argument( "--error", help="Sets a specific error condition", default=None, choices=_error_messages.keys() ),
 ])
 def message(args):
     """
     Sets message field on the production status table
     """
     flaginc=int(args.flag)
+    if args.error is not None:
+        flaginc=_error_messages[args.error]
+        
     id_ = getLatestId( args.table, args.dstname, int(args.run), int(args.segment) )
-    update = f"update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};"
+    update = f"""
+       update {args.table} set message='{args.message}',flags=flags+{flaginc},logsize={args.logsize}  where id={id_};
+    """
     curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
     if curs:
         curs.commit()
@@ -498,6 +534,7 @@ def message(args):
     argument( "filename", help="Name of the file to be staged out"),
     argument( "outdir",   help="Output directory" ),
     argument( "--retries", help="Number of retries before silent failure", type=int, default=5 ),
+    argument( "--delay", help="Delay between retries in seconds (default 600)", type=int, default=600 ),    
     argument( "--hostname", help="host name of the filesystem", default="lustre", choices=["lustre","gpfs"] ),
     argument( "--nevents",  help="Number of events produced",dest="nevents",type=int,default=0),
     argument(     "--inc", help="If set, increments the number of events",dest="inc",default=False,action="store_true"),
@@ -517,12 +554,44 @@ def stageout(args):
         print("Copy back file")
 
     # Copy the file
-    try:
-        shutil.copy2( f"{args.filename}", f"{args.outdir}" )
-        print(".... copy back finished ....")
-    except Exception as e:
-        print(f"ERROR: Failed to copy file {args.filename} to {args.outdir}.  Aborting stageout.")
-        return
+    success_=False
+    for attempt_ in range(0,args.retries):
+        try:
+            shutil.copy2( f"{args.filename}", f"{args.outdir}/{args.filename}.part" ) # initiate the copy.  '.part' suffix indicates the file is in transit
+            success_=True
+            sz  = int( os.path.getsize(f"{args.outdir}/{args.filename}.part") )       # verify the file size
+            if sz != sztrue:
+                raise Exception("File was truncated")
+            shutil.move( f"{args.outdir}/{args.filename}.part", f"{args.outdir}/{args.filename}" )  # rename the output file          
+            break
+        except OSError as e:
+            print(f"An unexpected error occurred: {e}")
+        time.sleep(args.delay)
+
+    # On a failed copy we will mark the job as failed and abort.
+    if success_==False:
+        tablename=args.table
+        dstname=args.dstname
+        timestamp=args.timestamp
+        run=int(args.run)
+        seg=int(args.segment)
+        id_ = getLatestId( tablename, dstname, run, seg )
+        update=f"""
+        update {tablename} set status='failed',ended='{timestamp}', message='Copy back failed'  where id={id_}
+        """
+        curs, ntries, start, finish, ex, nm, sv = dbQuery( cnxn_string_map[ 'statw' ], update )
+        if curs:
+            curs.commit()
+
+        try:
+            os.remove( f"{args.outdir}/{args.filename}" )
+        except:
+            print(f"WARNING: could not cleanup {args.outdir}/{args.filename}")
+            pass
+
+        exit(123) # need to exit with an exit code so hopefully event builder will likewise term.
+            
+        return 'result', ntries, start, finish, ex, nm, sv        
 
     sz  = int( os.path.getsize(f"{args.outdir}/{args.filename}") ) 
 
